@@ -1,0 +1,67 @@
+<configuration>
+	<property>
+		<name>dt.application.BloomFilterDemo.operator.wordinput.fileName</name>
+		<value>samplefile.txt</value>
+	</property>
+	<property>
+		<name>dt.application.BloomFilterDemo.operator.bloomFilter.prop.expectedNumberOfElements</name>
+		<value>1500</value>
+	</property>
+    <property>
+        <name>dt.application.BloomFilterDemo.operator.bloomFilter.prop.falsePositiveProbability</name>
+        <value>0.0001</value>
+    </property>
+	<property>
+		<name>dt.application.BloomFilterDemo.stream.wordinput.count.locality</name>
+		<value>CONTAINER_LOCAL</value>
+		<description>Specify container locality for the viewtuplecount stream
+		</description>
+	</property>
+    <property>
+        <name>dt.application.BloomFilterSearchDemo.operator.wordinput.fileName</name>
+        <value>samplefile.txt</value>
+    </property>
+    <property>
+        <name>dt.application.BloomFilterSearchDemo.operator.bloomFilter.prop.expectedNumberOfElements</name>
+        <value>1500</value>
+    </property>
+    <property>
+        <name>dt.application.BloomFilterSearchDemo.operator.bloomFilter.prop.falsePositiveProbability</name>
+        <value>0.0001</value>
+    </property>
+    <property>
+        <name>dt.application.BloomFilterSearchDemo.stream.wordinput.count.locality</name>
+        <value>CONTAINER_LOCAL</value>
+        <description>Specify container locality for the viewtuplecount stream
+        </description>
+    </property>
+    <property>
+        <name>dt.application.BloomFilterSlidingDemo.operator.wordinput.fileName</name>
+        <value>samplefile.txt</value>
+    </property>
+    <property>
+        <name>dt.application.BloomFilterSlidingDemo.operator.bloomFilter.prop.expectedNumberOfElements</name>
+        <value>15000</value>
+    </property>
+    <property>
+        <name>dt.application.BloomFilterSlidingDemo.operator.bloomFilter.prop.falsePositiveProbability</name>
+        <value>0.001</value>
+    </property>
+    <property>
+        <name>dt.application.BloomFilterSlidingDemo.operator.bloomFilter.attr.APPLICATION_WINDOW_COUNT
+        </name>
+        <value>10</value>
+    </property>
+    <property>
+        <name>dt.application.BloomFilterSlidingDemo.operator.bloomFilter.windowSize
+        </name>
+        <value>2</value>
+    </property>
+    <property>
+        <name>dt.application.BloomFilterSlidingDemo.stream.wordinput.count.locality</name>
+        <value>CONTAINER_LOCAL</value>
+        <description>Specify container locality for the viewtuplecount stream
+        </description>
+    </property>
+
+</configuration>

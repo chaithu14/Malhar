@@ -20,6 +20,7 @@
     <module>frauddetect</module>
     <module>mobile</module>
     <module>wordcount</module>
+    <module>bloomApp</module>
     <module>mrmonitor</module>
     <module>mroperator</module>
     <module>uniquecount</module>
