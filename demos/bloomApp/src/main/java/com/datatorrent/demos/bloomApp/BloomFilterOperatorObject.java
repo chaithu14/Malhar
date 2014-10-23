@@ -11,7 +11,7 @@ public class BloomFilterOperatorObject<T>
   private int expectedNumberOfFilterElements; // expected (maximum) number of elements to be added
   private int numberOfAddedElements; // number of elements actually added to the Bloom filter
   private int k; // number of hash functions
-  protected static HashFunction hasher = new HashFunction();
+  protected HashFunction hasher = new HashFunction();
   protected Decomposer<T> customDecomposer = new DefaultDecomposer();
 
   /**
@@ -51,10 +51,13 @@ public class BloomFilterOperatorObject<T>
    * @param falsePositiveProbability is the desired false positive probability.
    * @param decomposer is the custom decomposer used to decompose the object to bytes.
    */
-  public BloomFilterOperatorObject(int expectedNumberOfElements, double falsePositiveProbability, Decomposer<T> decomposer)
+  public BloomFilterOperatorObject(int expectedNumberOfElements, double falsePositiveProbability, Decomposer<T> decomposer, HashFunction _hasher)
   {
     this(expectedNumberOfElements, falsePositiveProbability);
-    this.customDecomposer = decomposer;
+    if(decomposer != null)
+      this.customDecomposer = decomposer;
+    if(_hasher != null)
+      this.hasher = _hasher;
   }
 
   public BloomFilterOperatorObject()
@@ -70,7 +73,7 @@ public class BloomFilterOperatorObject<T>
    * @param hashes number of hashes/int's to produce.
    * @return array of int-sized hashes
    */
-  public static int[] createHashes(byte[] data, int hashes) {
+  public int[] createHashes(byte[] data, int hashes) {
     int[] result = new int[hashes];
     long hash64 = hasher.hash(data);
     // apply the less hashing technique
@@ -89,11 +92,6 @@ public class BloomFilterOperatorObject<T>
   /**
    * Calculates the expected probability of false positives based on
    * the number of expected filter elements and the size of the Bloom filter.
-   * <br /><br />
-   * The value returned by this method is the <i>expected</i> rate of false
-   * positives, assuming the number of inserted elements equals the number of
-   * expected elements. If the number of elements in the Bloom filter is less
-   * than the expected value, the true probability of false positives will be lower.
    *
    * @return expected probability of false positives.
    */
@@ -285,5 +283,15 @@ public class BloomFilterOperatorObject<T>
    */
   public double getBitsPerElement() {
     return this.bitSetSize / (double)numberOfAddedElements;
+  }
+
+  public void setHasher(HashFunction hasher)
+  {
+    this.hasher = hasher;
+  }
+
+  public void setCustomDecomposer(Decomposer<T> customDecomposer)
+  {
+    this.customDecomposer = customDecomposer;
   }
 }
