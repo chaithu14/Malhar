@@ -22,7 +22,7 @@ public class BloomFilterOperatorObject<T>
    * @param n is the expected number of elements the filter will contain.
    * @param k is the number of hash functions used.
    */
-  public void SetAttributes(double c, int n, int k) {
+  private void SetAttributes(double c, int n, int k) {
     this.expectedNumberOfFilterElements = n;
     this.k = k;
     this.bitsPerElement = c;
@@ -73,7 +73,7 @@ public class BloomFilterOperatorObject<T>
    * @param hashes number of hashes/int's to produce.
    * @return array of int-sized hashes
    */
-  public int[] createHashes(byte[] data, int hashes) {
+  private int[] createHashes(byte[] data, int hashes) {
     int[] result = new int[hashes];
     long hash64 = hasher.hash(data);
     // apply the less hashing technique
@@ -158,7 +158,7 @@ public class BloomFilterOperatorObject<T>
    *
    * @param bytes array of bytes to add to the Bloom filter.
    */
-  public void add(byte[] bytes) {
+  private void add(byte[] bytes) {
     int[] hashes = createHashes(bytes, k);
     for (int hash : hashes)
       bitset.set(Math.abs(hash % bitSetSize), true);
@@ -185,7 +185,7 @@ public class BloomFilterOperatorObject<T>
    * @param bytes array of bytes to check.
    * @return true if the array could have been inserted into the Bloom filter.
    */
-  public boolean contains(byte[] bytes) {
+  private boolean contains(byte[] bytes) {
     int[] hashes = createHashes(bytes, k);
     for (int hash : hashes) {
       if (!bitset.get(Math.abs(hash % bitSetSize))) {

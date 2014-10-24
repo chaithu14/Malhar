@@ -120,7 +120,7 @@ class BloomSearchOperator<T> extends BloomFilterOperator<T>
     @Override
     public void process(T tuple)
     {
-      if(!bfObj.contains(tuple)) {
+      if(!contains(tuple)) {
         output1.emit(tuple);
       } else {
         output2.emit(tuple);

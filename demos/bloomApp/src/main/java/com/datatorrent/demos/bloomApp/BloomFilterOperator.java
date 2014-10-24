@@ -72,6 +72,15 @@ public class BloomFilterOperator<T> extends BaseOperator
 
   }
 
+  public void add(T tuple)
+  {
+    bfObj.add(tuple);
+  }
+
+  public void clear()
+  {
+    bfObj.clear();
+  }
   public void setExpectedNumberOfElements(int expectedNumberOfElements)
   {
     this.expectedNumberOfElements = expectedNumberOfElements;

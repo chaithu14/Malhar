@@ -28,9 +28,9 @@ class BloomFilterUniqueOperator<T> extends BloomFilterOperator<T>
     @Override
     public void processTuple(T tuple)
     {
-      if(!bfObj.contains(tuple))
+      if(!contains(tuple))
         unique.emit(tuple);
-      bfObj.add(tuple);
+      add(tuple);
     }
 
   /**
