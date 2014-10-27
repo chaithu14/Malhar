@@ -20,6 +20,7 @@ import com.datatorrent.api.annotation.ApplicationAnnotation;
 import com.datatorrent.api.StreamingApplication;
 import com.datatorrent.api.DAG;
 import com.datatorrent.api.annotation.OutputPortFieldAnnotation;
+import com.datatorrent.lib.algo.bloomFilter.BloomFilterOperator;
 import com.datatorrent.lib.io.ConsoleOutputOperator;
 import org.apache.hadoop.conf.Configuration;
 
@@ -36,7 +37,7 @@ class BloomFilterUniqueOperator<T> extends BloomFilterOperator<T>
   /**
    * Output port
    */
-  @OutputPortFieldAnnotation(name = "unique")
+  @OutputPortFieldAnnotation(optional=true)
   public final transient DefaultOutputPort<T> unique = new DefaultOutputPort<T>();
 
 }

@@ -1,4 +1,4 @@
-package com.datatorrent.demos.bloomApp;
+package com.datatorrent.lib.algo.bloomFilter;
 
 import java.util.BitSet;
 import java.util.Collection;
@@ -10,7 +10,7 @@ public class BloomFilterOperatorObject<T>
   private double bitsPerElement;
   private int expectedNumberOfFilterElements; // expected (maximum) number of elements to be added
   private int numberOfAddedElements; // number of elements actually added to the Bloom filter
-  private int k; // number of hash functions
+  private int numberOfHashes; // number of hash functions
   protected HashFunction hasher = new HashFunction();
   protected Decomposer<T> customDecomposer = new DefaultDecomposer();
 
@@ -24,7 +24,7 @@ public class BloomFilterOperatorObject<T>
    */
   private void SetAttributes(double c, int n, int k) {
     this.expectedNumberOfFilterElements = n;
-    this.k = k;
+    this.numberOfHashes = k;
     this.bitsPerElement = c;
     this.bitSetSize = (int)Math.ceil(c * n);
     numberOfAddedElements = 0;
@@ -65,21 +65,18 @@ public class BloomFilterOperatorObject<T>
   }
 
   /**
-   * Generates digests based on the contents of an array of bytes and splits the result into 4-byte int's and store them in an array. The
-   * digest function is called until the required number of int's are produced. For each call to digest a salt
-   * is prepended to the data. The salt is increased by 1 for each call.
+   * Generate integer array based on the hash function till the number of hashes.
    *
    * @param data specifies input data.
-   * @param hashes number of hashes/int's to produce.
    * @return array of int-sized hashes
    */
-  private int[] createHashes(byte[] data, int hashes) {
-    int[] result = new int[hashes];
+  private int[] createHashes(byte[] data) {
+    int[] result = new int[numberOfHashes];
     long hash64 = hasher.hash(data);
     // apply the less hashing technique
     int hash1 = (int) hash64;
     int hash2 = (int) (hash64 >>> 32);
-    for (int i = 1; i <=  hashes; i++) {
+    for (int i = 1; i <=  numberOfHashes; i++) {
       int nextHash = hash1 + i * hash2;
       if (nextHash < 0) {
         nextHash = ~nextHash;
@@ -108,8 +105,8 @@ public class BloomFilterOperatorObject<T>
    */
   public double getFalsePositiveProbability(double numberOfElements) {
     // (1 - e^(-k * n / m)) ^ k
-    return Math.pow((1 - Math.exp(-k * (double) numberOfElements
-        / (double) bitSetSize)), k);
+    return Math.pow((1 - Math.exp(-numberOfHashes * (double) numberOfElements
+        / (double) bitSetSize)), numberOfHashes);
 
   }
 
@@ -124,15 +121,16 @@ public class BloomFilterOperatorObject<T>
   }
 
   /**
-   * Returns the value chosen for K.<br />
+   * Returns the value chosen for numberOfHashes.<br />
    * <br />
-   * K is the optimal number of hash functions based on the size
+   * numberOfHashes is the optimal number of hash functions based on the size
    * of the Bloom filter and the expected number of inserted elements.
    *
-   * @return optimal k.
+   * @return optimal numberOfHashes.
    */
-  public int getK() {
-    return k;
+  public int getNumberOfHashes()
+  {
+    return numberOfHashes;
   }
 
   /**
@@ -159,7 +157,7 @@ public class BloomFilterOperatorObject<T>
    * @param bytes array of bytes to add to the Bloom filter.
    */
   private void add(byte[] bytes) {
-    int[] hashes = createHashes(bytes, k);
+    int[] hashes = createHashes(bytes);
     for (int hash : hashes)
       bitset.set(Math.abs(hash % bitSetSize), true);
     numberOfAddedElements ++;
@@ -186,7 +184,7 @@ public class BloomFilterOperatorObject<T>
    * @return true if the array could have been inserted into the Bloom filter.
    */
   private boolean contains(byte[] bytes) {
-    int[] hashes = createHashes(bytes, k);
+    int[] hashes = createHashes(bytes);
     for (int hash : hashes) {
       if (!bitset.get(Math.abs(hash % bitSetSize))) {
         return false;
@@ -284,12 +282,19 @@ public class BloomFilterOperatorObject<T>
   public double getBitsPerElement() {
     return this.bitSetSize / (double)numberOfAddedElements;
   }
+  /**
+   * Set the hasher in the Bloom filter.
+   * @param hasher is the hash function to set.
+   */
 
   public void setHasher(HashFunction hasher)
   {
     this.hasher = hasher;
   }
-
+  /**
+   * Set the customdecomposer in the Bloom filter.
+   * @param customDecomposer is the decomposer to set.
+   */
   public void setCustomDecomposer(Decomposer<T> customDecomposer)
   {
     this.customDecomposer = customDecomposer;

@@ -1,17 +1,17 @@
-package com.datatorrent.demos.bloomApp;
+package com.datatorrent.lib.algo.bloomFilter;
 
 import com.sangupta.murmur.Murmur3;
+
 /**
  * Hash function returns a single long hash value.
  *
  */
-public class HashFunction {
+class HashFunction {
   private static final long SEED = 0x7f3a21eal;
   /**
    * Return the hash of the bytes as long.
    *
-   * @param bytes
-   *            the bytes to be hashed
+   * @param bytes  the bytes to be hashed
    *
    * @return the generated hash value
    */

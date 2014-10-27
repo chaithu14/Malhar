@@ -13,12 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.datatorrent.demos.bloomApp;
+package com.datatorrent.lib.algo.bloomFilter;
 
 import com.datatorrent.api.BaseOperator;
 import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.Context.OperatorContext;
-import com.datatorrent.api.annotation.InputPortFieldAnnotation;
 
 public class BloomFilterOperator<T> extends BaseOperator
 {
@@ -39,11 +38,10 @@ public class BloomFilterOperator<T> extends BaseOperator
   /**
    * Input port
    */
-  @InputPortFieldAnnotation(name = "data")
   public final transient DefaultInputPort<T> data = new DefaultInputPort<T>()
   {
     /**
-     * Adds the tuple into the BloomFilter
+     * Adds the tuple into the bloomFilter
      */
     @Override
     public void process(T tuple)
@@ -65,22 +63,29 @@ public class BloomFilterOperator<T> extends BaseOperator
   {
 
   }
-
+  /**
+   * API Wrapper for contains method of BloomFilterOperatorObject
+ */
   public boolean contains(T tuple)
   {
     return bfObj.contains(tuple);
 
   }
-
+  /**
+   * API Wrapper for add method of BloomFilterOperatorObject
+   */
   public void add(T tuple)
   {
     bfObj.add(tuple);
   }
-
+  /**
+   * API Wrapper for clear method of BloomFilterOperatorObject
+   */
   public void clear()
   {
     bfObj.clear();
   }
+
   public void setExpectedNumberOfElements(int expectedNumberOfElements)
   {
     this.expectedNumberOfElements = expectedNumberOfElements;

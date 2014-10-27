@@ -4,6 +4,7 @@ import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.DefaultOutputPort;
 import com.datatorrent.api.annotation.InputPortFieldAnnotation;
 import com.datatorrent.api.annotation.OutputPortFieldAnnotation;
+import com.datatorrent.lib.algo.bloomFilter.BloomFilterOperatorObject;
 import com.datatorrent.lib.multiwindow.AbstractSlidingWindow;
 
 public class BloomFilterSlidingOperator<T> extends AbstractSlidingWindow<T, BloomFilterOperatorObject<T>>
@@ -35,11 +36,11 @@ public class BloomFilterSlidingOperator<T> extends AbstractSlidingWindow<T, Bloo
     }
   }
 
-  @OutputPortFieldAnnotation(name = "CountOutput")
+  @OutputPortFieldAnnotation(optional=true)
   public transient DefaultOutputPort<T> outputPort = new DefaultOutputPort<T>();
 
 
-  @InputPortFieldAnnotation(name = "find")
+  @InputPortFieldAnnotation(optional=true)
   public final transient DefaultInputPort<T> find = new DefaultInputPort<T>()
   {
     @Override

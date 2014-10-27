@@ -1,4 +1,4 @@
-package com.datatorrent.demos.bloomApp;
+package com.datatorrent.lib.algo.bloomFilter;
 
 import java.nio.charset.Charset;
 

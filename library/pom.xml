@@ -247,6 +247,11 @@
       <version>0.2.3</version>
     </dependency>
     <dependency>
+      <groupId>com.sangupta</groupId>
+      <artifactId>bloomfilter</artifactId>
+      <version>0.9.0</version>
+    </dependency>
+    <dependency>
       <groupId>org.mockftpserver</groupId>
       <artifactId>MockFtpServer</artifactId>
       <version>2.4</version>

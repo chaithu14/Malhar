@@ -13,19 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.datatorrent.demos.bloomApp;
+package com.datatorrent.lib.algo;
 
-import com.datatorrent.api.LocalMode;
-import com.datatorrent.demos.bloomApp.Application;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+
+import com.datatorrent.lib.algo.bloomFilter.BloomFilterOperator;
 import org.apache.hadoop.conf.Configuration;
-import org.junit.Test;
-import com.datatorrent.lib.testbench.CollectorTestSink;
 
+import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.datatorrent.lib.testbench.CollectorTestSink;
 
 /**
  *
+ * Functional tests for {@link com.datatorrent.lib.algo.bloomFilter}. <p>
+ *
  */
-public class ApplicationTest
+public class BloomFilterTest
 {
   @Test
   public void testNodeProcessing()
@@ -76,6 +84,7 @@ public class ApplicationTest
 
     bfOper.endWindow();
     bfOper.teardown();
-    
+
   }
 }
+

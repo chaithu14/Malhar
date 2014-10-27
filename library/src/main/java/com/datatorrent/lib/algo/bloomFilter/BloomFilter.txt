@@ -1,0 +1,42 @@
+BloomFilter:
+===========
+BloomFilter is a space-efficient probabilistic data structure and used to test whether an element is a member of set or not. Bloom Filter never produce false negatives.
+
+Decomposer:
+==========
+Decomposer is an interface and used to decompose the given object into bytes. DefaultDecomposer implements Decomposer and defines the decompose method.
+
+HashFunction:
+============
+HashFunction is a class and used to return the hash value for the given decomposed bytes.
+
+BloomFilterOperatorObject:
+=========================
+BloomFilterOperatorObject is a BloomFilter java class. To create an empty Bloom filter, call the constructor with the required false positive probability and the number of elements you expect to add the Bloom filter. Also, We can call the constructor with specified Decomposer and hash function.
+
+* Add method is used to add the new elements in Bloom Filter.
+* contains method is used to check whether an element is a member of Bloom filter or not.
+* clear method is used to clear all the bits.
+
+Example:
+========
+Creating instance of BloomFilterOperatorObject:
+---------------------------------------------
+double falsePositiveProbability = 0.1
+int expectedElements = 150;
+
+BloomFilterOperatorObject<String> bloomFilter = new BloomFilterOperatorObject<String>(falsePositiveProbability, expectedElements);
+
+Adding an element:
+-----------------
+String str = "hello";
+bloomFilter.add(str);
+
+Check whether an element is member of Bloom Filter or not:
+--------------------------------------------------
+String str = "hello";
+bloomFilter.contains(str);
+
+BloomFilterOperator:
+===================
+BloomFilterOperator is an malhar operator which extends from BaseOperator class. Created BloomFilterOperatorObject instance in setup method. ProcessTuple method is used to add the tuple in Bloom Filter.

@@ -18,6 +18,7 @@ package com.datatorrent.demos.bloomApp;
 import com.datatorrent.api.annotation.ApplicationAnnotation;
 import com.datatorrent.api.StreamingApplication;
 import com.datatorrent.api.DAG;
+import com.datatorrent.lib.algo.bloomFilter.BloomFilterOperator;
 import com.datatorrent.lib.io.ConsoleOutputOperator;
 
 import com.datatorrent.api.DefaultInputPort;
@@ -110,11 +111,11 @@ class BloomSearchOperator<T> extends BloomFilterOperator<T>
   /**
    * Input port
    */
-  @InputPortFieldAnnotation(name = "Search")
+  @InputPortFieldAnnotation(optional=true)
   public final transient DefaultInputPort<T> input = new DefaultInputPort<T>()
   {
     /**
-     * Adds the tuple into the BloomFilter
+     * Adds the tuple into the bloomFilter
      */
 
     @Override
@@ -131,9 +132,9 @@ class BloomSearchOperator<T> extends BloomFilterOperator<T>
   /**
    * Output port
    */
-  @OutputPortFieldAnnotation(name = "found")
+  @OutputPortFieldAnnotation(optional=true)
   public final transient DefaultOutputPort<T> output1 = new DefaultOutputPort<T>();
-  @OutputPortFieldAnnotation(name = "not found")
+  @OutputPortFieldAnnotation(optional=true)
   public final transient DefaultOutputPort<T> output2 = new DefaultOutputPort<T>();
 }
 
