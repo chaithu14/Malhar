@@ -15,6 +15,7 @@ public class BloomFilterSlidingOperator<T> extends AbstractSlidingWindow<T, Bloo
   @Override
   protected void processDataTuple(T tuple)
   {
+    tuple2Insert.emit(tuple);
     states.get(currentCursor).add(tuple);
   }
 
@@ -38,6 +39,8 @@ public class BloomFilterSlidingOperator<T> extends AbstractSlidingWindow<T, Bloo
 
   @OutputPortFieldAnnotation(optional=true)
   public transient DefaultOutputPort<T> outputPort = new DefaultOutputPort<T>();
+  @OutputPortFieldAnnotation(optional=true)
+  public transient DefaultOutputPort<T> tuple2Insert = new DefaultOutputPort<T>();
 
 
   @InputPortFieldAnnotation(optional=true)

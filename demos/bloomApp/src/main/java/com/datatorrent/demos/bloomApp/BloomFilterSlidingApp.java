@@ -17,9 +17,70 @@ package com.datatorrent.demos.bloomApp;
 
 import com.datatorrent.api.*;
 import com.datatorrent.api.annotation.ApplicationAnnotation;
+import com.datatorrent.api.annotation.InputPortFieldAnnotation;
+import com.datatorrent.api.annotation.OutputPortFieldAnnotation;
+import com.datatorrent.lib.algo.bloomFilter.BloomFilterOperatorObject;
 import com.datatorrent.lib.io.ConsoleOutputOperator;
+import com.datatorrent.lib.multiwindow.AbstractSlidingWindow;
 import com.datatorrent.lib.testbench.RandomEventGenerator;
 import org.apache.hadoop.conf.Configuration;
+
+import java.util.HashSet;
+import java.util.Random;
+import java.util.Set;
+
+class SetSlidingOperator<T> extends AbstractSlidingWindow<T, HashSet<T>>
+{
+
+  @Override
+  protected void processDataTuple(T tuple)
+  {
+    states.get(currentCursor).add(tuple);
+  }
+
+  @Override
+  public void beginWindow(long windowId)
+  {
+    super.beginWindow(windowId);
+  }
+
+  @Override public HashSet<T> createWindowState()
+  {
+    HashSet<T> obj = states.get(currentCursor);
+    if(obj == null)
+      return new HashSet<T>();
+    else
+    {
+      obj.clear();
+      return obj;
+    }
+  }
+
+  void processTuple(T tuple)
+  {
+    for(int i = 0; i < getWindowSize(); i++)
+    {
+      HashSet<T> obj = states.get(i);
+      if(obj != null && obj.contains(tuple)) {
+        outputPort.emit(tuple);
+        return ;
+      }
+    }
+  }
+
+  @OutputPortFieldAnnotation(optional=true)
+  public transient DefaultOutputPort<T> outputPort = new DefaultOutputPort<T>();
+
+  @InputPortFieldAnnotation(optional=true)
+  public final transient DefaultInputPort<T> find = new DefaultInputPort<T>()
+  {
+    @Override
+    public void process(T tuple)
+    {
+      processTuple(tuple);
+    }
+  };
+}
 
 
 @ApplicationAnnotation(name="BloomFilterSlidingDemo")
@@ -42,10 +103,15 @@ public class BloomFilterSlidingApp implements StreamingApplication
 
 
     BloomFilterSlidingOperator<Integer> bf = dag.addOperator("bloomFilter", new BloomFilterSlidingOperator());
+    SetSlidingOperator<Integer> hashSliding = dag.addOperator("hashSet", new SetSlidingOperator<Integer>());
+
     dag.addStream("input", input.integer_data, bf.data);
+    //dag.addStream("input2Set", input.multi_integer_data, hashSliding.data);
+    dag.addStream("input2Set", bf.tuple2Insert, hashSliding.data);
     dag.addStream("find", findGen.integer_data, bf.find);
+    dag.addStream("findSet", bf.outputPort, hashSliding.find);
     ConsoleOutputOperator consoleOperator = dag.addOperator("console", new ConsoleOutputOperator());
-    dag.addStream("console", bf.outputPort, consoleOperator.input);
+    dag.addStream("console", hashSliding.outputPort, consoleOperator.input);
   }
 
 

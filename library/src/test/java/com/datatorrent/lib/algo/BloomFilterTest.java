@@ -15,13 +15,21 @@
  */
 package com.datatorrent.lib.algo;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.datatorrent.common.util.Slice;
 import com.datatorrent.lib.algo.bloomFilter.BloomFilterOperator;
+import com.datatorrent.lib.util.TestUtils;
+import com.esotericsoftware.kryo.Kryo;
+import com.google.common.util.concurrent.MoreExecutors;
+import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 
+import org.junit.Assert;
+import org.junit.Rule;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +43,48 @@ import com.datatorrent.lib.testbench.CollectorTestSink;
  */
 public class BloomFilterTest
 {
+  @Rule
+  public final TestUtils.TestInfo testInfo = new TestUtils.TestInfo();
+  @Test
+  public void testGet() throws Exception
+  {
+    File file = new File(testInfo.getDir());
+    FileUtils.deleteDirectory(file);
+    BloomFilterOperator<String> hds = new BloomFilterOperator<String>();
+    hds.setExpectedNumberOfElements(100);
+    hds.setFalsePositiveProbability((float) 0.01);
+    hds.setup(null);
+
+    hds.beginWindow(1);
+    hds.data.process("Hello");
+    hds.data.process("Operator");
+    hds.data.process("Stream");
+    hds.data.process("Datatorrent");
+    hds.data.process("Operator");
+
+
+    hds.endWindow();
+
+
+
+    hds.teardown();
+
+    // get fresh instance w/o cached readers
+    hds = TestUtils.clone(new Kryo(), hds);
+    hds.setup(null);
+    hds.beginWindow(1);
+    String searchString = "DataOperator";
+    if(hds.contains(searchString))
+    {
+      System.out.println(searchString + " is member of BloomFilterOperator");
+    } else {
+      System.out.println(searchString + " is not member of BloomFilterOperator");
+    }
+    hds.endWindow();
+    hds.teardown();
+    //Assert.assertArrayEquals("get", data.getBytes(), val);
+  }
+
   @Test
   public void testNodeProcessing()
   {

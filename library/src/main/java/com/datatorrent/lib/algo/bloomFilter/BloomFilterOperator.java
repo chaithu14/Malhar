@@ -19,12 +19,13 @@ import com.datatorrent.api.BaseOperator;
 import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.Context.OperatorContext;
 
-public class BloomFilterOperator<T> extends BaseOperator
+//import java.io.Serializable;
+
+public class BloomFilterOperator<T> extends BaseOperator /*implements Serializable*/
 {
   protected BloomFilterOperatorObject<T> bfObj;
   private int expectedNumberOfElements;
   private float falsePositiveProbability;
-
 
   @Override
   public void setup(OperatorContext context)
@@ -32,6 +33,9 @@ public class BloomFilterOperator<T> extends BaseOperator
     super.setup(context);
     if(this.bfObj == null) {
       bfObj = new BloomFilterOperatorObject<T>(expectedNumberOfElements, falsePositiveProbability);
+    } else {
+      bfObj.setHasher(new HashFunction());
+      bfObj.setCustomDecomposer(new DefaultDecomposer<T>());
     }
   }
 

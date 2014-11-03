@@ -1,17 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+
 <configuration>
 	<property>
-		<name>dt.application.BloomFilterDemo.class</name>
-		<value>com.datatorrent.demos.bloomApp.Application</value>
+		<name>dt.application.BloomFilterFaultDemo.class</name>
+		<value>com.datatorrent.demos.bloomApp.BloomFilterFaultTolerance</value>
 		<description>An alias for the application</description>
 	</property>
-	<property>
-		<name>dt.application.BloomFilterDemo.operator.wordinput.fileName</name>
-		<value>samplefile.txt</value>
-	</property>
-	<property>
-		<name>dt.application.BloomFilterDemo.stream.wordinput.count.locality</name>
-		<value>CONTAINER_LOCAL</value>
-		<description>Specify container locality for the viewtuplecount stream
-		</description>
-	</property>
+
+    <property>
+        <name>dt.application.BloomFilterFaultDemo.operator.wordinput.fileName</name>
+        <value>samplefile.txt</value>
+    </property>
+    <property>
+        <name>dt.application.BloomFilterFaultDemo.operator.bloomFilter.prop.expectedNumberOfElements</name>
+        <value>1500</value>
+    </property>
+    <property>
+        <name>dt.application.BloomFilterFaultDemo.operator.bloomFilter.prop.falsePositiveProbability</name>
+        <value>0.0001</value>
+    </property>
+    <property>
+        <name>dt.application.BloomFilterFaultDemo.stream.wordinput.count.locality</name>
+        <value>CONTAINER_LOCAL</value>
+        <description>Specify container locality for the viewtuplecount stream
+        </description>
+    </property>
+
 </configuration>

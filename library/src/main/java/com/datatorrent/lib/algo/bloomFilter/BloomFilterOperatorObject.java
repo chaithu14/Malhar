@@ -1,9 +1,15 @@
 package com.datatorrent.lib.algo.bloomFilter;
 
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.KryoSerializable;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
+
+//import java.io.Serializable;
 import java.util.BitSet;
 import java.util.Collection;
 
-public class BloomFilterOperatorObject<T>
+public class BloomFilterOperatorObject<T>  implements KryoSerializable
 {
   private BitSet bitset;
   private int bitSetSize;
@@ -11,8 +17,8 @@ public class BloomFilterOperatorObject<T>
   private int expectedNumberOfFilterElements; // expected (maximum) number of elements to be added
   private int numberOfAddedElements; // number of elements actually added to the Bloom filter
   private int numberOfHashes; // number of hash functions
-  protected HashFunction hasher = new HashFunction();
-  protected Decomposer<T> customDecomposer = new DefaultDecomposer();
+  protected transient HashFunction hasher = new HashFunction();
+  protected transient Decomposer<T> customDecomposer = new DefaultDecomposer();
 
   /**
    * Set the attributes to the empty Bloom filter. The total length of the Bloom filter will be
@@ -184,11 +190,11 @@ public class BloomFilterOperatorObject<T>
    * @return true if the array could have been inserted into the Bloom filter.
    */
   private boolean contains(byte[] bytes) {
+
     int[] hashes = createHashes(bytes);
     for (int hash : hashes) {
-      if (!bitset.get(Math.abs(hash % bitSetSize))) {
+      if (!bitset.get(Math.abs(hash % bitSetSize)))
         return false;
-      }
     }
     return true;
   }
@@ -233,6 +239,9 @@ public class BloomFilterOperatorObject<T>
     return bitset;
   }
 
+  public void setBitSet(BitSet bitset) {
+     this.bitset = bitset;
+  }
   /**
    * Returns the number of bits in the Bloom filter. Use count() to retrieve
    * the number of inserted elements.
@@ -299,4 +308,36 @@ public class BloomFilterOperatorObject<T>
   {
     this.customDecomposer = customDecomposer;
   }
+
+  @Override public void write(Kryo kryo, Output output)
+  {
+    kryo.writeObject(output, bitSetSize);
+    kryo.writeObject(output, bitsPerElement);
+    kryo.writeObject(output, expectedNumberOfFilterElements);
+    kryo.writeObject(output, numberOfAddedElements);
+    kryo.writeObject(output, numberOfHashes);
+    //byte[] bytes = bitset.toByteArray();
+    //kryo.writeObject(output, bytes.length);
+    //output.write(bytes);
+    for (int i = 0; i < bitSetSize; i++) {
+      kryo.writeObject(output, bitset.get(i));
+    }
+  }
+
+  @Override public void read(Kryo kryo, Input input)
+  {
+    bitSetSize = kryo.readObject(input, Integer.class);
+    bitsPerElement = kryo.readObject(input, Double.class);
+    expectedNumberOfFilterElements = kryo.readObject(input, Integer.class);
+    numberOfAddedElements = kryo.readObject(input, Integer.class);
+    numberOfHashes = kryo.readObject(input, Integer.class);
+    //int length = kryo.readObject(input, Integer.class);
+    //bitset = BitSet.valueOf(input.readBytes(length));
+    bitset = new BitSet(bitSetSize);
+    for (int i = 0; i < bitSetSize; i++) {
+      bitset.set(i, kryo.readObject(input, boolean.class));
+    }
+
+  }
 }
+

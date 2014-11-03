@@ -58,7 +58,36 @@
         <value>2</value>
     </property>
     <property>
+        <name>dt.application.BloomFilterSlidingDemo.operator.hashSet.attr.APPLICATION_WINDOW_COUNT
+        </name>
+        <value>10</value>
+    </property>
+    <property>
+        <name>dt.application.BloomFilterSlidingDemo.operator.hashSet.windowSize
+        </name>
+        <value>2</value>
+    </property>
+    <property>
         <name>dt.application.BloomFilterSlidingDemo.stream.wordinput.count.locality</name>
+        <value>CONTAINER_LOCAL</value>
+        <description>Specify container locality for the viewtuplecount stream
+        </description>
+    </property>
+
+    <property>
+        <name>dt.application.BloomFilterFaultDemo.operator.wordinput.fileName</name>
+        <value>samplefile.txt</value>
+    </property>
+    <property>
+        <name>dt.application.BloomFilterFaultDemo.operator.bloomFilter.prop.expectedNumberOfElements</name>
+        <value>1500</value>
+    </property>
+    <property>
+        <name>dt.application.BloomFilterFaultDemo.operator.bloomFilter.prop.falsePositiveProbability</name>
+        <value>0.0001</value>
+    </property>
+    <property>
+        <name>dt.application.BloomFilterFaultDemo.stream.wordinput.count.locality</name>
         <value>CONTAINER_LOCAL</value>
         <description>Specify container locality for the viewtuplecount stream
         </description>
