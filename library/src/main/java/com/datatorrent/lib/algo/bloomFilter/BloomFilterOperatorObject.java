@@ -1,15 +1,14 @@
 package com.datatorrent.lib.algo.bloomFilter;
 
-import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryo.KryoSerializable;
-import com.esotericsoftware.kryo.io.Input;
-import com.esotericsoftware.kryo.io.Output;
+import com.esotericsoftware.kryo.DefaultSerializer;
+import com.esotericsoftware.kryo.serializers.JavaSerializer;
 
-//import java.io.Serializable;
+import java.io.Serializable;
 import java.util.BitSet;
 import java.util.Collection;
 
-public class BloomFilterOperatorObject<T>  implements KryoSerializable
+@DefaultSerializer(JavaSerializer.class)
+public class BloomFilterOperatorObject<T>  implements Serializable
 {
   private BitSet bitset;
   private int bitSetSize;
@@ -307,37 +306,6 @@ public class BloomFilterOperatorObject<T>  implements KryoSerializable
   public void setCustomDecomposer(Decomposer<T> customDecomposer)
   {
     this.customDecomposer = customDecomposer;
-  }
-
-  @Override public void write(Kryo kryo, Output output)
-  {
-    kryo.writeObject(output, bitSetSize);
-    kryo.writeObject(output, bitsPerElement);
-    kryo.writeObject(output, expectedNumberOfFilterElements);
-    kryo.writeObject(output, numberOfAddedElements);
-    kryo.writeObject(output, numberOfHashes);
-    //byte[] bytes = bitset.toByteArray();
-    //kryo.writeObject(output, bytes.length);
-    //output.write(bytes);
-    for (int i = 0; i < bitSetSize; i++) {
-      kryo.writeObject(output, bitset.get(i));
-    }
-  }
-
-  @Override public void read(Kryo kryo, Input input)
-  {
-    bitSetSize = kryo.readObject(input, Integer.class);
-    bitsPerElement = kryo.readObject(input, Double.class);
-    expectedNumberOfFilterElements = kryo.readObject(input, Integer.class);
-    numberOfAddedElements = kryo.readObject(input, Integer.class);
-    numberOfHashes = kryo.readObject(input, Integer.class);
-    //int length = kryo.readObject(input, Integer.class);
-    //bitset = BitSet.valueOf(input.readBytes(length));
-    bitset = new BitSet(bitSetSize);
-    for (int i = 0; i < bitSetSize; i++) {
-      bitset.set(i, kryo.readObject(input, boolean.class));
-    }
-
   }
 }
 

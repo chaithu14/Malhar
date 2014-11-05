@@ -19,9 +19,7 @@ import com.datatorrent.api.BaseOperator;
 import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.Context.OperatorContext;
 
-//import java.io.Serializable;
-
-public class BloomFilterOperator<T> extends BaseOperator /*implements Serializable*/
+public class BloomFilterOperator<T> extends BaseOperator
 {
   protected BloomFilterOperatorObject<T> bfObj;
   private int expectedNumberOfElements;
