@@ -55,7 +55,7 @@
     <property>
         <name>dt.application.BloomFilterSlidingDemo.operator.bloomFilter.windowSize
         </name>
-        <value>2</value>
+        <value>3</value>
     </property>
     <property>
         <name>dt.application.BloomFilterSlidingDemo.operator.hashSet.attr.APPLICATION_WINDOW_COUNT
@@ -65,7 +65,7 @@
     <property>
         <name>dt.application.BloomFilterSlidingDemo.operator.hashSet.windowSize
         </name>
-        <value>2</value>
+        <value>3</value>
     </property>
     <property>
         <name>dt.application.BloomFilterSlidingDemo.stream.wordinput.count.locality</name>

@@ -15,19 +15,19 @@
  */
 package com.datatorrent.demos.bloomApp;
 
-import com.datatorrent.api.*;
+import com.datatorrent.api.DAG;
+import com.datatorrent.api.DefaultInputPort;
+import com.datatorrent.api.DefaultOutputPort;
+import com.datatorrent.api.StreamingApplication;
 import com.datatorrent.api.annotation.ApplicationAnnotation;
 import com.datatorrent.api.annotation.InputPortFieldAnnotation;
 import com.datatorrent.api.annotation.OutputPortFieldAnnotation;
-import com.datatorrent.lib.algo.bloomFilter.BloomFilterOperatorObject;
 import com.datatorrent.lib.io.ConsoleOutputOperator;
 import com.datatorrent.lib.multiwindow.AbstractSlidingWindow;
 import com.datatorrent.lib.testbench.RandomEventGenerator;
 import org.apache.hadoop.conf.Configuration;
 
 import java.util.HashSet;
-import java.util.Random;
-import java.util.Set;
 
 class SetSlidingOperator<T> extends AbstractSlidingWindow<T, HashSet<T>>
 {
@@ -91,11 +91,11 @@ public class BloomFilterSlidingApp implements StreamingApplication
   {
     int maxValue = 30000;
 
-    RandomEventGenerator input = dag.addOperator("rand", new RandomEventGenerator());
+    RandomEventGenerator input = dag.addOperator("Ids", new RandomEventGenerator());
     input.setMinvalue(0);
     input.setMaxvalue(maxValue);
 
-    RandomEventGenerator findGen = dag.addOperator("findVal", new RandomEventGenerator());
+    RandomEventGenerator findGen = dag.addOperator("findId", new RandomEventGenerator());
     findGen.setMinvalue(0);
     findGen.setMaxvalue(maxValue);
     findGen.setTuplesBlast(5);
@@ -109,9 +109,9 @@ public class BloomFilterSlidingApp implements StreamingApplication
     //dag.addStream("input2Set", input.multi_integer_data, hashSliding.data);
     dag.addStream("input2Set", bf.tuple2Insert, hashSliding.data);
     dag.addStream("find", findGen.integer_data, bf.find);
-    dag.addStream("findSet", bf.outputPort, hashSliding.find);
+    dag.addStream("findInSet", bf.outputPort, hashSliding.find);
     ConsoleOutputOperator consoleOperator = dag.addOperator("console", new ConsoleOutputOperator());
-    dag.addStream("console", hashSliding.outputPort, consoleOperator.input);
+    dag.addStream("ContainsInSet", hashSliding.outputPort, consoleOperator.input);
   }
 
 
