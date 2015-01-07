@@ -1,8 +1,21 @@
+/*
+ * Copyright (c) 2013 DataTorrent, Inc. ALL Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.datatorrent.contrib.kinesis;
 
-/**
- * Created by chaitanya on 22/12/14.
- */
+import com.amazonaws.AmazonClientException;
 import com.amazonaws.services.kinesis.model.Record;
 import com.amazonaws.services.kinesis.model.Shard;
 import com.amazonaws.services.kinesis.model.ShardIteratorType;
@@ -113,38 +126,41 @@ public class KinesisConsumer implements Closeable
       return;
 
     consumerThreadExecutor = Executors.newFixedThreadPool(realNumStream);
-    for (final Shard shards : simpleConsumerThreads) {
+    for (final Shard shd : simpleConsumerThreads) {
       consumerThreadExecutor.submit(new Runnable() {
         @Override
         public void run()
         {
           logger.debug("Thread " + Thread.currentThread().getName() + " start consuming Records...");
           while (isAlive ) {
-            Shard shId = shards;
-            List<Record> records = KinesisUtil.getRecords(streamName, recordsLimit, shId, getIteratorType(shId.getShardId()), ShardPosition.get(shId.getShardId()));
-            if (records == null || records.isEmpty()) {
-              if(shId.getSequenceNumberRange().getEndingSequenceNumber() != null)
-              {
-                closedShards.add(shId);
-                break;
-              }
-              try {
-                Thread.sleep(recordsCheckInterval);
-              } catch (InterruptedException e) {
-                e.printStackTrace();
-              }
-            } else {
-              String seqNo = "";
-              for (Record rc : records) {
+            Shard shard = shd;
+            try {
+              List<Record> records = KinesisUtil.getRecords(streamName, recordsLimit, shard, getIteratorType(shard.getShardId()), ShardPosition.get(shard.getShardId()));
+              if (records == null || records.isEmpty()) {
+                if (shard.getSequenceNumberRange().getEndingSequenceNumber() != null) {
+                  closedShards.add(shard);
+                  break;
+                }
                 try {
-                  seqNo = rc.getSequenceNumber();
-                  putRecord(rc);
+                  Thread.sleep(recordsCheckInterval);
                 } catch (InterruptedException e) {
                   e.printStackTrace();
                 }
+              } else {
+                String seqNo = "";
+                for (Record rc : records) {
+                  try {
+                    seqNo = rc.getSequenceNumber();
+                    putRecord(rc);
+                  } catch (InterruptedException e) {
+                    e.printStackTrace();
+                  }
+                }
+                ShardPosition.put(shard.getShardId(), new String(seqNo));
               }
-              ShardPosition.put(shId.getShardId(), new String(seqNo));
-
+            } catch(AmazonClientException e)
+            {
+              throw new AmazonClientException(e);
             }
           }
           logger.debug("Thread " + Thread.currentThread().getName() + " stop consuming Records...");
@@ -181,6 +197,8 @@ public class KinesisConsumer implements Closeable
     KinesisConsumer newConsumer = new KinesisConsumer(this.streamName, partitionIds);
     newConsumer.initialOffset = this.initialOffset;
     newConsumer.recordsCheckInterval = this.recordsCheckInterval;
+    newConsumer.cacheSize = this.cacheSize;
+    newConsumer.recordsLimit = this.recordsLimit;
     newConsumer.resetShardPositions(shardPositions);
     return newConsumer;
   }

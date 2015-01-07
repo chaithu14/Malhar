@@ -1,3 +1,18 @@
+/*
+ * Copyright (c) 2013 DataTorrent, Inc. ALL Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.datatorrent.contrib.kinesis;
 
 import com.amazonaws.auth.AWSCredentialsProvider;
@@ -9,15 +24,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.validation.Valid;
+import javax.validation.constraints.Min;
 
-/**
- * Created by chaitanya on 22/12/14.
- */
 public abstract class AbstractKinesisInputOperator <K extends KinesisConsumer> implements InputOperator, ActivationListener<OperatorContext>
 {
   private static final Logger logger = LoggerFactory.getLogger(AbstractKinesisInputOperator.class);
 
-  private int tuplesBlast = 1024;
+  @Min(1)
+  private int maxTuplesPerWindow = Integer.MAX_VALUE;
+  private int emitCount = 0;
   protected AWSCredentialsProvider credentialsProvider = null;
 
   @Valid
@@ -43,6 +58,7 @@ public abstract class AbstractKinesisInputOperator <K extends KinesisConsumer> i
     } catch(Exception e)
     {
       logger.error(e.getMessage());
+      throw new RuntimeException(e.getMessage());
     }
     consumer.create();
   }
@@ -62,6 +78,7 @@ public abstract class AbstractKinesisInputOperator <K extends KinesisConsumer> i
   @Override
   public void beginWindow(long windowId)
   {
+    emitCount = 0;
   }
 
   /**
@@ -96,10 +113,13 @@ public abstract class AbstractKinesisInputOperator <K extends KinesisConsumer> i
   @Override
   public void emitTuples()
   {
-    int bufferLength = consumer.messageSize();
-    for (int i = tuplesBlast < bufferLength ? tuplesBlast : bufferLength; i-- > 0; ) {
+    int count = consumer.messageSize();
+    if(maxTuplesPerWindow > 0)
+      count = Math.min(count, maxTuplesPerWindow - emitCount);
+    for (int i = 0; i < count; i++) {
       emitTuple(consumer.pollRecord());
     }
+    emitCount += count;
   }
 
   public void setConsumer(K consumer)
@@ -132,23 +152,13 @@ public abstract class AbstractKinesisInputOperator <K extends KinesisConsumer> i
     this.consumer.setStreamName(streamName);
   }
 
-  public Integer getRecordsLimit()
+  public int getMaxTuplesPerWindow()
   {
-    return this.consumer.getRecordsLimit();
+    return maxTuplesPerWindow;
   }
 
-  public void setRecordsLimit(Integer recordsLimit)
+  public void setMaxTuplesPerWindow(int maxTuplesPerWindow)
   {
-    this.consumer.setRecordsLimit(recordsLimit);
-  }
-
-  public int getTuplesBlast()
-  {
-    return tuplesBlast;
-  }
-
-  public void setTuplesBlast(int tuplesBlast)
-  {
-    this.tuplesBlast = tuplesBlast;
+    this.maxTuplesPerWindow = maxTuplesPerWindow;
   }
 }

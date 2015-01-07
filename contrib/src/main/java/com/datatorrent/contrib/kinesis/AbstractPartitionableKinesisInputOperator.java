@@ -1,6 +1,20 @@
+/*
+ * Copyright (c) 2013 DataTorrent, Inc. ALL Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.datatorrent.contrib.kinesis;
 
-import com.amazonaws.auth.AWSCredentialsProvider;
 import com.amazonaws.services.kinesis.model.Shard;
 import com.datatorrent.api.Context.OperatorContext;
 import com.datatorrent.api.DefaultPartition;
@@ -16,9 +30,6 @@ import org.slf4j.LoggerFactory;
 import javax.validation.constraints.Min;
 import java.util.*;
 
-/**
- * Created by chaitanya on 22/12/14.
- */
 @OperatorAnnotation(partitionable = true)
 public abstract class AbstractPartitionableKinesisInputOperator extends AbstractKinesisInputOperator<KinesisConsumer> implements Partitioner<AbstractPartitionableKinesisInputOperator>, StatsListener
 {
@@ -66,12 +77,13 @@ public abstract class AbstractPartitionableKinesisInputOperator extends Abstract
   public Collection<Partition<AbstractPartitionableKinesisInputOperator>> definePartitions(Collection<Partition<AbstractPartitionableKinesisInputOperator>> partitions, int incrementalCapacity)
   {
     boolean isInitialParitition = partitions.iterator().next().getStats() == null;
-    //Set the credentials
+    // Set the credentials to get the list of shards
     if(isInitialParitition) {
       try {
         KinesisUtil.setAWSCredentials(credentialsProvider);
       } catch (Exception e) {
         logger.error(e.getMessage());
+        throw new RuntimeException(e.getMessage());
       }
     }
     List<Shard> shards = KinesisUtil.getShardList(getStreamName());
@@ -110,13 +122,17 @@ public abstract class AbstractPartitionableKinesisInputOperator extends Abstract
         return partitions;
       }
       break;
-    // For the 1 to N mapping The initial partition number is defined by stream application
+    // For the N to 1 mapping The initial partition number is defined by stream application
     // Afterwards, the framework will dynamically adjust the partition
     case MANY_TO_ONE:
-
+      /* This case was handled into two ways.
+         1. Dynamic Partition: Number of DT partitions is depends on the number of open shards.
+         2. Static Partition: Number of DT partitions is fixed, whether the number of shards are increased/decreased.
+      */
       int size = initialPartitionCount;
       if(newWaitingPartition.size() != 0)
       {
+        // Get the list of open shards
         shards = getOpenShards(partitions);
         if(isDynamicPartition)
           size = (int)Math.ceil(shards.size() / (shardsPerPartition * 1.0));
@@ -141,7 +157,8 @@ public abstract class AbstractPartitionableKinesisInputOperator extends Abstract
       }
       for (int i = 0; i < pIds.length; i++) {
         logger.info("[MANY_TO_ONE]: Create operator partition for kinesis partition(s): " + StringUtils.join(pIds[i], ", ") + ", StreamName: " + this.getConsumer().streamName);
-        newPartitions.add(createPartition(pIds[i], initShardPos));
+        if(pIds[i] != null)
+          newPartitions.add(createPartition(pIds[i], initShardPos));
       }
       break;
     default:
@@ -229,6 +246,8 @@ public abstract class AbstractPartitionableKinesisInputOperator extends Abstract
   {
     AbstractPartitionableKinesisInputOperator newOp = cloneOperator();
     newOp.strategy = this.strategy;
+    newOp.setCredentialsProvider(this.credentialsProvider);
+    newOp.setStreamName(this.getStreamName());
     return newOp;
   }
 
@@ -275,7 +294,6 @@ public abstract class AbstractPartitionableKinesisInputOperator extends Abstract
   Partition<AbstractPartitionableKinesisInputOperator> createPartition(Set<String> shardIds, Map<String, String> initShardPos)
   {
     Partition<AbstractPartitionableKinesisInputOperator> p = new DefaultPartition<AbstractPartitionableKinesisInputOperator>(_cloneOperator());
-    p.getPartitionedInstance().setCredentials(getCredentialsProvider(), getStreamName());
     KinesisConsumer newConsumerForPartition = getConsumer().cloneConsumer(shardIds, initShardPos);
     p.getPartitionedInstance().setConsumer(newConsumerForPartition);
     PartitionInfo pif = new PartitionInfo();
@@ -299,11 +317,6 @@ public abstract class AbstractPartitionableKinesisInputOperator extends Abstract
     this.context = context;
   }
 
-  public void setCredentials(AWSCredentialsProvider credentialsProvider, String streamName)
-  {
-    this.setCredentialsProvider(credentialsProvider);
-    this.setStreamName(streamName);
-  }
   @Override
   public void endWindow()
   {
