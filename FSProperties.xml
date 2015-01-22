@@ -1,0 +1,32 @@
+<configuration>
+	<property>
+		<name>dt.application.WordCountDemo.operator.wordinput.fileName</name>
+		<value>samplefile.txt</value>
+	</property>
+	<property>
+		<name>dt.application.WordCountDemo.stream.wordinput.count.locality</name>
+		<value>CONTAINER_LOCAL</value>
+		<description>Specify container locality for the viewtuplecount stream
+		</description>
+	</property>
+    <property>
+        <name>dt.application.FileSplitterDemo.operator.FileSplitter.prop.directory</name>
+        <value>/user/chaitanya/fileSP</value>
+    </property>
+    <property>
+        <name>dt.application.FileSplitterDemo.operator.BlockReader.prop.directory</name>
+        <value>/user/chaitanya/fileSP</value>
+    </property>
+    <property>
+        <name>dt.application.FileSplitterDemo.operator.FileSplitter.scanner.prop.filePatternRegexp</name>
+        <value>.*?\\.txt</value>
+    </property>
+    <property>
+        <name>dt.application.FileSplitterDemo.operator.FileSplitter.prop.blockSize</name>
+        <value>1024</value>
+    </property>
+    <property>
+        <name>dt.application.FileSplitterDemo.operator.FileSplitter.idempotentStorageManager.prop.recoveryPath</name>
+        <value>/user/chaitanya/recovery</value>
+    </property>
+</configuration>
