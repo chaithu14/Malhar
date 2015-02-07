@@ -56,10 +56,10 @@ public abstract class AbstractKinesisOutputOperator<V, T> implements Operator
   private String secretKey;
   private String endPoint;
   protected static transient AmazonKinesisClient client = null;
+  protected transient KinesisEncoder encoder;
   protected int sendCount;
   protected boolean isBatchProcessing = true;
 
-  protected abstract byte[] getRecord(V tuple);
   protected abstract Pair<String, V> tupleToKeyValue(T tuple);
   List<PutRecordsRequestEntry> putRecordsRequestEntryList = new ArrayList<PutRecordsRequestEntry>();
   // Max size of each record: 50KB, Max size of putRecords: 4.5MB
@@ -67,6 +67,11 @@ public abstract class AbstractKinesisOutputOperator<V, T> implements Operator
   @Min(2)
   @Max(500)
   protected int batchSize = 92;
+  protected byte[] getRecord(V tuple)
+  {
+    return encoder.toBytes(tuple);
+  }
+
   /**
    * Implement Operator Interface.
    */

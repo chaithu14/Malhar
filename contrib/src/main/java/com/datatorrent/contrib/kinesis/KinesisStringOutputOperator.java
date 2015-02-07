@@ -15,6 +15,7 @@
  */
 package com.datatorrent.contrib.kinesis;
 
+import com.datatorrent.api.Context;
 import com.datatorrent.common.util.Pair;
 
 /**
@@ -25,9 +26,10 @@ import com.datatorrent.common.util.Pair;
 public class KinesisStringOutputOperator extends AbstractKinesisOutputOperator<String, String>
 {
   @Override
-  protected byte[] getRecord(String tuple)
+  public void setup(Context.OperatorContext context)
   {
-    return tuple.getBytes();
+    encoder = new KinesisJsonEncoder();
+    super.setup(context);
   }
   @Override
   protected Pair<String, String> tupleToKeyValue(String tuple)
