@@ -15,30 +15,9 @@
  */
 package com.datatorrent.contrib.kafka;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import javax.validation.constraints.NotNull;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-
 import kafka.api.FetchRequest;
 import kafka.api.FetchRequestBuilder;
 import kafka.api.OffsetRequest;
@@ -48,6 +27,14 @@ import kafka.javaapi.FetchResponse;
 import kafka.javaapi.PartitionMetadata;
 import kafka.javaapi.consumer.SimpleConsumer;
 import kafka.message.MessageAndOffset;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.validation.constraints.NotNull;
+import java.util.*;
+import java.util.Map.Entry;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Simple kafka consumer adaptor used by kafka input operator Properties:<br>
@@ -486,26 +473,6 @@ public class SimpleKafkaConsumer extends KafkaConsumer
   }
 
   @Override
-  protected KafkaConsumer cloneConsumer(Set<KafkaPartition> partitionIds, Map<KafkaPartition, Long> startOffset)
-  {
-    // create different client for same partition
-    SimpleKafkaConsumer skc = new SimpleKafkaConsumer(zookeeper, topic, timeout, bufferSize, clientId, partitionIds);
-    skc.setCacheSize(getCacheSize());
-    skc.setMetadataRefreshInterval(getMetadataRefreshInterval());
-    skc.setMetadataRefreshRetryLimit(getMetadataRefreshRetryLimit());
-    skc.initialOffset = this.initialOffset;
-    skc.resetOffset(startOffset);
-    skc.setCacheSize(getCacheSize());
-    return skc;
-  }
-
-  @Override
-  protected KafkaConsumer cloneConsumer(Set<KafkaPartition> partitionIds)
-  {
-    return cloneConsumer(partitionIds, null);
-  }
-
-  @Override
   protected void commitOffset()
   {
     // the simple consumer offset is kept in the offsetTrack
@@ -547,5 +514,10 @@ public class SimpleKafkaConsumer extends KafkaConsumer
     return super.getConsumerStats();
   }
 
-
+  @Override
+  protected void resetPartitionsAndOffset(Set<KafkaPartition> partitionIds, Map<KafkaPartition, Long> startOffset)
+  {
+    this.kps = partitionIds;
+    resetOffset(startOffset);
+  }
 } // End of SimpleKafkaConsumer

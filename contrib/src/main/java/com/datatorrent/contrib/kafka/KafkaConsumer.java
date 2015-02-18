@@ -15,35 +15,24 @@
  */
 package com.datatorrent.contrib.kafka;
 
-import java.io.Closeable;
-import java.io.Serializable;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-
-import kafka.message.Message;
-
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.Pattern;
-import javax.validation.constraints.Pattern.Flag;
-
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang3.StringUtils;
-
 import com.datatorrent.api.Context;
 import com.esotericsoftware.kryo.serializers.FieldSerializer.Bind;
 import com.esotericsoftware.kryo.serializers.JavaSerializer;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.SetMultimap;
+import kafka.message.Message;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
+
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Pattern;
+import javax.validation.constraints.Pattern.Flag;
+import java.io.Closeable;
+import java.io.Serializable;
+import java.util.*;
+import java.util.Map.Entry;
+import java.util.concurrent.*;
 
 /**
  * Base Kafka Consumer class used by kafka input operator
@@ -227,11 +216,6 @@ public abstract class KafkaConsumer implements Closeable
     statsSnapShot.mark(partition, msg.payloadSize());
   };
 
-
-  protected abstract KafkaConsumer cloneConsumer(Set<KafkaPartition> kps);
-
-  protected abstract KafkaConsumer cloneConsumer(Set<KafkaPartition> kps, Map<KafkaPartition, Long> startOffset);
-
   protected abstract void commitOffset();
 
   protected abstract Map<KafkaPartition, Long> getCurrentOffsets();
@@ -242,6 +226,7 @@ public abstract class KafkaConsumer implements Closeable
     return stats;
   }
 
+  protected abstract void resetPartitionsAndOffset(Set<KafkaPartition> partitionIds, Map<KafkaPartition, Long> startOffset);
   /**
    * Counter class which gives the statistic value from the consumer
    */
