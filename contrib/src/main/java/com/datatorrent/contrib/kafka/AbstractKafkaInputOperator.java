@@ -15,21 +15,24 @@
  */
 package com.datatorrent.contrib.kafka;
 
-import javax.validation.Valid;
-import javax.validation.constraints.Min;
-import javax.validation.constraints.NotNull;
-
-import kafka.message.Message;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.datatorrent.api.Context.OperatorContext;
 import com.datatorrent.api.InputOperator;
 import com.datatorrent.api.Operator.ActivationListener;
 import com.datatorrent.api.Operator.CheckpointListener;
+import com.datatorrent.common.util.Pair;
+import com.datatorrent.lib.io.IdempotentStorageManager;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
+import kafka.message.Message;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import javax.validation.Valid;
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotNull;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * This is a base implementation of a Kafka input operator, which consumes data from Kafka message bus.&nbsp; Subclasses
@@ -66,10 +69,20 @@ public abstract class AbstractKafkaInputOperator<K extends KafkaConsumer> implem
   @Min(1)
   private int maxTuplesPerWindow = Integer.MAX_VALUE;
   private transient int emitCount = 0;
+  protected IdempotentStorageManager idempotentStorageManager;
+  protected transient long currentWindowId;
+  protected transient int operatorId;
+  protected final transient Map<KafkaPartition, Pair<Long, Integer>> currentWindowRecoveryState;
+  protected transient boolean isReplayState;
   @NotNull
   @Valid
   protected KafkaConsumer consumer = new SimpleKafkaConsumer();
 
+  public AbstractKafkaInputOperator()
+  {
+    idempotentStorageManager = new IdempotentStorageManager.FSIdempotentStorageManager();
+    currentWindowRecoveryState = new HashMap<KafkaPartition, Pair<Long, Integer>>();
+  }
   /**
    * Any concrete class derived from KafkaInputOperator has to implement this method so that it knows what type of
    * message it is going to send to Malhar in which output port.
@@ -98,6 +111,12 @@ public abstract class AbstractKafkaInputOperator<K extends KafkaConsumer> implem
   {
     logger.debug("consumer {} topic {} cacheSize {}", consumer, consumer.getTopic(), consumer.getCacheSize());
     consumer.create();
+    operatorId = context.getId();
+    idempotentStorageManager.setup(context);
+    //shardPosition.clear();
+    if (context.getValue(OperatorContext.ACTIVATION_WINDOW_ID) < idempotentStorageManager.getLargestRecoveryWindow()) {
+      isReplayState = true;
+    }
   }
 
   /**
@@ -106,6 +125,7 @@ public abstract class AbstractKafkaInputOperator<K extends KafkaConsumer> implem
   @Override
   public void teardown()
   {
+    idempotentStorageManager.teardown();
     consumer.teardown();
   }
 
@@ -115,15 +135,53 @@ public abstract class AbstractKafkaInputOperator<K extends KafkaConsumer> implem
   @Override
   public void beginWindow(long windowId)
   {
+    currentWindowId = windowId;
+    if (windowId <= idempotentStorageManager.getLargestRecoveryWindow()) {
+      replay(windowId);
+    }
     emitCount = 0;
   }
+  protected void replay(long windowId)
+  {
+    try {
+      @SuppressWarnings("unchecked")
+      Map<KafkaPartition, Pair<Long, Integer>> recoveredData = (Map<KafkaPartition, Pair<Long, Integer>>) idempotentStorageManager.load(operatorId, windowId);
+      if (recoveredData == null) {
+        return;
+      }
 
+      System.out.println("Recovery Data Size: " + recoveredData.size());
+      /*if(!(getConsumer() instanceof  SimpleKafkaConsumer))
+        return;
+      SimpleKafkaConsumer cons = (SimpleKafkaConsumer)getConsumer();
+
+      // add all partition request in one Fretch request together
+      FetchRequestBuilder frb = new FetchRequestBuilder().clientId(cons.getClientId());
+      for (Map.Entry<KafkaPartition, Pair<Long, Integer>> rc: recoveredData.entrySet()) {
+        frb.addFetch(consumer.topic, rc.getKey().getPartitionId(), cons.getCurrentOffsets().get(rc.getKey()), cons.getBufferSize());
+      }*/
+
+    }
+
+    catch (IOException e) {
+      throw new RuntimeException("replay", e);
+    }
+  }
   /**
    * Implement Operator Interface.
    */
   @Override
   public void endWindow()
   {
+    if (currentWindowId > idempotentStorageManager.getLargestRecoveryWindow()) {
+      try {
+        idempotentStorageManager.save(currentWindowRecoveryState, operatorId, currentWindowId);
+      }
+      catch (IOException e) {
+        throw new RuntimeException("saving recovery", e);
+      }
+    }
+    currentWindowRecoveryState.clear();
   }
 
   @Override
@@ -136,6 +194,12 @@ public abstract class AbstractKafkaInputOperator<K extends KafkaConsumer> implem
   @Override
   public void committed(long windowId)
   {
+    try {
+      idempotentStorageManager.deleteUpTo(operatorId, windowId);
+    }
+    catch (IOException e) {
+      throw new RuntimeException("deleting state", e);
+    }
   }
 
   /**
@@ -144,6 +208,11 @@ public abstract class AbstractKafkaInputOperator<K extends KafkaConsumer> implem
   @Override
   public void activate(OperatorContext ctx)
   {
+    if(isReplayState)
+    {
+      // If it is a replay state, don't start the consumer
+      return;
+    }
     // Don't start thread here!
     // # of kafka_consumer_threads depends on the type of kafka client and the message
     // metadata(topic/partition/replica) layout
@@ -165,12 +234,25 @@ public abstract class AbstractKafkaInputOperator<K extends KafkaConsumer> implem
   @Override
   public void emitTuples()
   {
+    if (currentWindowId <= idempotentStorageManager.getLargestRecoveryWindow()) {
+      return;
+    }
     int count = consumer.messageSize();
     if (maxTuplesPerWindow > 0) {
       count = Math.min(count, maxTuplesPerWindow - emitCount);
     }
     for (int i = 0; i < count; i++) {
-      emitTuple(consumer.pollMessage());
+      KafkaConsumer.holdingData consumerData = consumer.pollMessage();
+      emitTuple(consumerData.msg);
+      if(!currentWindowRecoveryState.containsKey(consumerData.kafkaPart))
+      {
+        currentWindowRecoveryState.put(consumerData.kafkaPart, new Pair<Long, Integer>(consumerData.offSet, 1));
+      } else {
+        Pair<Long, Integer> second = currentWindowRecoveryState.get(consumerData.kafkaPart);
+        Integer noOfRecords = second.getSecond();
+        currentWindowRecoveryState.put(consumerData.kafkaPart, new Pair<Long, Integer>(second.getFirst(), noOfRecords+1));
+      }
+      //shardPosition.put(shardId, recordId);
     }
     emitCount += count;
   }

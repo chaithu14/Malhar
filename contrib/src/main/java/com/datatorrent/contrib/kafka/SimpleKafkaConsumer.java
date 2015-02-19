@@ -152,7 +152,7 @@ public class SimpleKafkaConsumer extends KafkaConsumer
               long offset = -1l;
               for (MessageAndOffset msg : fetchResponse.messageSet(consumer.topic, kafkaPartition.getPartitionId())) {
                 offset = msg.nextOffset();
-                consumer.putMessage(kafkaPartition, msg.message());
+                consumer.putMessage(kafkaPartition, msg.message(), msg.offset());
               }
               if (offset != -1) {
                 consumer.offsetTrack.put(kafkaPartition, offset);
