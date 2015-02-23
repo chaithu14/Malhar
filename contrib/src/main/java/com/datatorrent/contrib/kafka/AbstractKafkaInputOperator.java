@@ -23,7 +23,14 @@ import com.datatorrent.common.util.Pair;
 import com.datatorrent.lib.io.IdempotentStorageManager;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
+import kafka.api.FetchRequest;
+import kafka.api.FetchRequestBuilder;
+import kafka.cluster.Broker;
+import kafka.javaapi.FetchResponse;
+import kafka.javaapi.PartitionMetadata;
+import kafka.javaapi.consumer.SimpleConsumer;
 import kafka.message.Message;
+import kafka.message.MessageAndOffset;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,6 +39,8 @@ import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -113,7 +122,6 @@ public abstract class AbstractKafkaInputOperator<K extends KafkaConsumer> implem
     consumer.create();
     operatorId = context.getId();
     idempotentStorageManager.setup(context);
-    //shardPosition.clear();
     if (context.getValue(OperatorContext.ACTIVATION_WINDOW_ID) < idempotentStorageManager.getLargestRecoveryWindow()) {
       isReplayState = true;
     }
@@ -151,6 +159,58 @@ public abstract class AbstractKafkaInputOperator<K extends KafkaConsumer> implem
       }
 
       System.out.println("Recovery Data Size: " + recoveredData.size());
+
+      Map<String, List<PartitionMetadata>> pms = KafkaMetadataUtil.getPartitionsForTopic(getConsumer().brokers, getConsumer().topic);
+      if (pms == null) {
+       return;
+      }
+
+      if(!(getConsumer() instanceof  SimpleKafkaConsumer))
+        return;
+      SimpleKafkaConsumer cons = (SimpleKafkaConsumer)getConsumer();
+      // add all partition request in one Fretch request together
+      FetchRequestBuilder frb = new FetchRequestBuilder().clientId(cons.getClientId());
+      for (Map.Entry<KafkaPartition, Pair<Long, Integer>> rc: recoveredData.entrySet()) {
+        KafkaPartition kp = rc.getKey();
+        List<PartitionMetadata> pmsVal = pms.get(kp.getClusterId());
+
+        Iterator<PartitionMetadata> pmIterator = pmsVal.iterator();
+        PartitionMetadata pm = pmIterator.next();
+        while(pm.partitionId() != kp.getPartitionId())
+        {
+          if(!pmIterator.hasNext())
+            break;
+          pm=pmIterator.next();
+        }
+        if(pm.partitionId() != kp.getPartitionId())
+          continue;
+
+        Broker bk = pm.leader();
+
+        frb.addFetch(consumer.topic, rc.getKey().getPartitionId(), rc.getValue().first, cons.getBufferSize());
+        FetchRequest req = frb.build();
+
+        SimpleConsumer ksc = new SimpleConsumer(bk.host(), bk.port(), cons.getTimeout(), cons.getBufferSize(), cons.getClientId());
+        if (ksc == null) {
+         continue;
+        }
+        FetchResponse fetchResponse = ksc.fetch(req);
+        long offset = -1l;
+        Integer count = 0;
+        for (MessageAndOffset msg : fetchResponse.messageSet(consumer.topic, kp.getPartitionId())) {
+          offset = msg.nextOffset();
+          try {
+            consumer.putMessage(kp, msg.message(), msg.offset());
+          } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+          }
+          count = count + 1;
+          if(count == rc.getValue().second)
+            break;
+        }
+      }
+
+
       /*if(!(getConsumer() instanceof  SimpleKafkaConsumer))
         return;
       SimpleKafkaConsumer cons = (SimpleKafkaConsumer)getConsumer();
