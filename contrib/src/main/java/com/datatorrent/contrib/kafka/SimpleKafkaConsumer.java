@@ -95,6 +95,9 @@ public class SimpleKafkaConsumer extends KafkaConsumer
     private SimpleKafkaConsumer consumer;
     // partitions consumed in this thread
     private final Set<KafkaPartition> kpS;
+    // Partitions consumed in this thread, don't remove the partitions
+    // from this set. Clear it at final block
+    private final Set<KafkaPartition> copyKpS;
     @SuppressWarnings("rawtypes")
     private Future threadItSelf;
 
@@ -104,6 +107,7 @@ public class SimpleKafkaConsumer extends KafkaConsumer
       this.clientName = consumer.getClientName(broker.host() + "_" + broker.port());
       this.consumer = consumer;
       this.kpS = kpl;
+      this.copyKpS = new HashSet<KafkaPartition>(kpl);
     }
 
     @Override
@@ -128,6 +132,8 @@ public class SimpleKafkaConsumer extends KafkaConsumer
           }
         }
 
+        boolean flag = false; // Enable the flag, if anyone of the kafka partitions of this consumer is active
+
         // stop consuming only when the consumer container is stopped or the metadata can not be refreshed
         while (consumer.isAlive && (consumer.metadataRefreshRetryLimit == -1 || consumer.retryCounter.get() < consumer.metadataRefreshRetryLimit)) {
 
@@ -138,17 +144,28 @@ public class SimpleKafkaConsumer extends KafkaConsumer
             FetchRequestBuilder frb = new FetchRequestBuilder().clientId(clientName);
             // add all partition request in one Fretch request together
             for (KafkaPartition kpForConsumer : kpS) {
+              if(consumer.partitionState.get(kpForConsumer))
+              {
+                flag = true;
+                break;
+              }
               frb.addFetch(consumer.topic, kpForConsumer.getPartitionId(), consumer.offsetTrack.get(kpForConsumer), consumer.bufferSize);
             }
 
             FetchRequest req = frb.build();
-            if (ksc == null) {
+            if (ksc == null || flag) {
               if (consumer.metadataRefreshInterval > 0) {
                 Thread.sleep(consumer.metadataRefreshInterval + 1000);
               } else {
                 Thread.sleep(100);
               }
+              if(flag)
+              {
+                flag = false;
+                continue;
+              }
             }
+
             FetchResponse fetchResponse = ksc.fetch(req);
             for (Iterator<KafkaPartition> iterator = kpS.iterator(); iterator.hasNext();) {
               KafkaPartition kafkaPartition = (KafkaPartition) iterator.next();
@@ -183,7 +200,11 @@ public class SimpleKafkaConsumer extends KafkaConsumer
           // Update consumer that these partitions are currently stop being consumed because of some unrecoverable exception
           consumer.partitionToBroker.remove(kpForConsumer);
         }
-        
+        for(KafkaPartition kpForConsumer : copyKpS) {
+          consumer.partitionState.replace(kpForConsumer, false);
+        }
+
+        copyKpS.clear();
         logger.info("Exit the consumer thread for broker {} ", broker);
       }
     }
@@ -192,6 +213,7 @@ public class SimpleKafkaConsumer extends KafkaConsumer
     {
       // Add the partition(s) to this existing consumer thread they are assigned to this broker
       kpS.addAll(newKps);
+      copyKpS.addAll(newKps);
 
     }
 
@@ -294,6 +316,9 @@ public class SimpleKafkaConsumer extends KafkaConsumer
 
   // This map maintains mapping between kafka partition and it's leader broker in realtime monitored by a thread
   private transient final ConcurrentHashMap<KafkaPartition, Broker> partitionToBroker = new ConcurrentHashMap<KafkaPartition, Broker>();
+
+  // This map maintains the state of the kafka partitions
+  private transient final ConcurrentHashMap<KafkaPartition, Boolean> partitionState = new ConcurrentHashMap<KafkaPartition, Boolean>();
   
   /**
    * Track offset for each partition, so operator could start from the last serialized state Use ConcurrentHashMap to
@@ -365,6 +390,10 @@ public class SimpleKafkaConsumer extends KafkaConsumer
                   // Out of this consumer's scope
                   continue;
                 }
+
+                if(!partitionState.containsKey(kp))
+                  partitionState.put(kp, false);
+
                 Broker b = pm.leader();
                 Broker oldB = partitionToBroker.put(kp, b);
                 if (oldB == null) {
@@ -376,6 +405,7 @@ public class SimpleKafkaConsumer extends KafkaConsumer
                   // add to positive and negative map
                   deltaPositive.put(b, kp);
                   deltaNegative.put(oldB, kp);
+                  partitionState.replace(kp, true);
                 }
 
                 // always update the latest connection information
