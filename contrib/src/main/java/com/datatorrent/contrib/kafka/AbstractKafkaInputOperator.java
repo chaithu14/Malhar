@@ -23,6 +23,14 @@ import com.datatorrent.common.util.Pair;
 import com.datatorrent.lib.io.IdempotentStorageManager;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import javax.validation.Valid;
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotNull;
 import kafka.api.FetchRequest;
 import kafka.api.FetchRequestBuilder;
 import kafka.cluster.Broker;
@@ -33,15 +41,6 @@ import kafka.message.Message;
 import kafka.message.MessageAndOffset;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import javax.validation.Valid;
-import javax.validation.constraints.Min;
-import javax.validation.constraints.NotNull;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
 
 /**
  * This is a base implementation of a Kafka input operator, which consumes data from Kafka message bus.&nbsp; Subclasses
@@ -83,6 +82,8 @@ public abstract class AbstractKafkaInputOperator<K extends KafkaConsumer> implem
   protected transient int operatorId;
   protected final transient Map<KafkaPartition, Pair<Long, Integer>> currentWindowRecoveryState;
   protected transient boolean isReplayState;
+  protected transient Map<KafkaPartition, Long> offsetStats = new HashMap<KafkaPartition, Long>();
+  private transient OperatorContext context = null;
   @NotNull
   @Valid
   protected KafkaConsumer consumer = new SimpleKafkaConsumer();
@@ -120,8 +121,10 @@ public abstract class AbstractKafkaInputOperator<K extends KafkaConsumer> implem
   {
     logger.debug("consumer {} topic {} cacheSize {}", consumer, consumer.getTopic(), consumer.getCacheSize());
     consumer.create();
+    this.context = context;
     operatorId = context.getId();
     idempotentStorageManager.setup(context);
+    offsetStats.clear();
     if (context.getValue(OperatorContext.ACTIVATION_WINDOW_ID) < idempotentStorageManager.getLargestRecoveryWindow()) {
       isReplayState = true;
     }
@@ -176,13 +179,12 @@ public abstract class AbstractKafkaInputOperator<K extends KafkaConsumer> implem
 
         Iterator<PartitionMetadata> pmIterator = pmsVal.iterator();
         PartitionMetadata pm = pmIterator.next();
-        while(pm.partitionId() != kp.getPartitionId())
-        {
-          if(!pmIterator.hasNext())
+        while (pm.partitionId() != kp.getPartitionId()) {
+          if (!pmIterator.hasNext())
             break;
-          pm=pmIterator.next();
+          pm = pmIterator.next();
         }
-        if(pm.partitionId() != kp.getPartitionId())
+        if (pm.partitionId() != kp.getPartitionId())
           continue;
 
         Broker bk = pm.leader();
@@ -192,24 +194,18 @@ public abstract class AbstractKafkaInputOperator<K extends KafkaConsumer> implem
 
         SimpleConsumer ksc = new SimpleConsumer(bk.host(), bk.port(), cons.getTimeout(), cons.getBufferSize(), cons.getClientId());
         if (ksc == null) {
-         continue;
+          continue;
         }
         FetchResponse fetchResponse = ksc.fetch(req);
-        long offset = -1l;
         Integer count = 0;
         for (MessageAndOffset msg : fetchResponse.messageSet(consumer.topic, kp.getPartitionId())) {
-          offset = msg.nextOffset();
-          try {
-            consumer.putMessage(kp, msg.message(), msg.offset());
-          } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-          }
+          emitTuple(msg.message());
+          offsetStats.put(kp, msg.offset());
           count = count + 1;
-          if(count == rc.getValue().second)
+          if (count == rc.getValue().second)
             break;
         }
       }
-
 
       /*if(!(getConsumer() instanceof  SimpleKafkaConsumer))
         return;
@@ -235,6 +231,10 @@ public abstract class AbstractKafkaInputOperator<K extends KafkaConsumer> implem
   {
     if (currentWindowId > idempotentStorageManager.getLargestRecoveryWindow()) {
       try {
+        if((getConsumer() instanceof  SimpleKafkaConsumer)) {
+          SimpleKafkaConsumer cons = (SimpleKafkaConsumer)getConsumer();
+          context.setCounters(cons.getConsumerStats(offsetStats));
+        }
         idempotentStorageManager.save(currentWindowRecoveryState, operatorId, currentWindowId);
       }
       catch (IOException e) {
@@ -304,15 +304,27 @@ public abstract class AbstractKafkaInputOperator<K extends KafkaConsumer> implem
     for (int i = 0; i < count; i++) {
       KafkaConsumer.holdingData consumerData = consumer.pollMessage();
       emitTuple(consumerData.msg);
+      offsetStats.put(consumerData.kafkaPart, consumerData.offSet);
       if(!currentWindowRecoveryState.containsKey(consumerData.kafkaPart))
       {
         currentWindowRecoveryState.put(consumerData.kafkaPart, new Pair<Long, Integer>(consumerData.offSet, 1));
       } else {
         Pair<Long, Integer> second = currentWindowRecoveryState.get(consumerData.kafkaPart);
-        Integer noOfRecords = second.getSecond();
-        currentWindowRecoveryState.put(consumerData.kafkaPart, new Pair<Long, Integer>(second.getFirst(), noOfRecords+1));
+        Integer noOfMessages = second.getSecond();
+        currentWindowRecoveryState.put(consumerData.kafkaPart, new Pair<Long, Integer>(second.getFirst(), noOfMessages+1));
       }
-      //shardPosition.put(shardId, recordId);
+    }
+    if(isReplayState)
+    {
+      isReplayState = false;
+      if(!(getConsumer() instanceof  SimpleKafkaConsumer))
+        return;
+      SimpleKafkaConsumer cons = (SimpleKafkaConsumer)getConsumer();
+      // Set the offset positions to the consumer
+      Map<KafkaPartition, Long> currentOffsets = new HashMap<KafkaPartition, Long>(cons.getCurrentOffsets());
+      currentOffsets.putAll(offsetStats);
+      cons.resetOffset(currentOffsets);
+      cons.start();
     }
     emitCount += count;
   }

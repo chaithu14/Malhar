@@ -492,7 +492,7 @@ public class SimpleKafkaConsumer extends KafkaConsumer
     return offsetTrack;
   }
 
-  private void resetOffset(Map<KafkaPartition, Long> overrideOffset)
+  public void resetOffset(Map<KafkaPartition, Long> overrideOffset)
   {
     if (overrideOffset == null) {
       return;
@@ -507,10 +507,9 @@ public class SimpleKafkaConsumer extends KafkaConsumer
     }
   }
 
-  @Override
-  public KafkaMeterStats getConsumerStats()
+  public KafkaMeterStats getConsumerStats(Map<KafkaPartition, Long> offsetStats)
   {
-    stats.updateOffsets(offsetTrack);
+    stats.updateOffsets(offsetStats);
     return super.getConsumerStats();
   }
 
