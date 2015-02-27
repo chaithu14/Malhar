@@ -95,8 +95,8 @@ public class SimpleKafkaConsumer extends KafkaConsumer
     private SimpleKafkaConsumer consumer;
     // partitions consumed in this thread
     private final Set<KafkaPartition> kpS;
-    // Partitions consumed in this thread, don't remove the partitions
-    // from this set. Clear it at final block
+    // Partitions consumed in this thread.
+    // Deactivate the partitions state in this set at final block.
     private final Set<KafkaPartition> copyKpS;
     @SuppressWarnings("rawtypes")
     private Future threadItSelf;
@@ -132,7 +132,7 @@ public class SimpleKafkaConsumer extends KafkaConsumer
           }
         }
 
-        boolean flag = false; // Enable the flag, if anyone of the kafka partitions of this consumer is active
+        boolean isPartitionActive = false; // Enable this variable, if anyone of the kafka partitions of this consumer is active
 
         // stop consuming only when the consumer container is stopped or the metadata can not be refreshed
         while (consumer.isAlive && (consumer.metadataRefreshRetryLimit == -1 || consumer.retryCounter.get() < consumer.metadataRefreshRetryLimit)) {
@@ -146,22 +146,22 @@ public class SimpleKafkaConsumer extends KafkaConsumer
             for (KafkaPartition kpForConsumer : kpS) {
               if(consumer.partitionState.get(kpForConsumer))
               {
-                flag = true;
+                isPartitionActive = true;
                 break;
               }
               frb.addFetch(consumer.topic, kpForConsumer.getPartitionId(), consumer.offsetTrack.get(kpForConsumer), consumer.bufferSize);
             }
 
             FetchRequest req = frb.build();
-            if (ksc == null || flag) {
+            if (ksc == null || isPartitionActive) {
               if (consumer.metadataRefreshInterval > 0) {
                 Thread.sleep(consumer.metadataRefreshInterval + 1000);
               } else {
                 Thread.sleep(100);
               }
-              if(flag)
+              if(isPartitionActive)
               {
-                flag = false;
+                isPartitionActive = false;
                 continue;
               }
             }
