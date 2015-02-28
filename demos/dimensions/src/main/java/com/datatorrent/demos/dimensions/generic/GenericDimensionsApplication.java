@@ -16,13 +16,12 @@
 package com.datatorrent.demos.dimensions.generic;
 
 import com.datatorrent.api.Context;
-import org.apache.hadoop.conf.Configuration;
-
 import com.datatorrent.api.DAG;
 import com.datatorrent.api.StreamingApplication;
 import com.datatorrent.api.annotation.ApplicationAnnotation;
 import com.datatorrent.contrib.kafka.KafkaSinglePortOutputOperator;
-import com.datatorrent.contrib.kafka.KafkaSinglePortStringInputOperator;
+import com.datatorrent.contrib.kafka.KafkaStringInputOperator;
+import org.apache.hadoop.conf.Configuration;
 
 /**
  * DimensionsDemo run with HDHT
@@ -108,7 +107,7 @@ public class GenericDimensionsApplication implements StreamingApplication
     JsonToMapConverter converter = dag.addOperator("Parse", JsonToMapConverter.class);
     GenericDimensionComputation dimensions = dag.addOperator("Compute", new GenericDimensionComputation());
     DimensionStoreOperator store = dag.addOperator("Store", DimensionStoreOperator.class);
-    KafkaSinglePortStringInputOperator queries = dag.addOperator("Query", new KafkaSinglePortStringInputOperator());
+    KafkaStringInputOperator queries = dag.addOperator("Query", new KafkaStringInputOperator());
     KafkaSinglePortOutputOperator<Object, Object> queryResult = dag.addOperator("QueryResult", new KafkaSinglePortOutputOperator<Object, Object>());
 
     dag.setInputPortAttribute(converter.input, Context.PortContext.PARTITION_PARALLEL, true);

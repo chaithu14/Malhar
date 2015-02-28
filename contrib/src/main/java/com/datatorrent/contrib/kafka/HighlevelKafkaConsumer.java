@@ -147,23 +147,9 @@ public class HighlevelKafkaConsumer extends KafkaConsumer
   }
 
   @Override
-  protected KafkaConsumer cloneConsumer(Set<Integer> partitionIds)
+  protected void resetPartitionsAndOffset(Set<Integer> partitionIds, Map<Integer, Long> startOffset)
   {
-    return cloneConsumer(partitionIds, null);
-  }
-  
-  @Override
-  protected KafkaConsumer cloneConsumer(Set<Integer> partitionIds, Map<Integer, Long> startOffset)
-  {
-    Properties newProp = new Properties();
-    // Copy most properties from the template consumer. For example the "group.id" should be set to same value 
-    newProp.putAll(consumerConfig);
-    HighlevelKafkaConsumer newConsumer = new HighlevelKafkaConsumer(newProp);
-    newConsumer.setBrokerSet(this.brokerSet);
-    newConsumer.setTopic(this.topic);
-    newConsumer.numStream = partitionIds.size();
-    newConsumer.initialOffset = initialOffset;
-    return newConsumer;
+    this.numStream = partitionIds.size();
   }
 
   @Override

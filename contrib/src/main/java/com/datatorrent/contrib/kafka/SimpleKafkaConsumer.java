@@ -380,25 +380,6 @@ public class SimpleKafkaConsumer extends KafkaConsumer
   }
 
   @Override
-  protected KafkaConsumer cloneConsumer(Set<Integer> partitionIds, Map<Integer, Long> startOffset)
-  {
-    // create different client for same partition
-    SimpleKafkaConsumer  skc = new SimpleKafkaConsumer(brokerSet, topic, timeout, bufferSize, clientId, partitionIds);
-    skc.setCacheSize(getCacheSize());
-    skc.setMetadataRefreshInterval(getMetadataRefreshInterval());
-    skc.setMetadataRefreshRetryLimit(getMetadataRefreshRetryLimit());
-    skc.initialOffset = this.initialOffset;
-    skc.resetOffset(startOffset);
-    skc.setCacheSize(getCacheSize());
-    return skc;
-  }
-
-  @Override
-  protected KafkaConsumer cloneConsumer(Set<Integer> partitionIds){
-    return cloneConsumer(partitionIds, null);
-  }
-
-  @Override
   protected void commitOffset()
   {
     // the simple consumer offset is kept in the offsetTrack
@@ -439,5 +420,11 @@ public class SimpleKafkaConsumer extends KafkaConsumer
     return super.getConsumerStats();
   }
 
+  @Override
+  protected void resetPartitionsAndOffset(Set<Integer> partitionIds, Map<Integer, Long> startOffset)
+  {
+    this.partitionIds = partitionIds;
+    resetOffset(startOffset);
+  }
 
 } // End of SimpleKafkaConsumer

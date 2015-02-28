@@ -109,7 +109,7 @@ public class KafkaInputOperatorTest extends KafkaOperatorTestBase
 
 
     // Create KafkaSinglePortStringInputOperator
-    KafkaSinglePortStringInputOperator node = dag.addOperator("Kafka message consumer", KafkaSinglePortStringInputOperator.class);
+    KafkaStringInputOperator node = dag.addOperator("Kafka message consumer", KafkaStringInputOperator.class);
     consumer.setTopic(TEST_TOPIC);
     if (isValid) {
       Set<String> brokerSet = new HashSet<String>();

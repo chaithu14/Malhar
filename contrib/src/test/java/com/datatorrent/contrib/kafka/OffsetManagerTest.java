@@ -44,7 +44,7 @@ import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.LocalMode;
 import com.datatorrent.api.Operator;
 import com.datatorrent.api.DAG.Locality;
-import com.datatorrent.contrib.kafka.AbstractPartitionableKafkaInputOperator.PartitionStrategy;
+import com.datatorrent.contrib.kafka.AbstractKafkaInputOperator.PartitionStrategy;
 
 public class OffsetManagerTest extends KafkaOperatorTestBase
 {
@@ -220,7 +220,7 @@ public class OffsetManagerTest extends KafkaOperatorTestBase
     DAG dag = lma.getDAG();
 
     // Create KafkaSinglePortStringInputOperator
-    PartitionableKafkaSinglePortStringInputOperator node = dag.addOperator("Kafka message consumer", PartitionableKafkaSinglePortStringInputOperator.class);
+    KafkaStringInputOperator node = dag.addOperator("Kafka message consumer", KafkaStringInputOperator.class);
 
 
     TestOffsetManager tfm = new TestOffsetManager();

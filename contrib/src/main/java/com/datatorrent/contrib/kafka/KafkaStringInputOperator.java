@@ -29,7 +29,7 @@ import java.nio.ByteBuffer;
  *
  * @since 0.3.5
  */
-public class KafkaSinglePortStringInputOperator extends AbstractKafkaSinglePortInputOperator<String>
+public class KafkaStringInputOperator extends AbstractKafkaInputOperator<KafkaConsumer, String>
 {
 
   /**

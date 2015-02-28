@@ -137,7 +137,7 @@ public class KafkaPartitionableInputOperatorTest extends KafkaOperatorTestBase
     DAG dag = lma.getDAG();
 
     // Create KafkaSinglePortStringInputOperator
-    PartitionableKafkaSinglePortStringInputOperator node = dag.addOperator("Kafka message consumer", PartitionableKafkaSinglePortStringInputOperator.class);
+    KafkaStringInputOperator node = dag.addOperator("Kafka message consumer", KafkaStringInputOperator.class);
     node.setInitialPartitionCount(1);
 
     //set topic
