@@ -184,7 +184,6 @@ public abstract class AbstractKafkaInputOperator<K extends KafkaConsumer> implem
   {
     return consumer;
   }
-
   // add topic as operator property
   public void setTopic(String topic)
   {

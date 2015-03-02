@@ -94,6 +94,7 @@ public abstract class KafkaConsumer implements Closeable
   protected SetMultimap<String, String> zookeeper;
   
   protected transient SetMultimap<String, String> brokers;
+  protected transient Map<String, String> clusterId2Topic;
 
 
   /**
@@ -116,6 +117,7 @@ public abstract class KafkaConsumer implements Closeable
    */
   public void create(){
     initBrokers();
+    createTopics();
     holdingBuffer = new ArrayBlockingQueue<Message>(cacheSize);
 
   };
@@ -132,6 +134,21 @@ public abstract class KafkaConsumer implements Closeable
       }
     }
     
+  }
+
+  public void createTopics()
+  {
+    clusterId2Topic = new HashMap<String, String>();
+    for (String tp : topic.split(",")) {
+      String[] parts = tp.split(":");
+      if (parts.length == 2) {
+        clusterId2Topic.put(parts[0], parts[1]);
+      } else if (parts.length == 1) {
+        clusterId2Topic.put(KafkaPartition.DEFAULT_CLUSTERID, parts[0] + ":" + parts[1]);
+      } else
+        throw new IllegalArgumentException("Wrong topic string: " + topic + "\n"
+            + " Expected format should be cluster1:topic1,cluster2:topic2 or topic1");
+    }
   }
 
   /**
@@ -220,6 +237,10 @@ public abstract class KafkaConsumer implements Closeable
     this.cacheSize = cacheSize;
   }
 
+  public Map<String, String> getClusterId2Topic()
+  {
+    return clusterId2Topic;
+  }
 
   final protected void putMessage(KafkaPartition partition, Message msg) throws InterruptedException{
     // block from receiving more message

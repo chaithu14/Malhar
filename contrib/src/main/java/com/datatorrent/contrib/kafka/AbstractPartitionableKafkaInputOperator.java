@@ -149,7 +149,7 @@ public abstract class AbstractPartitionableKafkaInputOperator extends AbstractKa
     // get partition metadata for topics.
     // Whatever operator is using high-level or simple kafka consumer, the operator always create a temporary simple kafka consumer to get the metadata of the topic
     // The initial value of brokerList of the KafkaConsumer is used to retrieve the topic metadata
-    Map<String, List<PartitionMetadata>> kafkaPartitions = KafkaMetadataUtil.getPartitionsForTopic(getConsumer().brokers, getConsumer().getTopic());
+    Map<String, List<PartitionMetadata>> kafkaPartitions = KafkaMetadataUtil.getPartitionsForTopic(getConsumer().brokers, getConsumer().getClusterId2Topic());
 
     // Operator partitions
     List<Partition<AbstractPartitionableKafkaInputOperator>> newPartitions = null;
@@ -178,7 +178,7 @@ public abstract class AbstractPartitionableKafkaInputOperator extends AbstractKa
             String clusterId = kp.getKey();
             for (PartitionMetadata pm : kp.getValue()) {
               logger.info("[ONE_TO_ONE]: Create operator partition for cluster {}, topic {}, kafka partition {} ", clusterId, getConsumer().topic, pm.partitionId());
-              newPartitions.add(createPartition(Sets.newHashSet(new KafkaPartition(clusterId, consumer.topic, pm.partitionId())), initOffset));
+              newPartitions.add(createPartition(Sets.newHashSet(new KafkaPartition(clusterId, consumer.getClusterId2Topic().get(kp.getKey()), pm.partitionId())), initOffset));
             }
           }
           
@@ -216,7 +216,7 @@ public abstract class AbstractPartitionableKafkaInputOperator extends AbstractKa
               if (kps[i % size] == null) {
                 kps[i % size] = new HashSet<KafkaPartition>();
               }
-              kps[i % size].add(new KafkaPartition(clusterId, consumer.topic, pm.partitionId()));
+              kps[i % size].add(new KafkaPartition(clusterId, consumer.clusterId2Topic.get(en.getKey()), pm.partitionId()));
               i++;
             }
           }
@@ -427,9 +427,9 @@ public abstract class AbstractPartitionableKafkaInputOperator extends AbstractKa
           existingIds.addAll(pio.kpids);
         }
 
-        for (Entry<String, List<PartitionMetadata>> en : KafkaMetadataUtil.getPartitionsForTopic(consumer.brokers, consumer.getTopic()).entrySet()) {
+        for (Entry<String, List<PartitionMetadata>> en : KafkaMetadataUtil.getPartitionsForTopic(consumer.brokers, consumer.getClusterId2Topic()).entrySet()) {
           for (PartitionMetadata pm : en.getValue()) {
-            KafkaPartition pa = new KafkaPartition(en.getKey(), consumer.topic, pm.partitionId());
+            KafkaPartition pa = new KafkaPartition(en.getKey(), consumer.getClusterId2Topic().get(en.getKey()), pm.partitionId());
             if(!existingIds.contains(pa)){
               newWaitingPartition.add(pa);
             }

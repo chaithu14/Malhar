@@ -132,7 +132,7 @@ public class HighlevelKafkaConsumer extends KafkaConsumer
         numStream = new HashMap<String, Integer>();
       }
       // get metadata from kafka and initialize streams accordingly
-      for (Entry<String, List<PartitionMetadata>> e : KafkaMetadataUtil.getPartitionsForTopic(brokers, topic).entrySet()) {
+      for (Entry<String, List<PartitionMetadata>> e : KafkaMetadataUtil.getPartitionsForTopic(brokers, clusterId2Topic).entrySet()) {
         numStream.put(e.getKey(), e.getValue().size());
       }
     }
@@ -151,13 +151,13 @@ public class HighlevelKafkaConsumer extends KafkaConsumer
     for (final Entry<String, Integer> e : numStream.entrySet()) {
 
       int realNumStream = e.getValue();
-      topicCountMap.put(topic, new Integer(realNumStream));
+      topicCountMap.put(clusterId2Topic.get(e.getKey()), new Integer(realNumStream));
       Map<String, List<KafkaStream<byte[], byte[]>>> consumerMap = standardConsumer.get(e.getKey()).createMessageStreams(topicCountMap);
 
-      for (final KafkaStream<byte[], byte[]> stream : consumerMap.get(topic)) {
+      for (final KafkaStream<byte[], byte[]> stream : consumerMap.get(clusterId2Topic.get(e.getKey()))) {
         consumerThreadExecutor.submit(new Runnable() {
 
-          KafkaPartition kp = new KafkaPartition(e.getKey(), topic, -1);
+          KafkaPartition kp = new KafkaPartition(e.getKey(), clusterId2Topic.get(e.getKey()), -1);
 
           public void run()
           {

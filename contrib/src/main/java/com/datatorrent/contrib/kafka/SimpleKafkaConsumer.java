@@ -124,7 +124,7 @@ public class SimpleKafkaConsumer extends KafkaConsumer
           } else {
             long startOffsetReq = consumer.initialOffset.equalsIgnoreCase("earliest") ? OffsetRequest.EarliestTime() : OffsetRequest.LatestTime();
             logger.info("Partition {} initial offset {} {}", kpForConsumer.getPartitionId(), startOffsetReq, consumer.initialOffset);
-            consumer.offsetTrack.put(kpForConsumer, KafkaMetadataUtil.getLastOffset(ksc, consumer.topic, kpForConsumer.getPartitionId(), startOffsetReq, clientName));
+            consumer.offsetTrack.put(kpForConsumer, KafkaMetadataUtil.getLastOffset(ksc, kpForConsumer.getTopic(), kpForConsumer.getPartitionId(), startOffsetReq, clientName));
           }
         }
 
@@ -138,7 +138,7 @@ public class SimpleKafkaConsumer extends KafkaConsumer
             FetchRequestBuilder frb = new FetchRequestBuilder().clientId(clientName);
             // add all partition request in one Fretch request together
             for (KafkaPartition kpForConsumer : kpS) {
-              frb.addFetch(consumer.topic, kpForConsumer.getPartitionId(), consumer.offsetTrack.get(kpForConsumer), consumer.bufferSize);
+              frb.addFetch(kpForConsumer.getTopic(), kpForConsumer.getPartitionId(), consumer.offsetTrack.get(kpForConsumer), consumer.bufferSize);
             }
 
             FetchRequest req = frb.build();
@@ -152,10 +152,10 @@ public class SimpleKafkaConsumer extends KafkaConsumer
             FetchResponse fetchResponse = ksc.fetch(req);
             for (Iterator<KafkaPartition> iterator = kpS.iterator(); iterator.hasNext();) {
               KafkaPartition kafkaPartition = (KafkaPartition) iterator.next();
-              if (fetchResponse.hasError() && fetchResponse.errorCode(consumer.topic, kafkaPartition.getPartitionId()) != ErrorMapping.NoError()) {
+              if (fetchResponse.hasError() && fetchResponse.errorCode(kafkaPartition.getTopic(), kafkaPartition.getPartitionId()) != ErrorMapping.NoError()) {
                 // Kick off partition(s) which has error when fetch from this broker temporarily 
                 // Monitor will find out which broker it goes in monitor thread
-                logger.warn("Error when consuming topic {} from broker {} with error code {} ", kafkaPartition, broker,  fetchResponse.errorCode(consumer.topic, kafkaPartition.getPartitionId()));
+                logger.warn("Error when consuming topic {} from broker {} with error code {} ", kafkaPartition, broker,  fetchResponse.errorCode(kafkaPartition.getTopic(), kafkaPartition.getPartitionId()));
                 iterator.remove();
                 consumer.partitionToBroker.remove(kafkaPartition);
                 consumer.stats.updatePartitionStats(kafkaPartition, -1, "");
@@ -163,7 +163,7 @@ public class SimpleKafkaConsumer extends KafkaConsumer
               } 
               // If the fetchResponse either has no error or the no error for $kafkaPartition get the data
               long offset = -1l;
-              for (MessageAndOffset msg : fetchResponse.messageSet(consumer.topic, kafkaPartition.getPartitionId())) {
+              for (MessageAndOffset msg : fetchResponse.messageSet(kafkaPartition.getTopic(), kafkaPartition.getPartitionId())) {
                 offset = msg.nextOffset();
                 consumer.putMessage(kafkaPartition, msg.message());
               }
@@ -306,7 +306,7 @@ public class SimpleKafkaConsumer extends KafkaConsumer
   public void create()
   {
     super.create();
-    Map<String, List<PartitionMetadata>> partitionMetas = KafkaMetadataUtil.getPartitionsForTopic(brokers, topic);
+    Map<String, List<PartitionMetadata>> partitionMetas = KafkaMetadataUtil.getPartitionsForTopic(brokers, clusterId2Topic);
     if (kps == null) {
       kps = new HashSet<KafkaPartition>();
     }
@@ -319,7 +319,7 @@ public class SimpleKafkaConsumer extends KafkaConsumer
     for (Entry<String, List<PartitionMetadata>> en : partitionMetas.entrySet()) {
       String clusterId = en.getKey();
       for (PartitionMetadata part : en.getValue()) {
-        KafkaPartition kp = new KafkaPartition(clusterId, topic, part.partitionId());
+        KafkaPartition kp = new KafkaPartition(clusterId, clusterId2Topic.get(clusterId), part.partitionId());
         kps.add(kp);
       }
     }
@@ -351,7 +351,7 @@ public class SimpleKafkaConsumer extends KafkaConsumer
         {
           if (isAlive && (metadataRefreshRetryLimit == -1 || retryCounter.get() < metadataRefreshRetryLimit)) {
             logger.debug("{}: Update metadata for topic {}", Thread.currentThread().getName(), topic);
-            Map<String, List<PartitionMetadata>> pms = KafkaMetadataUtil.getPartitionsForTopic(brokers, topic);
+            Map<String, List<PartitionMetadata>> pms = KafkaMetadataUtil.getPartitionsForTopic(brokers, clusterId2Topic);
             if (pms == null) {
               // retrieve metadata fail add retry count and return
               retryCounter.getAndAdd(1);
@@ -360,7 +360,7 @@ public class SimpleKafkaConsumer extends KafkaConsumer
 
             for (Entry<String, List<PartitionMetadata>> pmLEntry : pms.entrySet()) {
               for (PartitionMetadata pm : pmLEntry.getValue()) {
-                KafkaPartition kp = new KafkaPartition(pmLEntry.getKey(), topic, pm.partitionId());
+                KafkaPartition kp = new KafkaPartition(pmLEntry.getKey(), clusterId2Topic.get(pmLEntry.getKey()), pm.partitionId());
                 if (!kps.contains(kp)) {
                   // Out of this consumer's scope
                   continue;

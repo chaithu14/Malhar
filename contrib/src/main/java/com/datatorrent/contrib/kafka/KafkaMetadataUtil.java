@@ -101,7 +101,22 @@ public class KafkaMetadataUtil
         return getPartitionsForTopic(new HashSet<String>(bs), topic);
       }});
   }
-  
+
+  /**
+   * @param brokers in multiple clusters, keyed by cluster id
+   * @param topics different topics across cluster
+   * @return Get the partition metadata list for the specific topic via the brokers
+   * null if topic is not found
+   */
+  public static Map<String, List<PartitionMetadata>> getPartitionsForTopic(SetMultimap<String, String> brokers,  final Map<String, String> topics)
+  {
+    return Maps.transformEntries(brokers.asMap(), new EntryTransformer<String, Collection<String>, List<PartitionMetadata>>(){
+      @Override
+      public List<PartitionMetadata> transformEntry(String key, Collection<String> bs)
+      {
+        return getPartitionsForTopic(new HashSet<String>(bs), topics.get(key));
+      }});
+  }
   
   public static Set<String> getBrokers(Set<String> zkHost){
     
