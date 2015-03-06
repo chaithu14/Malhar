@@ -338,15 +338,20 @@ public abstract class AbstractKafkaInputOperator<K extends KafkaConsumer> implem
   public void setZookeeper(String zookeeperString)
   {
     SetMultimap<String, String> theClusters = HashMultimap.create();
-    for (String zk : zookeeperString.split(",")) {
+    for (String zk : zookeeperString.split(";")) {
       String[] parts = zk.split(":");
       if (parts.length == 3) {
-        theClusters.put(parts[0], parts[1] + ":" + parts[2]);
+        for(String hostName : parts[1].split(",")) {
+          theClusters.put(parts[0], hostName + ":" + parts[2]);
+        }
       } else if (parts.length == 2) {
-        theClusters.put(KafkaPartition.DEFAULT_CLUSTERID, parts[0] + ":" + parts[1]);
+        for(String hostName : parts[0].split(",")) {
+          theClusters.put(KafkaPartition.DEFAULT_CLUSTERID, hostName + ":" + parts[1]);
+        }
+
       } else
         throw new IllegalArgumentException("Wrong zookeeper string: " + zookeeperString + "\n"
-            + " Expected format should be cluster1:zookeeper1:port1,cluster2:zookeeper2:port2 or zookeeper1:port1,zookeeper:port2");
+            + " Expected format should be cluster1:zookeeper1,zookeeper2:port1;cluster2:zookeeper3:port2 or zookeeper1:port1,zookeeper:port2");
     }
     this.consumer.setZookeeper(theClusters);
   }
