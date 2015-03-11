@@ -271,4 +271,25 @@ public class KafkaInputOperatorTest extends KafkaOperatorTestBase
     Assert.assertEquals("Total messages collected ", totalCount, testMeta.sink.collectedTuples.size());
     testMeta.sink.collectedTuples.clear();
   }
+
+  @Test
+  public void testZookeeper() throws Exception
+  {
+    // initial the latch for this test
+    latch = new CountDownLatch(50);
+
+    testMeta.operator = new KafkaSinglePortStringInputOperator();
+
+    KafkaConsumer consumer = new SimpleKafkaConsumer();
+    consumer.setTopic(TEST_TOPIC);
+
+    testMeta.operator.setConsumer(consumer);
+    testMeta.operator.setZookeeper("cluster1::node0,node1,node2:2181;cluster2::node4:2181");
+    latch.await(500, TimeUnit.MILLISECONDS);
+
+    Assert.assertEquals("Total size of clusters ", 4, testMeta.operator.getConsumer().getZookeeper().size());
+    Assert.assertEquals("Number of nodes in cluster1 ", 3, testMeta.operator.getConsumer().getZookeeper().get("cluster1").size());
+    Assert.assertEquals("Number of nodes in cluster2 ", 1, testMeta.operator.getConsumer().getZookeeper().get("cluster2").size());
+  }
+
 }
