@@ -21,11 +21,10 @@ public class TestAppMySql implements StreamingApplication
 
     MapEnrichmentOperator enrichmentOperator = dag.addOperator("Enrichment", new MapEnrichmentOperator());
     JDBCLoader store = new JDBCLoader();
-    store.setDbName("enrichment");
-    store.setHostName("localhost");
+    store.setDbDriver("org.gjt.mm.mysql.Driver");
+    store.setDbUrl("jdbc:mysql://localhost/enrichment");
     store.setUserName("root");
-    store.setPassword("quantum");
-    store.setDbType("mysql");
+    store.setPassword("test");
     store.setTableName("productmapping");
 
     enrichmentOperator.setStore(store);
