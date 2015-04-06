@@ -3,45 +3,33 @@ package com.datatorrent.contrib.enrichment;
 import com.datatorrent.common.util.DTThrowable;
 
 import com.datatorrent.lib.db.jdbc.JdbcStore;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import javax.validation.constraints.NotNull;
 
-public class JDBCLoader extends DBLoader
+public class JDBCLoader extends JdbcStore implements EnrichmentBackup
 {
-  protected transient Connection connection = null;
-
-  protected final JdbcStore store;
-
   protected String queryStmt;
 
   protected String tableName;
 
-  public JDBLoader() {
-    store = new JdbcStore();
-  }
+  protected List<String> includeFields;
+  protected List<String> lookupFields;
 
-  @Override
-  public void connect() throws IOException {
-    store.connect();
-    connection = store.getConnection();
-    if(connection == null) {
-      logger.error("JDBC connection Failure");
-    }
-  }
-
-  @Override protected Object getQueryResult(Object key)
+  protected Object getQueryResult(Object key)
   {
     try {
       PreparedStatement getStatement ;
       if(queryStmt == null) {
-        getStatement = connection.prepareStatement(generateQueryStmt(key));
+        getStatement = getConnection().prepareStatement(generateQueryStmt(key));
       } else {
-        getStatement = connection.prepareStatement(queryStmt);
+        getStatement = getConnection().prepareStatement(queryStmt);
         ArrayList<Object> keys = (ArrayList<Object>) key;
         for (int i = 0; i < keys.size(); i++) {
           getStatement.setObject(i+1, keys.get(i));
@@ -53,7 +41,7 @@ public class JDBCLoader extends DBLoader
     }
   }
 
-  @Override protected ArrayList<Object> getDataFrmResult(Object result) throws RuntimeException
+  protected ArrayList<Object> getDataFrmResult(Object result) throws RuntimeException
   {
     try {
       ResultSet resultSet = (ResultSet) result;
@@ -100,32 +88,17 @@ public class JDBCLoader extends DBLoader
     return stmt;
   }
 
-  @Override
-  public void disconnect() throws IOException
-  {
-    store.disconnect();
-  }
-
-  @Override
-  public boolean isConnected() {
-   return store.isConnected();
-  }
-
   public String getQueryStmt()
   {
     return queryStmt;
   }
 
-<<<<<<< HEAD:contrib/src/main/java/com/datatorrent/contrib/enrichment/JDBCLoader.java
   @Override
   public boolean needRefresh() {
     return false;
   }
 
-  public void disconnect() throws IOException
-=======
   public void setQueryStmt(String queryStmt)
->>>>>>> Changed the interface DBLoader and JDBLoader:contrib/src/main/java/com/datatorrent/contrib/enrichment/JDBLoader.java
   {
     this.queryStmt = queryStmt;
   }
@@ -140,28 +113,47 @@ public class JDBCLoader extends DBLoader
     this.tableName = tableName;
   }
 
-  public void setDbUrl(String dbUrl)
+  @Override public void setLookupFields(List<String> lookupFields)
   {
-    store.setDbUrl(dbUrl);
+    this.lookupFields = lookupFields;
   }
 
-  public void setDbDriver(String dbDriver)
+  @Override public void setIncludeFields(List<String> includeFields)
   {
-    store.setDbDriver(dbDriver);
+    this.includeFields = includeFields;
   }
 
-  public void setUserName(String userName)
+  @Override public Map<Object, Object> loadInitialData()
   {
-    store.setUserName(userName);
+    return null;
   }
 
-  public void setPassword(String password)
+  @Override public Object get(Object key)
   {
-    store.setPassword(password);
+    return getDataFrmResult(getQueryResult(key));
   }
 
-  public void setConnectionProperties(String connectionProperties)
+  @Override public List<Object> getAll(List<Object> keys)
   {
-    store.setConnectionProperties(connectionProperties);
+    List<Object> values = Lists.newArrayList();
+    for (Object key : keys) {
+      values.add(get(key));
+    }
+    return values;
+  }
+
+  @Override public void put(Object key, Object value)
+  {
+    throw new RuntimeException("Not supported operation");
+  }
+
+  @Override public void putAll(Map<Object, Object> m)
+  {
+    throw new RuntimeException("Not supported operation");
+  }
+
+  @Override public void remove(Object key)
+  {
+    throw new RuntimeException("Not supported operation");
   }
 }

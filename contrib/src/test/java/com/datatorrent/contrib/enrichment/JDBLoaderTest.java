@@ -48,7 +48,7 @@ public class JDBLoaderTest
     private void createTable()
     {
         try {
-            Statement stmt = dbloader.connection.createStatement();
+            Statement stmt = dbloader.getConnection().createStatement();
 
             String createTable = "CREATE TABLE IF NOT EXISTS " + dbloader.getTableName() +
                     "(ID INT PRIMARY KEY     NOT NULL," +
@@ -68,7 +68,7 @@ public class JDBLoaderTest
     private void insertRecordsInTable()
     {
       try {
-        Statement stmt = dbloader.connection.createStatement();
+        Statement stmt = dbloader.getConnection().createStatement();
         String tbName = dbloader.getTableName();
 
         String sql = "INSERT INTO " + tbName + " (ID,NAME,AGE,ADDRESS,SALARY) " +
@@ -97,7 +97,7 @@ public class JDBLoaderTest
     {
         String sql = "delete from  " + dbloader.tableName;
         try {
-          Statement stmt = dbloader.connection.createStatement();
+          Statement stmt = dbloader.getConnection().createStatement();
           stmt.executeUpdate(sql);
           logger.debug("Table deleted successfully...");
         } catch (SQLException e) {

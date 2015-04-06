@@ -1,9 +1,11 @@
 package com.datatorrent.contrib.enrichment;
 
 import com.datatorrent.contrib.hbase.HBaseStore;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hbase.HBaseConfiguration;
@@ -14,40 +16,26 @@ import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.security.UserGroupInformation;
 
-public class HBaseLoader extends DBLoader
+public class HBaseLoader extends HBaseStore implements EnrichmentBackup
 {
+  protected List<String> includeFields;
+  protected List<String> lookupFields;
 
-  protected final HBaseStore store;
-
-  protected transient HTable hTable;
-  public HBaseLoader() {
-    store = new HBaseStore();
-  }
-
-  @Override
-  public void connect() throws IOException {
-    store.connect();
-    hTable = store.getTable();
-    if(hTable == null) {
-      logger.error("HBase connection Failure");
-    }
-  }
-
-  @Override protected Object getQueryResult(Object key)
+  protected Object getQueryResult(Object key)
   {
     try {
       Get get = new Get(getRowBytes(key));
       for(String f : includeFields) {
         get.addFamily(Bytes.toBytes(f));
       }
-      return hTable.get(get);
+      return getTable().get(get);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
 
   }
 
-  @Override protected ArrayList<Object> getDataFrmResult(Object result)
+  protected ArrayList<Object> getDataFrmResult(Object result)
   {
     Result res = (Result)result;
     if (res == null || res.isEmpty())
@@ -65,38 +53,47 @@ public class HBaseLoader extends DBLoader
     return ((String)key).getBytes();
   }
 
-  @Override
-  public void disconnect() throws IOException
+  @Override public void setLookupFields(List<String> lookupFields)
   {
-    store.disconnect();
+    this.lookupFields = lookupFields;
   }
 
-  @Override
-  public boolean isConnected() {
-    return store.isConnected();
+  @Override public void setIncludeFields(List<String> includeFields)
+  {
+    this.includeFields = includeFields;
   }
 
-
-  public void setZookeeperQuorum(String zookeeperQuorum) {
-    store.setZookeeperQuorum(zookeeperQuorum);
-  }
-  public void setZookeeperClientPort(int zookeeperClientPort) {
-    store.setZookeeperClientPort(zookeeperClientPort);
-  }
-  public void setTableName(String tableName) {
-    store.setTableName(tableName);
-  }
-  public void setPrincipal(String principal)
+  @Override public Map<Object, Object> loadInitialData()
   {
-    store.setPrincipal(principal);
-  }
-  public void setKeytabPath(String keytabPath)
-  {
-    store.setKeytabPath(keytabPath);
+    return null;
   }
 
-  public void setReloginCheckInterval(long reloginCheckInterval)
+  @Override public Object get(Object key)
   {
-    store.setReloginCheckInterval(reloginCheckInterval);
+    return getDataFrmResult(getQueryResult(key));
+  }
+
+  @Override public List<Object> getAll(List<Object> keys)
+  {
+    List<Object> values = Lists.newArrayList();
+    for (Object key : keys) {
+      values.add(get(key));
+    }
+    return values;
+  }
+
+  @Override public void put(Object key, Object value)
+  {
+    throw new RuntimeException("Not supported operation");
+  }
+
+  @Override public void putAll(Map<Object, Object> m)
+  {
+    throw new RuntimeException("Not supported operation");
+  }
+
+  @Override public void remove(Object key)
+  {
+    throw new RuntimeException("Not supported operation");
   }
 }
