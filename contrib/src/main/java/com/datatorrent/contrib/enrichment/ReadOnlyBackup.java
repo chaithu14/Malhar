@@ -1,7 +1,5 @@
 package com.datatorrent.contrib.enrichment;
 
-import com.datatorrent.lib.db.cache.CacheManager;
-
 import java.util.List;
 import java.util.Map;
 

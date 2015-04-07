@@ -10,8 +10,8 @@ public class BeanEnrichmentOperator extends AbstractEnrichmentOperator<Object, O
 
   public Class inputClass;
   public Class outputClass;
-  private List<Field> fields = new ArrayList<Field>();
-  private List<Field> updates = new ArrayList<Field>();
+  private transient List<Field> fields = new ArrayList<Field>();
+  private transient List<Field> updates = new ArrayList<Field>();
 
   @Override
   protected Object getKey(Object tuple) {

@@ -1,17 +1,14 @@
 package com.datatorrent.contrib.enrichment;
 
-import com.datatorrent.common.util.DTThrowable;
-
 import com.datatorrent.lib.db.jdbc.JdbcStore;
 import com.google.common.collect.Lists;
-import java.io.IOException;
-import java.sql.*;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
-import javax.validation.constraints.NotNull;
 
 public class JDBCLoader extends JdbcStore implements EnrichmentBackup
 {
@@ -19,8 +16,8 @@ public class JDBCLoader extends JdbcStore implements EnrichmentBackup
 
   protected String tableName;
 
-  protected List<String> includeFields;
-  protected List<String> lookupFields;
+  protected transient List<String> includeFields;
+  protected transient List<String> lookupFields;
 
   protected Object getQueryResult(Object key)
   {

@@ -4,22 +4,17 @@ import com.datatorrent.contrib.hbase.HBaseStore;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.hbase.HBaseConfiguration;
 import org.apache.hadoop.hbase.KeyValue;
-import org.apache.hadoop.hbase.client.HTable;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.util.Bytes;
-import org.apache.hadoop.security.UserGroupInformation;
 
 public class HBaseLoader extends HBaseStore implements EnrichmentBackup
 {
-  protected List<String> includeFields;
-  protected List<String> lookupFields;
+  protected transient List<String> includeFields;
+  protected transient List<String> lookupFields;
 
   protected Object getQueryResult(Object key)
   {
