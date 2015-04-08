@@ -58,6 +58,11 @@ public class HBaseLoader extends HBaseStore implements EnrichmentBackup
     this.includeFields = includeFields;
   }
 
+  @Override public boolean needRefresh()
+  {
+    return false;
+  }
+
   @Override public Map<Object, Object> loadInitialData()
   {
     return null;

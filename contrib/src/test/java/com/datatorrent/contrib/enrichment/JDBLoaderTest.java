@@ -26,14 +26,9 @@ public class JDBLoaderTest
     protected void starting(Description description)
     {
         try {
-<<<<<<< HEAD
           dbloader = new JDBCLoader();
-          dbloader.setDbType("hsql");
-=======
-          dbloader = new JDBLoader();
           dbloader.setDbDriver("org.hsqldb.jdbcDriver");
           dbloader.setDbUrl("jdbc:hsqldb:mem:test;sql.syntax_mys=true");
->>>>>>> Changed the interface DBLoader and JDBLoader
           dbloader.setTableName("COMPANY");
 
           dbloader.connect();
