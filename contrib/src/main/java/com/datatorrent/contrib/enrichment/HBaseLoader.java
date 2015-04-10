@@ -4,6 +4,7 @@ import com.datatorrent.contrib.hbase.HBaseStore;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.hbase.KeyValue;
@@ -15,19 +16,20 @@ public class HBaseLoader extends HBaseStore implements EnrichmentBackup
 {
   protected transient List<String> includeFields;
   protected transient List<String> lookupFields;
+  protected transient List<String> includeFamilys;
 
   protected Object getQueryResult(Object key)
   {
     try {
       Get get = new Get(getRowBytes(key));
+      int idx = 0;
       for(String f : includeFields) {
-        get.addFamily(Bytes.toBytes(f));
+        get.addColumn(Bytes.toBytes(includeFamilys.get(idx++)), Bytes.toBytes(f));
       }
       return getTable().get(get);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-
   }
 
   protected ArrayList<Object> getDataFrmResult(Object result)
@@ -56,6 +58,11 @@ public class HBaseLoader extends HBaseStore implements EnrichmentBackup
   @Override public void setIncludeFields(List<String> includeFields)
   {
     this.includeFields = includeFields;
+  }
+
+  public void setIncludeFamilyStr(String familyStr)
+  {
+    this.includeFamilys = Arrays.asList(familyStr.split(","));
   }
 
   @Override public boolean needRefresh()

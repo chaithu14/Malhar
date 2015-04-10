@@ -4,13 +4,13 @@ import com.datatorrent.api.DAG;
 import com.datatorrent.api.StreamingApplication;
 import com.datatorrent.api.annotation.ApplicationAnnotation;
 import com.datatorrent.contrib.enrichment.BeanEnrichmentOperator;
-import com.datatorrent.contrib.enrichment.JDBCLoader;
+import com.datatorrent.contrib.enrichment.HBaseLoader;
 import com.datatorrent.lib.io.ConsoleOutputOperator;
 import org.apache.hadoop.conf.Configuration;
 
 
-@ApplicationAnnotation(name="TestBeanAppMysql")
-public class TestBeanAppMySql implements StreamingApplication
+@ApplicationAnnotation(name="TestBeanAppHBase")
+public class TestBeanAppHBase implements StreamingApplication
 {
 
   @Override public void populateDAG(DAG dag, Configuration conf)
@@ -21,18 +21,17 @@ public class TestBeanAppMySql implements StreamingApplication
     JsonToSalesEventConverter converter = dag.addOperator("Parse", new JsonToSalesEventConverter());
 
     BeanEnrichmentOperator enrichmentOperator = dag.addOperator("Enrichment", new BeanEnrichmentOperator());
-    JDBCLoader store = new JDBCLoader();
-    store.setDbDriver("org.gjt.mm.mysql.Driver");
-    store.setDbUrl("jdbc:mysql://localhost/enrichment");
-    store.setUserName("root");
-    store.setPassword("test");
+    HBaseLoader store = new HBaseLoader();
+    store.setZookeeperQuorum("localhost");
+    store.setZookeeperClientPort(2181);
     store.setTableName("productmapping");
+    store.setIncludeFamilyStr("product");
 
     enrichmentOperator.inputClass = SalesData.class;
     enrichmentOperator.outputClass = SalesData.class;
     enrichmentOperator.setStore(store);
-    enrichmentOperator.setLookupFieldsStr("productId");
     enrichmentOperator.setIncludeFieldsStr("productCategory");
+    enrichmentOperator.setLookupFieldsStr("productId");
 
     ConsoleOutputOperator out1 = dag.addOperator("Console1", new ConsoleOutputOperator());
     ConsoleOutputOperator console = dag.addOperator("Console", new ConsoleOutputOperator());
@@ -43,3 +42,4 @@ public class TestBeanAppMySql implements StreamingApplication
     dag.addStream("Output", enrichmentOperator.output, console.input);
   }
 }
+
