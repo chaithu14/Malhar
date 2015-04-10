@@ -110,16 +110,11 @@ public class JDBCLoader extends JdbcStore implements EnrichmentBackup
     this.tableName = tableName;
   }
 
-  @Override public void setLookupFields(List<String> lookupFields)
-  {
-    this.lookupFields = lookupFields;
-  }
-
-  @Override public void setIncludeFields(List<String> includeFields)
+  @Override public void setFields(List<String> lookupFields,List<String> includeFields)
   {
     this.includeFields = includeFields;
+    this.lookupFields = lookupFields;
   }
-
   @Override public Map<Object, Object> loadInitialData()
   {
     return null;

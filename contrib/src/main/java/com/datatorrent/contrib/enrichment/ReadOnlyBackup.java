@@ -5,7 +5,6 @@ import java.util.Map;
 
 public abstract class ReadOnlyBackup implements EnrichmentBackup
 {
-
   protected transient List<String> includeFields;
   protected transient List<String> lookupFields;
 
@@ -24,14 +23,9 @@ public abstract class ReadOnlyBackup implements EnrichmentBackup
     throw new RuntimeException("Not supported operation");
   }
 
-
-  @Override public void setLookupFields(List<String> lookupFields)
-  {
-    this.lookupFields = lookupFields;
-  }
-
-  @Override public void setIncludeFields(List<String> includeFields)
+  @Override public void setFields(List<String> lookupFields,List<String> includeFields)
   {
     this.includeFields = includeFields;
+    this.lookupFields = lookupFields;
   }
 }

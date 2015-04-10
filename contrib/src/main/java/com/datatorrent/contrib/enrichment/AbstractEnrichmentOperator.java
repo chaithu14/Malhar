@@ -9,7 +9,6 @@ import com.datatorrent.lib.db.cache.CacheManager;
 import com.datatorrent.lib.db.cache.CacheStore;
 import com.datatorrent.lib.db.cache.CacheStore.ExpiryType;
 import com.esotericsoftware.kryo.NotNull;
-
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -77,8 +76,7 @@ public abstract class AbstractEnrichmentOperator<INPUT, OUTPUT> extends BaseOper
     }
 
     try {
-      store.setIncludeFields(includeFields);
-      store.setLookupFields(lookupFields);
+      store.setFields(includeFields, lookupFields);
 
       cacheManager.setPrimary(primaryCache);
       cacheManager.setBackup(store);

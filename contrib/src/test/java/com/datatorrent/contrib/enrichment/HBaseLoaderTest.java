@@ -144,8 +144,7 @@ public class HBaseLoaderTest
     includeKeys.add("Salary");
     ArrayList<String> lookupKeys = new ArrayList<String>();
     lookupKeys.add("ID");
-    testMeta.dbloader.setIncludeFields(includeKeys);
-    testMeta.dbloader.setLookupFields(lookupKeys);
+    testMeta.dbloader.setFields(includeKeys, lookupKeys);
 
     String includeFamilyStr = "personal, professional";
     testMeta.dbloader.setIncludeFamilyStr(includeFamilyStr);

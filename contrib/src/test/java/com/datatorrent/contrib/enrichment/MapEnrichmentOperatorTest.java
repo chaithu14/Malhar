@@ -125,12 +125,7 @@ public class MapEnrichmentOperatorTest
       return false;
     }
 
-    @Override public void setLookupFields(List<String> lookupFields)
-    {
-
-    }
-
-    @Override public void setIncludeFields(List<String> includeFields)
+    @Override public void setFields(List<String> lookupFields, List<String> includeFields)
     {
 
     }

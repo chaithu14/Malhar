@@ -50,14 +50,10 @@ public class HBaseLoader extends HBaseStore implements EnrichmentBackup
     return ((String)key).getBytes();
   }
 
-  @Override public void setLookupFields(List<String> lookupFields)
-  {
-    this.lookupFields = lookupFields;
-  }
-
-  @Override public void setIncludeFields(List<String> includeFields)
+  @Override public void setFields(List<String> lookupFields,List<String> includeFields)
   {
     this.includeFields = includeFields;
+    this.lookupFields = lookupFields;
   }
 
   public void setIncludeFamilyStr(String familyStr)

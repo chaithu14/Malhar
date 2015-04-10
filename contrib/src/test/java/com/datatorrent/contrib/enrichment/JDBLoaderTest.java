@@ -121,9 +121,7 @@ public class JDBLoaderTest
     includeKeys.add("NAME");
     includeKeys.add("AGE");
     includeKeys.add("ADDRESS");
-    testMeta.dbloader.setIncludeFields(includeKeys);
-
-    testMeta.dbloader.setLookupFields(lookupKeys);
+    testMeta.dbloader.setFields(includeKeys, lookupKeys);
 
     latch.await(1000, TimeUnit.MILLISECONDS);
 
