@@ -9,8 +9,8 @@ import com.datatorrent.lib.io.ConsoleOutputOperator;
 import org.apache.hadoop.conf.Configuration;
 
 
-@ApplicationAnnotation(name="TestBeanAppMysql")
-public class TestBeanAppMySql implements StreamingApplication
+@ApplicationAnnotation(name="GenericSalesBeanEnrichmentWithJDBCStore")
+public class GenericSalesBeanEnrichmentWithJDBCStore implements StreamingApplication
 {
 
   @Override public void populateDAG(DAG dag, Configuration conf)
@@ -22,17 +22,15 @@ public class TestBeanAppMySql implements StreamingApplication
 
     BeanEnrichmentOperator enrichmentOperator = dag.addOperator("Enrichment", new BeanEnrichmentOperator());
     JDBCLoader store = new JDBCLoader();
-    store.setDbDriver("org.gjt.mm.mysql.Driver");
-    store.setDbUrl("jdbc:mysql://localhost/enrichment");
-    store.setUserName("root");
-    store.setPassword("test");
-    store.setTableName("productmapping");
+    store.setDbDriver(conf.get("dt.application.GenericSalesBeanEnrichmentWithJDBCStore.operator.store.dbDriver"));
+    store.setDbUrl(conf.get("dt.application.GenericSalesBeanEnrichmentWithJDBCStore.operator.store.dbUrl"));
+    store.setUserName(conf.get("dt.application.GenericSalesBeanEnrichmentWithJDBCStore.operator.store.userName"));
+    store.setPassword(conf.get("dt.application.GenericSalesBeanEnrichmentWithJDBCStore.operator.store.password"));
+    store.setTableName(conf.get("dt.application.GenericSalesBeanEnrichmentWithJDBCStore.operator.store.tableName"));
 
     enrichmentOperator.inputClass = SalesData.class;
     enrichmentOperator.outputClass = SalesData.class;
     enrichmentOperator.setStore(store);
-    enrichmentOperator.setLookupFieldsStr("productId");
-    enrichmentOperator.setIncludeFieldsStr("productCategory");
 
     ConsoleOutputOperator out1 = dag.addOperator("Console1", new ConsoleOutputOperator());
     ConsoleOutputOperator console = dag.addOperator("Console", new ConsoleOutputOperator());

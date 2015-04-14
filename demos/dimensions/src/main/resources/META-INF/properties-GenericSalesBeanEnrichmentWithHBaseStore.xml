@@ -1,0 +1,33 @@
+
+<!-- properties for the GenericSalesBeanEnrichmentWithHBaseStore demo -->
+<configuration>
+  <!--FieldMappingFile for GenericSalesBeanEnrichmentWithHBaseStore-->
+  <property>
+    <name>dt.application.GenericSalesBeanEnrichmentWithHBaseStore.operator.store.zookeeperQuorum</name>
+    <value></value>
+  </property>
+    <property>
+        <name>dt.application.GenericSalesBeanEnrichmentWithHBaseStore.operator.store.zookeeperClientPort</name>
+        <value></value>
+    </property>
+    <property>
+        <name>dt.application.GenericSalesBeanEnrichmentWithHBaseStore.operator.store.tableName</name>
+        <value></value>
+    </property>
+    <property>
+        <name>dt.application.GenericSalesBeanEnrichmentWithHBaseStore.operator.store.includeFamilyStr</name>
+        <value></value>
+    </property>
+    <property>
+        <name>dt.application.GenericSalesBeanEnrichmentWithHBaseStore.operator.Enrichment.prop.includeFieldsStr</name>
+        <value></value>
+    </property>
+    <property>
+        <name>dt.application.GenericSalesBeanEnrichmentWithHBaseStore.operator.Enrichment.prop.lookupFieldsStr</name>
+        <value></value>
+    </property>
+    <property>
+        <name>dt.application.GenericSalesBeanEnrichmentWithHBaseStore.operator.*.attr.MEMORY_MB</name>
+        <value>1500</value>
+    </property>
+</configuration>

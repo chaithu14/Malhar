@@ -92,20 +92,4 @@
     <value>#/ops/apps/{appId}/appdata</value>
   </property>
 
-
-  <property>
-    <name>dt.application.TestApp.operator.*.attr.MEMORY_MB</name>
-    <value>1500</value>
-  </property>
-
-  <property>
-    <name>dt.application.TestAppMysql.operator.*.attr.MEMORY_MB</name>
-    <value>1500</value>
-  </property>
-
-    <property>
-        <name>dt.application.TestBeanAppMysql.operator.*.attr.MEMORY_MB</name>
-        <value>1500</value>
-    </property>
-  
 </configuration>

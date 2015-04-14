@@ -8,8 +8,8 @@ import com.datatorrent.contrib.enrichment.MapEnrichmentOperator;
 import com.datatorrent.lib.io.ConsoleOutputOperator;
 import org.apache.hadoop.conf.Configuration;
 
-@ApplicationAnnotation(name="TestAppMysql")
-public class TestAppMySql implements StreamingApplication
+@ApplicationAnnotation(name="GenericSalesMapEnrichmentWithJDBCStore")
+public class GenericSalesMapEnrichmentWithJDBCStore implements StreamingApplication
 {
 
   @Override public void populateDAG(DAG dag, Configuration conf)
@@ -21,15 +21,13 @@ public class TestAppMySql implements StreamingApplication
 
     MapEnrichmentOperator enrichmentOperator = dag.addOperator("Enrichment", new MapEnrichmentOperator());
     JDBCLoader store = new JDBCLoader();
-    store.setDbDriver("org.gjt.mm.mysql.Driver");
-    store.setDbUrl("jdbc:mysql://localhost/enrichment");
-    store.setUserName("root");
-    store.setPassword("test");
-    store.setTableName("productmapping");
+    store.setDbDriver(conf.get("dt.application.GenericSalesMapEnrichmentWithJDBCStore.operator.store.dbDriver"));
+    store.setDbUrl(conf.get("dt.application.GenericSalesMapEnrichmentWithJDBCStore.operator.store.dbUrl"));
+    store.setUserName(conf.get("dt.application.GenericSalesMapEnrichmentWithJDBCStore.operator.store.userName"));
+    store.setPassword(conf.get("dt.application.GenericSalesMapEnrichmentWithJDBCStore.operator.store.password"));
+    store.setTableName(conf.get("dt.application.GenericSalesMapEnrichmentWithJDBCStore.operator.store.tableName"));
 
     enrichmentOperator.setStore(store);
-    enrichmentOperator.setLookupFieldsStr("productId");
-    enrichmentOperator.setIncludeFieldsStr("productCategory");
 
     ConsoleOutputOperator out1 = dag.addOperator("Console1", new ConsoleOutputOperator());
     ConsoleOutputOperator console = dag.addOperator("Console", new ConsoleOutputOperator());

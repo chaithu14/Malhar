@@ -1,16 +1,13 @@
 package com.datatorrent.demos.dimensions.generic;
 
-import com.datatorrent.api.Context;
-import com.datatorrent.api.DAG;
-import com.datatorrent.api.StreamingApplication;
-import com.datatorrent.api.annotation.ApplicationAnnotation;
-import com.datatorrent.contrib.enrichment.FsBackupStore;
-import com.datatorrent.contrib.enrichment.MapEnrichmentOperator;
-import com.datatorrent.lib.io.ConsoleOutputOperator;
-import org.apache.hadoop.conf.Configuration;
+import com.datatorrent.api.*;
+import com.datatorrent.api.annotation.*;
+import com.datatorrent.contrib.enrichment.*;
+import com.datatorrent.lib.io.*;
+import org.apache.hadoop.conf.*;
 
-@ApplicationAnnotation(name="TestApp")
-public class TestApp implements StreamingApplication
+@ApplicationAnnotation(name="GenericSalesMapEnrichmentWithFSStore")
+public class GenericSalesMapEnrichmentWithFSStore implements StreamingApplication
 {
 
   @Override public void populateDAG(DAG dag, Configuration conf)
@@ -22,10 +19,8 @@ public class TestApp implements StreamingApplication
 
     MapEnrichmentOperator enrichmentOperator = dag.addOperator("Enrichment", new MapEnrichmentOperator());
     FsBackupStore fsstore = new FsBackupStore();
-    fsstore.setFileName("file:///home/chaitanya/Downloads/projectmapping.json");
+    fsstore.setFileName(conf.get("dt.application.GenericSalesMapEnrichmentWithFSStore.operator.store.fileName"));
     enrichmentOperator.setStore(fsstore);
-    enrichmentOperator.setLookupFieldsStr("productId");
-    enrichmentOperator.setIncludeFieldsStr("productCategory");
 
     ConsoleOutputOperator out1 = dag.addOperator("Console1", new ConsoleOutputOperator());
     ConsoleOutputOperator console = dag.addOperator("Console", new ConsoleOutputOperator());

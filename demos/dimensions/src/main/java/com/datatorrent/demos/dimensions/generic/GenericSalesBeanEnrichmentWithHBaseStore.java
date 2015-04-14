@@ -9,8 +9,8 @@ import com.datatorrent.lib.io.ConsoleOutputOperator;
 import org.apache.hadoop.conf.Configuration;
 
 
-@ApplicationAnnotation(name="TestBeanAppHBase")
-public class TestBeanAppHBase implements StreamingApplication
+@ApplicationAnnotation(name="GenericSalesBeanEnrichmentWithHBaseStore")
+public class GenericSalesBeanEnrichmentWithHBaseStore implements StreamingApplication
 {
 
   @Override public void populateDAG(DAG dag, Configuration conf)
@@ -22,16 +22,14 @@ public class TestBeanAppHBase implements StreamingApplication
 
     BeanEnrichmentOperator enrichmentOperator = dag.addOperator("Enrichment", new BeanEnrichmentOperator());
     HBaseLoader store = new HBaseLoader();
-    store.setZookeeperQuorum("localhost");
-    store.setZookeeperClientPort(2181);
-    store.setTableName("productmapping");
-    store.setIncludeFamilyStr("product");
+    store.setZookeeperQuorum(conf.get("dt.application.GenericSalesBeanEnrichmentWithHBaseStore.operator.store.zookeeperQuorum"));
+    store.setZookeeperClientPort(Integer.getInteger(conf.get("dt.application.GenericSalesBeanEnrichmentWithHBaseStore.operator.store.zookeeperClientPort")));
+    store.setTableName(conf.get("dt.application.GenericSalesBeanEnrichmentWithHBaseStore.operator.store.tableName"));
+    store.setIncludeFamilyStr(conf.get("dt.application.GenericSalesBeanEnrichmentWithHBaseStore.operator.store.includeFamilyStr"));
 
     enrichmentOperator.inputClass = SalesData.class;
     enrichmentOperator.outputClass = SalesData.class;
     enrichmentOperator.setStore(store);
-    enrichmentOperator.setIncludeFieldsStr("productCategory");
-    enrichmentOperator.setLookupFieldsStr("productId");
 
     ConsoleOutputOperator out1 = dag.addOperator("Console1", new ConsoleOutputOperator());
     ConsoleOutputOperator console = dag.addOperator("Console", new ConsoleOutputOperator());
