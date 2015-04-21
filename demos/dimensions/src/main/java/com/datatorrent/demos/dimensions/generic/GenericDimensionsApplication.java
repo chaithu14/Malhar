@@ -15,19 +15,11 @@
  */
 package com.datatorrent.demos.dimensions.generic;
 
-import com.datatorrent.api.Context;
-
-import com.datatorrent.contrib.enrichment.FsBackupStore;
-import com.datatorrent.contrib.enrichment.MapEnrichmentOperator;
-import com.datatorrent.lib.io.ConsoleOutputOperator;
-import org.apache.hadoop.conf.Configuration;
-
-import com.datatorrent.api.DAG;
-import com.datatorrent.api.StreamingApplication;
-import com.datatorrent.api.annotation.ApplicationAnnotation;
-import com.datatorrent.contrib.kafka.KafkaJsonEncoder;
-import com.datatorrent.contrib.kafka.KafkaSinglePortOutputOperator;
-import com.datatorrent.contrib.kafka.KafkaSinglePortStringInputOperator;
+import com.datatorrent.api.*;
+import com.datatorrent.api.annotation.*;
+import com.datatorrent.contrib.enrichment.*;
+import com.datatorrent.lib.io.*;
+import org.apache.hadoop.conf.*;
 
 /**
  * DimensionsDemo run with HDHT
@@ -112,7 +104,7 @@ public class GenericDimensionsApplication implements StreamingApplication
     //input.setAddProductCategory(true);
     JsonToMapConverter converter = dag.addOperator("Parse", JsonToMapConverter.class);
     MapEnrichmentOperator enrichmentOperator = new MapEnrichmentOperator();
-    FsBackupStore fsstore = new FsBackupStore();
+    FSLoader fsstore = new FSLoader();
     fsstore.setFileName("projectmapping.json");
     enrichmentOperator.setStore(fsstore);
 

@@ -18,7 +18,7 @@ public class GenericSalesMapEnrichmentWithFSStore implements StreamingApplicatio
     JsonToMapConverter converter = dag.addOperator("Parse", JsonToMapConverter.class);
 
     MapEnrichmentOperator enrichmentOperator = dag.addOperator("Enrichment", new MapEnrichmentOperator());
-    FsBackupStore fsstore = new FsBackupStore();
+    FSLoader fsstore = new FSLoader();
     fsstore.setFileName(conf.get("dt.application.GenericSalesMapEnrichmentWithFSStore.operator.store.fileName"));
     enrichmentOperator.setStore(fsstore);
 

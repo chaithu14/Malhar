@@ -23,7 +23,7 @@ public class GenericSalesBeanEnrichmentWithHBaseStore implements StreamingApplic
     BeanEnrichmentOperator enrichmentOperator = dag.addOperator("Enrichment", new BeanEnrichmentOperator());
     HBaseLoader store = new HBaseLoader();
     store.setZookeeperQuorum(conf.get("dt.application.GenericSalesBeanEnrichmentWithHBaseStore.operator.store.zookeeperQuorum"));
-    store.setZookeeperClientPort(Integer.getInteger(conf.get("dt.application.GenericSalesBeanEnrichmentWithHBaseStore.operator.store.zookeeperClientPort")));
+    store.setZookeeperClientPort(Integer.parseInt(conf.get("dt.application.GenericSalesBeanEnrichmentWithHBaseStore.operator.store.zookeeperClientPort")));
     store.setTableName(conf.get("dt.application.GenericSalesBeanEnrichmentWithHBaseStore.operator.store.tableName"));
     store.setIncludeFamilyStr(conf.get("dt.application.GenericSalesBeanEnrichmentWithHBaseStore.operator.store.includeFamilyStr"));
 

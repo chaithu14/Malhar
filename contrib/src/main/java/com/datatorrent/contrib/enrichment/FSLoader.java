@@ -1,27 +1,19 @@
 package com.datatorrent.contrib.enrichment;
 
-import com.esotericsoftware.kryo.NotNull;
-import com.google.common.collect.Maps;
-import org.apache.commons.io.IOUtils;
-import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataInputStream;
+import com.esotericsoftware.kryo.*;
+import com.google.common.collect.*;
+import java.io.*;
+import java.util.*;
+import org.apache.commons.io.*;
+import org.apache.hadoop.conf.*;
+import org.apache.hadoop.fs.*;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
-import org.codehaus.jackson.JsonProcessingException;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.map.ObjectReader;
-import org.codehaus.jackson.type.TypeReference;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.codehaus.jackson.*;
+import org.codehaus.jackson.map.*;
+import org.codehaus.jackson.type.*;
+import org.slf4j.*;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
-public class FsBackupStore extends ReadOnlyBackup
+public class FSLoader extends ReadOnlyBackup
 {
   @NotNull
   private String fileName;
@@ -34,7 +26,7 @@ public class FsBackupStore extends ReadOnlyBackup
   private transient static final ObjectReader reader = mapper.reader(new TypeReference<Map<String, Object>>()
   {
   });
-  private transient static final Logger logger = LoggerFactory.getLogger(FsBackupStore.class);
+  private transient static final Logger logger = LoggerFactory.getLogger(FSLoader.class);
 
   public String getFileName()
   {

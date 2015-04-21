@@ -12,7 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 @Stateless
-class JsonToSalesEventConverter extends BaseOperator
+public class JsonToSalesEventConverter extends BaseOperator
 {
 
   private static final ObjectMapper mapper = new ObjectMapper();

@@ -29,7 +29,7 @@ public class FileEnrichmentTest
     FileUtils.copyFile(new File(origUrl.getPath()), new File(fileUrl.getPath()));
 
     MapEnrichmentOperator oper = new MapEnrichmentOperator();
-    FsBackupStore store = new FsBackupStore();
+    FSLoader store = new FSLoader();
     store.setFileName(fileUrl.toString());
     oper.setLookupFieldsStr("productId");
     oper.setStore(store);
