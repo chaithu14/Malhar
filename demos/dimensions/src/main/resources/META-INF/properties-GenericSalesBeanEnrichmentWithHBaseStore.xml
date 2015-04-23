@@ -27,6 +27,14 @@
         <value></value>
     </property>
     <property>
+        <name>dt.application.GenericSalesBeanEnrichmentWithHBaseStore.operator.Enrichment.prop.inputClass</name>
+        <value></value>
+    </property>
+    <property>
+        <name>dt.application.GenericSalesBeanEnrichmentWithHBaseStore.operator.Enrichment.prop.outputClass</name>
+        <value></value>
+    </property>
+    <property>
         <name>dt.application.GenericSalesBeanEnrichmentWithHBaseStore.operator.*.attr.MEMORY_MB</name>
         <value>1500</value>
     </property>

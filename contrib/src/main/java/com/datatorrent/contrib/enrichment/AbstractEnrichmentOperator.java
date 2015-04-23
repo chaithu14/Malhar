@@ -14,6 +14,23 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * Base class for Enrichment Operator.&nbsp; Subclasses should provide implementation to getKey and convert.
+ * The operator receives a tuple and emits enriched tuple based on includeFields and lookupFields. <br/>
+ *
+ * Properties:<br>
+ * <b>lookupFieldsStr</b>: List of comma seperated keys for quick searching. Ex: Field1,Field2,Field3<br>
+ * <b>includeFieldsStr</b>: List of comma seperated fields to be replaced/added to the input tuple. Ex: Field1,Field2,Field3<br>
+ * <b>store</b>: Specify the type of loader for looking data<br>
+ * <br>
+ *
+ *
+ * @displayName Abstract Enrichment Operator
+ * @tags Enrichment
+ * @param <INPUT> Type of tuples which are received by this operator</T>
+ * @param <OUTPUT> Type of tuples which are emitted by this operator</T>
+ * @since 2.1.0
+ */
 public abstract class AbstractEnrichmentOperator<INPUT, OUTPUT> extends BaseOperator
 {
   /**
@@ -86,6 +103,9 @@ public abstract class AbstractEnrichmentOperator<INPUT, OUTPUT> extends BaseOper
     }
   }
 
+  /**
+   * Set the type of backup store for storing and searching data.
+   */
   public void setStore(EnrichmentBackup store) {
     this.store = store;
   }
@@ -104,6 +124,9 @@ public abstract class AbstractEnrichmentOperator<INPUT, OUTPUT> extends BaseOper
     return lookupFieldsStr;
   }
 
+  /**
+   * Set the lookup fields for quick searching. It would be in comma separated list
+   */
   public void setLookupFieldsStr(String lookupFieldsStr)
   {
     this.lookupFieldsStr = lookupFieldsStr;
@@ -114,6 +137,9 @@ public abstract class AbstractEnrichmentOperator<INPUT, OUTPUT> extends BaseOper
     return includeFieldsStr;
   }
 
+  /**
+   * Set the list of comma separated fields to be added/replaced to the incoming tuple.
+   */
   public void setIncludeFieldsStr(String includeFieldsStr)
   {
     this.includeFieldsStr = includeFieldsStr;

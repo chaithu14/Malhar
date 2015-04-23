@@ -31,6 +31,14 @@
         <value></value>
     </property>
     <property>
+        <name>dt.application.GenericSalesBeanEnrichmentWithJDBCStore.operator.Enrichment.prop.inputClass</name>
+        <value></value>
+    </property>
+    <property>
+        <name>dt.application.GenericSalesBeanEnrichmentWithJDBCStore.operator.Enrichment.prop.outputClass</name>
+        <value></value>
+    </property>
+    <property>
         <name>dt.application.GenericSalesBeanEnrichmentWithJDBCStore.operator.*.attr.MEMORY_MB</name>
         <value>1500</value>
     </property>

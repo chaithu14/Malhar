@@ -27,8 +27,6 @@ public class GenericSalesBeanEnrichmentWithHBaseStore implements StreamingApplic
     store.setTableName(conf.get("dt.application.GenericSalesBeanEnrichmentWithHBaseStore.operator.store.tableName"));
     store.setIncludeFamilyStr(conf.get("dt.application.GenericSalesBeanEnrichmentWithHBaseStore.operator.store.includeFamilyStr"));
 
-    enrichmentOperator.inputClass = SalesData.class;
-    enrichmentOperator.outputClass = SalesData.class;
     enrichmentOperator.setStore(store);
 
     ConsoleOutputOperator out1 = dag.addOperator("Console1", new ConsoleOutputOperator());

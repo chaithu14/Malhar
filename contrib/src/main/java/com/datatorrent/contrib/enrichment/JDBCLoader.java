@@ -10,6 +10,18 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * <p>HBaseLoader extends from {@link JdbcStore} uses JDBC to connect and implements EnrichmentBackup interface.</p> <br/>
+ *
+ * Properties:<br>
+ * <b>queryStmt</b>: Sql Prepared Statement which needs to be executed<br>
+ * <b>tableName</b>: JDBC table name<br>
+ * <br>
+ *
+ * @displayName JDBCLoader
+ * @tags Loader
+ * @since 2.1.0
+ */
 public class JDBCLoader extends JdbcStore implements EnrichmentBackup
 {
   protected String queryStmt;
@@ -95,6 +107,9 @@ public class JDBCLoader extends JdbcStore implements EnrichmentBackup
     return false;
   }
 
+  /**
+   * Set the sql Prepared Statement if the enrichment mechanism is query based.
+   */
   public void setQueryStmt(String queryStmt)
   {
     this.queryStmt = queryStmt;
@@ -104,7 +119,9 @@ public class JDBCLoader extends JdbcStore implements EnrichmentBackup
   {
     return tableName;
   }
-
+  /**
+   * Set the table name.
+   */
   public void setTableName(String tableName)
   {
     this.tableName = tableName;

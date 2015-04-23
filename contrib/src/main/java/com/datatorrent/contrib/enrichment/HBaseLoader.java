@@ -12,6 +12,17 @@ import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Result;
 import org.apache.hadoop.hbase.util.Bytes;
 
+/**
+ * <p>HBaseLoader extends from {@link HBaseStore} uses HBase to connect and implements EnrichmentBackup interface.</p> <br/>
+ *
+ * Properties:<br>
+ * <b>includeFamilys</b>: List of comma separated families and each family corresponds to the group name of column fields in includeFieldsStr. Ex: Family1,Family2<br>
+ * <br>
+ *
+ * @displayName HBaseLoader
+ * @tags Loader
+ * @since 2.1.0
+ */
 public class HBaseLoader extends HBaseStore implements EnrichmentBackup
 {
   protected transient List<String> includeFields;
@@ -56,6 +67,9 @@ public class HBaseLoader extends HBaseStore implements EnrichmentBackup
     this.lookupFields = lookupFields;
   }
 
+  /**
+   * Set the familyStr and would be in the form of comma separated list.
+   */
   public void setIncludeFamilyStr(String familyStr)
   {
     this.includeFamilys = Arrays.asList(familyStr.split(","));

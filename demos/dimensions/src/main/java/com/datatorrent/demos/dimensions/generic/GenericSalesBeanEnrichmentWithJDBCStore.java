@@ -28,8 +28,6 @@ public class GenericSalesBeanEnrichmentWithJDBCStore implements StreamingApplica
     store.setPassword(conf.get("dt.application.GenericSalesBeanEnrichmentWithJDBCStore.operator.store.password"));
     store.setTableName(conf.get("dt.application.GenericSalesBeanEnrichmentWithJDBCStore.operator.store.tableName"));
 
-    enrichmentOperator.inputClass = SalesData.class;
-    enrichmentOperator.outputClass = SalesData.class;
     enrichmentOperator.setStore(store);
 
     ConsoleOutputOperator out1 = dag.addOperator("Console1", new ConsoleOutputOperator());
