@@ -14,9 +14,9 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.LoggerFactory;
 
-public class JDBLoaderTest
+public class JDBCLoaderTest
 {
-  static final org.slf4j.Logger logger = LoggerFactory.getLogger(JDBLoaderTest.class);
+  static final org.slf4j.Logger logger = LoggerFactory.getLogger(JDBCLoaderTest.class);
 
   public static class TestMeta extends TestWatcher
   {

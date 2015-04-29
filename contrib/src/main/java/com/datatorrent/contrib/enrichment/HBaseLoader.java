@@ -33,7 +33,7 @@ public class HBaseLoader extends HBaseStore implements EnrichmentBackup
   protected Object getQueryResult(Object key)
   {
     try {
-      Get get = new Get(getRowBytes(key));
+      Get get = new Get(getRowBytes(((ArrayList)key).get(0)));
       int idx = 0;
       for(String f : includeFields) {
         get.addColumn(Bytes.toBytes(includeFamilys.get(idx++)), Bytes.toBytes(f));

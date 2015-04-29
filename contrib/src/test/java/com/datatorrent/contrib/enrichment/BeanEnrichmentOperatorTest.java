@@ -5,7 +5,7 @@ import com.datatorrent.lib.util.TestUtils;
 import org.junit.Assert;
 import org.junit.Test;
 
-public class BeanEnrichmentOperatorTest extends  JDBLoaderTest
+public class BeanEnrichmentOperatorTest extends JDBCLoaderTest
 {
   public class Order {
     public int OID;
