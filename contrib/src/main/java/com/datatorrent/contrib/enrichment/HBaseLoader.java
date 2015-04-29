@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.hadoop.hbase.KeyValue;
 import org.apache.hadoop.hbase.client.Get;
 import org.apache.hadoop.hbase.client.Result;
@@ -50,6 +51,17 @@ public class HBaseLoader extends HBaseStore implements EnrichmentBackup
       return null;
     ArrayList<Object> columnInfo = new ArrayList<Object>();
 
+    if(CollectionUtils.isEmpty(includeFields)) {
+      if(includeFields == null) {
+        includeFields = new ArrayList<String>();
+        includeFamilys.clear();
+        includeFamilys = new ArrayList<String>();
+      }
+      for (KeyValue kv: res.raw()) {
+        includeFields.add(new String(kv.getQualifier()));
+        includeFamilys.add(new String(kv.getFamily()));
+      }
+    }
     for(KeyValue kv : res.raw()) {
       columnInfo.add(kv.getValue());
     }

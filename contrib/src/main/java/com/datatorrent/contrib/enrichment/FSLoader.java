@@ -1,17 +1,25 @@
 package com.datatorrent.contrib.enrichment;
 
-import com.esotericsoftware.kryo.*;
-import com.google.common.collect.*;
-import java.io.*;
-import java.util.*;
-import org.apache.commons.io.*;
-import org.apache.hadoop.conf.*;
-import org.apache.hadoop.fs.*;
+import com.esotericsoftware.kryo.NotNull;
+import com.google.common.collect.Maps;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.io.IOUtils;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
-import org.codehaus.jackson.*;
-import org.codehaus.jackson.map.*;
-import org.codehaus.jackson.type.*;
-import org.slf4j.*;
+import org.apache.hadoop.fs.Path;
+import org.codehaus.jackson.JsonProcessingException;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.map.ObjectReader;
+import org.codehaus.jackson.type.TypeReference;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class FSLoader extends ReadOnlyBackup
 {
@@ -49,6 +57,13 @@ public class FSLoader extends ReadOnlyBackup
       while ((line = bin.readLine()) != null) {
         try {
           Map<String, Object> tuple = reader.readValue(line);
+          if(CollectionUtils.isEmpty(includeFields)) {
+            if(includeFields == null)
+              includeFields = new ArrayList<String>();
+            for (Map.Entry<String, Object> e : tuple.entrySet()) {
+              includeFields.add(e.getKey());
+            }
+          }
           ArrayList<Object> includeTuple = new ArrayList<Object>();
           for(String s: includeFields) {
             includeTuple.add(tuple.get(s));

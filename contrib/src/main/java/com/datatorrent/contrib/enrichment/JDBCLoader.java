@@ -9,6 +9,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.collections.CollectionUtils;
 
 /**
  * <p>HBaseLoader extends from {@link JdbcStore} uses JDBC to connect and implements EnrichmentBackup interface.</p> <br/>
@@ -55,26 +56,18 @@ public class JDBCLoader extends JdbcStore implements EnrichmentBackup
     try {
       ResultSet resultSet = (ResultSet) result;
       if (resultSet.next()) {
+        ResultSetMetaData rsdata = resultSet.getMetaData();
+        // If the includefields is empty, populate it from ResultSetMetaData
+        if(CollectionUtils.isEmpty(includeFields)) {
+          if(includeFields == null)
+            includeFields = new ArrayList<String>();
+          for (int i = 1; i <= rsdata.getColumnCount(); i++) {
+            includeFields.add(rsdata.getColumnName(i));
+          }
+        }
         ArrayList<Object> res = new ArrayList<Object>();
-        if(queryStmt == null) {
-          for(String f : includeFields) {
-            res.add(resultSet.getObject(f));
-          }
-        } else {
-          ResultSetMetaData rsdata = resultSet.getMetaData();
-          int columnCount = rsdata.getColumnCount();
-          // If the includefields is empty, populate it from ResultSetMetaData
-          if(includeFields == null || includeFields.size() == 0) {
-            if(includeFields == null)
-              includeFields = new ArrayList<String>();
-            for (int i = 1; i <= columnCount; i++) {
-              includeFields.add(rsdata.getColumnName(i));
-            }
-          }
-
-          for (int i = 1; i <= columnCount; i++) {
-            res.add(resultSet.getObject(i));
-          }
+        for(String f : includeFields) {
+          res.add(resultSet.getObject(f));
         }
         return res;
       } else
@@ -94,6 +87,7 @@ public class JDBCLoader extends JdbcStore implements EnrichmentBackup
         stmt = stmt + " and ";
       }
     }
+    logger.info("generateQueryStmt: {}", stmt);
     return stmt;
   }
 

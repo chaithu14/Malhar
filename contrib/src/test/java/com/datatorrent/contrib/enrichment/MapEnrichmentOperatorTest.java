@@ -3,6 +3,9 @@ package com.datatorrent.contrib.enrichment;
 import com.beust.jcommander.internal.Maps;
 import com.datatorrent.lib.testbench.CollectorTestSink;
 import com.datatorrent.lib.util.TestUtils;
+import java.util.ArrayList;
+import org.apache.commons.collections.CollectionUtils;
+import org.junit.Assert;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -30,9 +33,8 @@ public class MapEnrichmentOperatorTest
     oper.input.process(inMap);
     oper.endWindow();
 
-    System.out.println("Number of tuples emitted " + sink.collectedTuples.size());
-    System.out.println(sink.collectedTuples.get(0));
-
+    Assert.assertEquals("includeSelectedKeys: Number of tuples emitted: ", 1, sink.collectedTuples.size());
+    Assert.assertEquals("Enrich Tuple: ", "{A=Val_A, B=Val_B, C=Val_C, In2=Value2, In1=Value3}", sink.collectedTuples.get(0).toString());
   }
 
   @Test
@@ -55,14 +57,14 @@ public class MapEnrichmentOperatorTest
     oper.input.process(inMap);
     oper.endWindow();
 
-    System.out.println("Number of tuples emitted " + sink.collectedTuples.size());
-    System.out.println(sink.collectedTuples.get(0));
+    Assert.assertEquals("includeSelectedKeys: Number of tuples emitted: ", 1, sink.collectedTuples.size());
+    Assert.assertEquals("Enrich Tuple: ", "{A=Val_A, B=Val_B, In2=Value2, In1=Value1}", sink.collectedTuples.get(0).toString());
   }
 
   private static class MemoryStore implements EnrichmentBackup
   {
     static Map<String, Map> returnData = Maps.newHashMap();
-
+    private List<String> includeFields;
     static {
       Map<String, String> map = Maps.newHashMap();
       map.put("A", "Val_A");
@@ -87,7 +89,19 @@ public class MapEnrichmentOperatorTest
     @Override public Object get(Object key)
     {
       List<String> keyList = (List<String>)key;
-      return returnData.get(keyList.get(0));
+      Map<String, String> keyValue = returnData.get(keyList.get(0));
+      ArrayList<Object> lst = new ArrayList<Object>();
+      if(CollectionUtils.isEmpty(includeFields)) {
+        if(includeFields == null)
+          includeFields = new ArrayList<String>();
+        for (Map.Entry<String, String> e : keyValue.entrySet()) {
+          includeFields.add(e.getKey());
+        }
+      }
+      for(String field : includeFields) {
+        lst.add(keyValue.get(field));
+      }
+      return lst;
     }
 
     @Override public List<Object> getAll(List<Object> keys)
@@ -127,6 +141,7 @@ public class MapEnrichmentOperatorTest
 
     @Override public void setFields(List<String> lookupFields, List<String> includeFields)
     {
+      this.includeFields = includeFields;
 
     }
 

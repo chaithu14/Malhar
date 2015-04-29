@@ -5,6 +5,8 @@ import com.datatorrent.api.Context;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  *
@@ -39,6 +41,7 @@ import java.util.List;
  */
 public class BeanEnrichmentOperator extends AbstractEnrichmentOperator<Object, Object> {
 
+  private transient static final Logger logger = LoggerFactory.getLogger(BeanEnrichmentOperator.class);
   public Class inputClass;
   public Class outputClass;
   private transient List<Field> fields = new ArrayList<Field>();
@@ -63,8 +66,9 @@ public class BeanEnrichmentOperator extends AbstractEnrichmentOperator<Object, O
       Object o = outputClass.newInstance();
       // Copy the fields from input to output
       Field[] fields = inputClass.getFields();
+
       for(Field f : fields) {
-        f.set(o, f.get(in));
+        outputClass.getField(f.getName()).set(o, f.get(in));
       }
       if (cached == null)
         return o;
@@ -82,6 +86,8 @@ public class BeanEnrichmentOperator extends AbstractEnrichmentOperator<Object, O
     } catch (InstantiationException e) {
       throw new RuntimeException(e);
     } catch (IllegalAccessException e) {
+      throw new RuntimeException(e);
+    } catch (NoSuchFieldException e) {
       throw new RuntimeException(e);
     }
   }
