@@ -1,0 +1,22 @@
+
+<!-- properties for the GenericSalesMapEnrichmentWithFSStore demo -->
+<configuration>
+  <!--FieldMappingFile for GenericSalesMapEnrichmentWithFSStore-->
+  <property>
+    <name>dt.application.GenericSalesMapEnrichmentWithFSStore.operator.store.fileName</name>
+    <value></value>
+  </property>
+    <property>
+        <name>dt.application.GenericSalesMapEnrichmentWithFSStore.operator.Enrichment.prop.includeFieldsStr</name>
+        <value></value>
+    </property>
+    <property>
+        <name>dt.application.GenericSalesMapEnrichmentWithFSStore.operator.Enrichment.prop.lookupFieldsStr</name>
+        <value></value>
+    </property>
+
+    <property>
+        <name>dt.application.GenericSalesMapEnrichmentWithFSStore.operator.*.attr.MEMORY_MB</name>
+        <value>1500</value>
+    </property>
+</configuration>    

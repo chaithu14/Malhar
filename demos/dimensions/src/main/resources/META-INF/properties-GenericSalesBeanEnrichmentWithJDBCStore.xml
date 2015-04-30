@@ -1,0 +1,45 @@
+
+<!-- properties for the GenericSalesBeanEnrichmentWithJDBCStore demo -->
+<configuration>
+    <!--FieldMappingFile for GenericSalesBeanEnrichmentWithJDBCStore-->
+    <property>
+        <name>dt.application.GenericSalesBeanEnrichmentWithJDBCStore.operator.store.dbDriver</name>
+        <value></value>
+    </property>
+    <property>
+        <name>dt.application.GenericSalesBeanEnrichmentWithJDBCStore.operator.store.dbUrl</name>
+        <value></value>
+    </property>
+    <property>
+        <name>dt.application.GenericSalesBeanEnrichmentWithJDBCStore.operator.store.userName</name>
+        <value></value>
+    </property>
+    <property>
+        <name>dt.application.GenericSalesBeanEnrichmentWithJDBCStore.operator.store.password</name>
+        <value></value>
+    </property>
+    <property>
+        <name>dt.application.GenericSalesBeanEnrichmentWithJDBCStore.operator.store.tableName</name>
+        <value></value>
+    </property>
+    <property>
+        <name>dt.application.GenericSalesBeanEnrichmentWithJDBCStore.operator.Enrichment.prop.includeFieldsStr</name>
+        <value></value>
+    </property>
+    <property>
+        <name>dt.application.GenericSalesBeanEnrichmentWithJDBCStore.operator.Enrichment.prop.lookupFieldsStr</name>
+        <value></value>
+    </property>
+    <property>
+        <name>dt.application.GenericSalesBeanEnrichmentWithJDBCStore.operator.Enrichment.prop.inputClass</name>
+        <value></value>
+    </property>
+    <property>
+        <name>dt.application.GenericSalesBeanEnrichmentWithJDBCStore.operator.Enrichment.prop.outputClass</name>
+        <value></value>
+    </property>
+    <property>
+        <name>dt.application.GenericSalesBeanEnrichmentWithJDBCStore.operator.*.attr.MEMORY_MB</name>
+        <value>1500</value>
+    </property>
+</configuration>

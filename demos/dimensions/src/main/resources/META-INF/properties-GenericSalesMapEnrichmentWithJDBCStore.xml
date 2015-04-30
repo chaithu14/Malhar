@@ -1,0 +1,37 @@
+
+<!-- properties for the GenericSalesMapEnrichmentWithJDBCStore demo -->
+<configuration>
+  <!--FieldMappingFile for GenericSalesMapEnrichmentWithJDBCStore-->
+  <property>
+    <name>dt.application.GenericSalesMapEnrichmentWithJDBCStore.operator.store.dbDriver</name>
+    <value></value>
+  </property>
+    <property>
+        <name>dt.application.GenericSalesMapEnrichmentWithJDBCStore.operator.store.dbUrl</name>
+        <value></value>
+    </property>
+    <property>
+        <name>dt.application.GenericSalesMapEnrichmentWithJDBCStore.operator.store.userName</name>
+        <value></value>
+    </property>
+    <property>
+        <name>dt.application.GenericSalesMapEnrichmentWithJDBCStore.operator.store.password</name>
+        <value></value>
+    </property>
+    <property>
+        <name>dt.application.GenericSalesMapEnrichmentWithJDBCStore.operator.store.tableName</name>
+        <value></value>
+    </property>
+    <property>
+        <name>dt.application.GenericSalesMapEnrichmentWithJDBCStore.operator.Enrichment.prop.includeFieldsStr</name>
+        <value></value>
+    </property>
+    <property>
+        <name>dt.application.GenericSalesMapEnrichmentWithJDBCStore.operator.Enrichment.prop.lookupFieldsStr</name>
+        <value></value>
+    </property>
+    <property>
+        <name>dt.application.GenericSalesMapEnrichmentWithJDBCStore.operator.*.attr.MEMORY_MB</name>
+        <value>1500</value>
+    </property>
+</configuration>
