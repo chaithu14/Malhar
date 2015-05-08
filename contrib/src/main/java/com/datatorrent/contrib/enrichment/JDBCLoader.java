@@ -35,15 +35,10 @@ public class JDBCLoader extends JdbcStore implements EnrichmentBackup
   protected Object getQueryResult(Object key)
   {
     try {
-      PreparedStatement getStatement ;
-      if(queryStmt == null) {
-        getStatement = getConnection().prepareStatement(generateQueryStmt(key));
-      } else {
-        getStatement = getConnection().prepareStatement(queryStmt);
-        ArrayList<Object> keys = (ArrayList<Object>) key;
-        for (int i = 0; i < keys.size(); i++) {
-          getStatement.setObject(i+1, keys.get(i));
-        }
+      PreparedStatement getStatement = getConnection().prepareStatement(queryStmt);
+      ArrayList<Object> keys = (ArrayList<Object>) key;
+      for (int i = 0; i < keys.size(); i++) {
+        getStatement.setObject(i+1, keys.get(i));
       }
       return getStatement.executeQuery();
     } catch (SQLException e) {
@@ -77,13 +72,12 @@ public class JDBCLoader extends JdbcStore implements EnrichmentBackup
     }
   }
 
-  private String generateQueryStmt(Object key)
+  private String generateQueryStmt()
   {
     String stmt = "select * from " + tableName + " where ";
-    ArrayList<Object> keys = (ArrayList<Object>) key;
-    for (int i = 0; i < keys.size(); i++) {
-      stmt = stmt + lookupFields.get(i) + " = " + keys.get(i);
-      if(i != keys.size() - 1) {
+    for (int i = 0; i < lookupFields.size(); i++) {
+      stmt = stmt + lookupFields.get(i) + " = ? ";
+      if(i != lookupFields.size() - 1) {
         stmt = stmt + " and ";
       }
     }
@@ -125,6 +119,8 @@ public class JDBCLoader extends JdbcStore implements EnrichmentBackup
   {
     this.includeFields = includeFields;
     this.lookupFields = lookupFields;
+    if(queryStmt == null)
+      queryStmt = generateQueryStmt();
   }
   @Override public Map<Object, Object> loadInitialData()
   {

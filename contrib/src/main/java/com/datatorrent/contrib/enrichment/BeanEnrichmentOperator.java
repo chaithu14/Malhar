@@ -115,6 +115,7 @@ public class BeanEnrichmentOperator extends AbstractEnrichmentOperator<Object, O
     for (String fName : includeFields) {
       try {
         Field f = outputClass.getField(fName);
+        f.setAccessible(true);
         updates.add(f);
       } catch (NoSuchFieldException e) {
         throw new RuntimeException(e);

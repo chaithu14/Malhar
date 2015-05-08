@@ -49,10 +49,12 @@ public class FSLoader extends ReadOnlyBackup
   @Override public Map<Object, Object> loadInitialData()
   {
     Map<Object, Object> result = null;
+    FSDataInputStream in = null;
+    BufferedReader bin = null;
     try {
       result = Maps.newHashMap();
-      FSDataInputStream in = fs.open(filePath);
-      BufferedReader bin = new BufferedReader(new InputStreamReader(in));
+      in = fs.open(filePath);
+      bin = new BufferedReader(new InputStreamReader(in));
       String line;
       while ((line = bin.readLine()) != null) {
         try {
@@ -76,10 +78,19 @@ public class FSLoader extends ReadOnlyBackup
       IOUtils.closeQuietly(bin);
       IOUtils.closeQuietly(in);
     } catch (IOException e) {
-      e.printStackTrace();
+      throw new RuntimeException(e);
+    } finally {
+      if(bin != null)
+        IOUtils.closeQuietly(bin);
+      if(in != null)
+        IOUtils.closeQuietly(in);
+      try {
+        fs.close();
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
     }
     logger.debug("loading initial data {}", result.size());
-    logger.debug("{}", result);
     return result;
   }
 

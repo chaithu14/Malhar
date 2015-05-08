@@ -40,6 +40,10 @@ public abstract class AbstractEnrichmentOperator<INPUT, OUTPUT> extends BaseOper
 
   private transient CacheStore primaryCache = new CacheStore();
 
+  private int entryExpiryDurationInMillis = 24 * 60 * 60 * 1000;
+  private int cacheCleanupInMillis = 24 * 60 * 60 * 1000;
+  private int cacheSize = 16 * 1024 * 1024;
+
   public transient DefaultOutputPort<OUTPUT> output = new DefaultOutputPort<OUTPUT>();
 
   @InputPortFieldAnnotation(optional = true)
@@ -82,10 +86,10 @@ public abstract class AbstractEnrichmentOperator<INPUT, OUTPUT> extends BaseOper
     cacheManager = new NullValuesCacheManager();
 
     // set expiration to one day.
-    primaryCache.setEntryExpiryDurationInMillis(24 * 60 * 60 * 1000);
-    primaryCache.setCacheCleanupInMillis(24 * 60 * 60 * 1000);
+    primaryCache.setEntryExpiryDurationInMillis(entryExpiryDurationInMillis);
+    primaryCache.setCacheCleanupInMillis(cacheCleanupInMillis);
     primaryCache.setEntryExpiryStrategy(ExpiryType.EXPIRE_AFTER_WRITE);
-    primaryCache.setMaxCacheSize(16 * 1024 * 1024);
+    primaryCache.setMaxCacheSize(cacheSize);
 
     lookupFields = Arrays.asList(lookupFieldsStr.split(","));
     if (includeFieldsStr != null) {
@@ -143,5 +147,20 @@ public abstract class AbstractEnrichmentOperator<INPUT, OUTPUT> extends BaseOper
   public void setIncludeFieldsStr(String includeFieldsStr)
   {
     this.includeFieldsStr = includeFieldsStr;
+  }
+
+  public void setEntryExpiryDurationInMillis(int entryExpiryDurationInMillis)
+  {
+    this.entryExpiryDurationInMillis = entryExpiryDurationInMillis;
+  }
+
+  public void setCacheCleanupInMillis(int cacheCleanupInMillis)
+  {
+    this.cacheCleanupInMillis = cacheCleanupInMillis;
+  }
+
+  public void setCacheSize(int cacheSize)
+  {
+    this.cacheSize = cacheSize;
   }
 }
