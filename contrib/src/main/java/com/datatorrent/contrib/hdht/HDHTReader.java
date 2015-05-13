@@ -374,7 +374,7 @@ public class HDHTReader implements Operator, HDHT.Reader
     HDHTWalManager.WalPosition recoveryStartWalPosition;
   }
 
-  private static class BucketReader implements Closeable
+  public static class BucketReader implements Closeable
   {
     BucketMeta bucketMeta;
     final HashMap<String, HDSFileReader> readers = Maps.newHashMap();
