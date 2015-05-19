@@ -8,23 +8,14 @@ public abstract class BackupStore
 
   protected String keyField;
 
-  protected AbstractJoinOperator op;
-
-  BackupStore(String keyField, AbstractJoinOperator op)
+  BackupStore(String keyField)
   {
     this.keyField = keyField;
-    this.op = op;
   }
   public void setup()
   {
 
   }
-
-  public Object getKey(Object tuple)
-  {
-    return op.getValue(keyField, tuple);
-  }
-
 
   public abstract Object getValidTuples(Object key, Object tuple);
 
@@ -39,4 +30,6 @@ public abstract class BackupStore
   }
 
   public abstract void put(Object tuple);
+
+  public abstract void shutdown();
 }

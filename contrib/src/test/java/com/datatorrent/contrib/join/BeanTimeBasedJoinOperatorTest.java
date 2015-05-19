@@ -4,13 +4,14 @@ import com.datatorrent.lib.testbench.CollectorTestSink;
 import com.datatorrent.lib.util.TestUtils;
 import com.esotericsoftware.kryo.Kryo;
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 
-public class BeanCountBasedJoinOperatorTest
+public class BeanTimeBasedJoinOperatorTest
 {
 
   @Rule public final TestUtils.TestInfo testInfo = new TestUtils.TestInfo();
@@ -86,7 +87,7 @@ public class BeanCountBasedJoinOperatorTest
   {
 
     BeanJoinOperator oper = new BeanJoinOperator();
-    oper.setWindowSize(2);
+    oper.setExpiryTime(200);
     oper.setIncludeFieldStr("ID,Name;OID,Amount");
     oper.setKeyFields("ID,CID");
     oper.outputClass = CustOrder.class;
@@ -94,7 +95,7 @@ public class BeanCountBasedJoinOperatorTest
     oper.setup(null);
     oper.activate(null);
 
-    CollectorTestSink<CustOrder> sink = new CollectorTestSink<CustOrder>();
+    CollectorTestSink<List<CustOrder>> sink = new CollectorTestSink<List<CustOrder>>();
     @SuppressWarnings({ "unchecked", "rawtypes" }) CollectorTestSink<Object> tmp = (CollectorTestSink) sink;
     oper.outputPort.setSink(tmp);
 
@@ -123,7 +124,8 @@ public class BeanCountBasedJoinOperatorTest
 
     /* Number of tuple, emitted */
     Assert.assertEquals("Number of tuple emitted ", 1, sink.collectedTuples.size());
-    CustOrder emitted = sink.collectedTuples.iterator().next();
+    List<CustOrder> emittedList = sink.collectedTuples.iterator().next();
+    CustOrder emitted = emittedList.get(0);
 
     Assert.assertEquals("value of ID :", tuple.ID, emitted.ID);
     Assert.assertEquals("value of Name :", tuple.Name, emitted.Name);

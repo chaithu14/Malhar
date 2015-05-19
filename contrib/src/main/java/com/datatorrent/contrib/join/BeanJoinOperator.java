@@ -22,15 +22,23 @@ public class BeanJoinOperator extends AbstractJoinOperator
     }
   }
 
-  @Override protected void addValue(Object output, String field, Object extractTuple)
+  @Override protected void addValue(Object output, Object extractTuple, Boolean isFirst)
   {
-    try {
-      outputClass.getField(field).set(output, getValue(field, extractTuple));
-    } catch (IllegalAccessException e) {
-      throw  new RuntimeException(e);
-    } catch (NoSuchFieldException e) {
-      throw new RuntimeException(e);
+    String[] fields ;
+    if(isFirst)
+      fields = includeFields[0];
+    else
+      fields = includeFields[1];
+    for(int i=0; i < fields.length; i++) {
+      try {
+        outputClass.getField(fields[i]).set(output, getValue(fields[i], extractTuple));
+      } catch (IllegalAccessException e) {
+        throw  new RuntimeException(e);
+      } catch (NoSuchFieldException e) {
+        throw new RuntimeException(e);
+      }
     }
+
   }
 
   public Object getValue(String keyField, Object tuple)

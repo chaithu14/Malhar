@@ -10,9 +10,16 @@ public class MapJoinOperator extends AbstractJoinOperator<Map<String, Object>>
     return new HashMap<String, Object>();
   }
 
-  @Override protected void addValue(Map<String, Object> output, String field, Object extractTuple)
+  @Override protected void addValue(Map<String, Object> output, Object extractTuple, Boolean isFirst)
   {
-    output.put(field, ((Map<String, Object>)extractTuple).get(field));
+    String[] fields ;
+    if(isFirst)
+      fields = includeFields[0];
+    else
+      fields = includeFields[1];
+    for(int i=0; i < fields.length; i++) {
+      output.put(fields[i], ((Map<String, Object>)extractTuple).get(fields[i]));
+    }
   }
 
   public Object getValue(String keyField, Object tuple)

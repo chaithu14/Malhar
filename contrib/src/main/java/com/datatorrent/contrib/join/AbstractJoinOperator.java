@@ -6,8 +6,8 @@ import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.DefaultOutputPort;
 import com.datatorrent.api.Operator;
 import com.datatorrent.api.annotation.InputPortFieldAnnotation;
+import com.datatorrent.lib.bucket.Event;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -18,20 +18,16 @@ import org.slf4j.LoggerFactory;
 public abstract class AbstractJoinOperator<T> extends BaseOperator implements Operator.ActivationListener<Context.OperatorContext>, Operator.CheckpointListener
 {
   static final org.slf4j.Logger logger = LoggerFactory.getLogger(AbstractJoinOperator.class);
-  private BackupStore lStore;
-  private BackupStore rStore;
+  private transient InMemoryStore lStore;
+  private transient InMemoryStore rStore;
 
-  private boolean isTimeBased = false;
-
-  private long expiryTime;
-
-  private int windowSize;
+  private long expiryTime = 1;
 
   private String keyFields;
 
-  private ArrayBlockingQueue<MutablePair<Object,Boolean>> holdingBuffer;
+  private transient ArrayBlockingQueue<MutablePair<TimeEvent,Boolean>> holdingBuffer;
 
-  private List<String> includeFields;
+  protected String[][] includeFields;
 
   private String includeFieldStr;
 
@@ -39,30 +35,24 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
 
   private transient Boolean isAlive = false;
 
+  protected int bucketSpanInMillis = 30000;
+  private transient long sleepTimeMillis = 100;
 
-
-  public final transient DefaultOutputPort<T> outputPort = new DefaultOutputPort<T>();
+  public final transient DefaultOutputPort<List<T>> outputPort = new DefaultOutputPort<List<T>>();
 
   @Override
   public void setup(Context.OperatorContext context)
   {
     isAlive = true;
     String[] keys = keyFields.split(",");
-    if(lStore == null && rStore == null)
-    {
-      if(isTimeBased) {
-        lStore = new TimeBasedStore(keys[0], expiryTime, this);
-        rStore = new TimeBasedStore(keys[1], expiryTime, this);
-      } else {
-        lStore = new CountBasedStore(keys[0], windowSize, this);
-        rStore = new CountBasedStore(keys[1], windowSize, this);
-      }
-      holdingBuffer = new ArrayBlockingQueue<MutablePair<Object, Boolean>>(bufferSize);
-    }
+    lStore = new InMemoryStore<TimeEvent>(keys[0], expiryTime, bucketSpanInMillis);
+    rStore = new InMemoryStore<TimeEvent>(keys[1], expiryTime, bucketSpanInMillis);
+    holdingBuffer = new ArrayBlockingQueue<MutablePair<TimeEvent, Boolean>>(bufferSize);
 
     lStore.setup();
     rStore.setup();
     populateIncludeFields();
+    logger.info("Setup: {}", holdingBuffer.size());
   }
 
   @InputPortFieldAnnotation(optional = true)
@@ -70,16 +60,15 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
   {
     @Override public void process(T tuple)
     {
-      try {
-        if(isTimeBased) {
-          Object t = new MutablePair<Object, Long>(tuple, System.currentTimeMillis());
-          holdingBuffer.put(new MutablePair<Object, Boolean>(t, true));
-        } else {
-          holdingBuffer.put(new MutablePair<Object, Boolean>(tuple, true));
-        }
+      TimeEvent t = new TimeEvent(getValue(lStore.keyField, tuple), System.currentTimeMillis(), tuple);
+      lStore.put(t);
+      joinedTuple(t, true);
+      /*try {
+        TimeEvent t = new TimeEvent(getValue(lStore.keyField, tuple), System.currentTimeMillis(), tuple);
+        holdingBuffer.put(new MutablePair<TimeEvent, Boolean>(t, true));
       } catch (InterruptedException e) {
         throw new RuntimeException(e);
-      }
+      }*/
     }
   };
 
@@ -88,28 +77,27 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
   {
     @Override public void process(T tuple)
     {
-      try {
-        if(isTimeBased) {
-          Object t = new MutablePair<Object, Long>(tuple, System.currentTimeMillis());
-          holdingBuffer.put(new MutablePair<Object, Boolean>(t, false));
-        } else {
-          holdingBuffer.put(new MutablePair<Object, Boolean>(tuple, false));
-        }
+      TimeEvent t = new TimeEvent(getValue(rStore.keyField, tuple), System.currentTimeMillis(), tuple);
+      rStore.put(t);
+      joinedTuple(t, false);
+      /*try {
+        TimeEvent t = new TimeEvent(getValue(rStore.keyField, tuple), System.currentTimeMillis(), tuple);
+        holdingBuffer.put(new MutablePair<TimeEvent, Boolean>(t, false));
       } catch (InterruptedException e) {
         throw new RuntimeException(e);
-      }
+      }*/
     }
   };
 
   private void populateIncludeFields()
   {
-    includeFields = new ArrayList<String>();
-    for(String f: includeFieldStr.split(";")) {
-      includeFields.addAll(Arrays.asList(f.split(",")));
-      includeFields.add(null);
+    includeFields = new String[2][];
+    String[] portFields = includeFieldStr.split(";");
+    for(int i = 0; i < portFields.length; i++) {
+      includeFields[i] = portFields[i].split(",");
     }
-
   }
+
   private void startThread()
   {
     ExecutorService threadExecutor = Executors.newFixedThreadPool(1);
@@ -120,11 +108,11 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
         while (isAlive) {
           int count = holdingBuffer.size();
           for(int i = 0; i < count; i++) {
-            MutablePair<Object,Boolean> tuple = holdingBuffer.poll();
+            MutablePair<TimeEvent,Boolean> tuple = holdingBuffer.poll();
             if(tuple.getRight()) {
-              joinedTuple(tuple.getLeft(), lStore, rStore, tuple.getRight());
+              joinedTuple(tuple.getLeft(), tuple.getRight());
             } else {
-              joinedTuple(tuple.getLeft(), rStore, lStore, tuple.getRight());
+              joinedTuple(tuple.getLeft(), tuple.getRight());
             }
           }
         }
@@ -132,41 +120,67 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
     });
   }
 
-  private void joinedTuple(Object tuple, BackupStore firstStore, BackupStore secondStore, Boolean isFirst)
+  private void joinedTuple(TimeEvent tuple, Boolean isFirst)
   {
-    Object key = firstStore.getKey(getObject(tuple));
-    Object value = secondStore.getValidTuples(key, tuple);
+    //Object key = firstStore.getKey(getObject(tuple));
+    Object key = tuple.getEventKey();
+    Object value ;
+    if(isFirst) {
+      value = rStore.getValidTuples(key, tuple);
+      //lStore.put(tuple);
+    } else {
+      value = lStore.getValidTuples(key,tuple);
+      //rStore.put(tuple);
+    }
     if(value != null) {
-      ArrayList<Object> joinedValues = (ArrayList<Object>)value;
+      ArrayList<Event> joinedValues = (ArrayList<Event>)value;
+      List<T> result = new ArrayList<T>();
       for(int idx = 0; idx < joinedValues.size(); idx++) {
         T output = createOutputTuple();
-        Object jTuple = tuple;
+        Object jTuple = tuple.getTuple();
         if(!isFirst) {
-          jTuple = joinedValues.get(idx);
+          jTuple = ((TimeEvent)joinedValues.get(idx)).getTuple();
         }
-        for(String f: includeFields) {
-          if(f == null) {
-            if(isFirst) {
-              jTuple = joinedValues.get(idx);
-            } else {
-              jTuple = tuple;
-            }
-            continue;
-          }
-          addValue(output, f, getObject(jTuple));
+        addValue(output, jTuple, true);
+        if(isFirst) {
+          jTuple = ((TimeEvent)joinedValues.get(idx)).getTuple();
+        } else {
+          jTuple = tuple.getTuple();
         }
-        outputPort.emit(output);
+        addValue(output, jTuple, false);
+        result.add(output);
+      }
+      if(result.size() != 0) {
+        outputPort.emit(result);
       }
     }
-    firstStore.put(tuple);
+
   }
 
+  @Override
+  public void endWindow()
+  {
+    logger.info("ENdWindow: {}", holdingBuffer.size());
+    handleIdleTime();
+    logger.info("After handle Time: ENdWindow: {}", holdingBuffer.size());
+  }
+
+  public void handleIdleTime()
+  {
+    if(holdingBuffer.size() != 0) {
+      try {
+        Thread.sleep(sleepTimeMillis);
+      }
+      catch (InterruptedException ie) {
+        throw new RuntimeException(ie);
+      }
+    }
+  }
   @Override
   public void checkpointed(long windowId)
   {
     lStore.checkpointed(windowId);
     rStore.checkpointed(windowId);
-
   }
 
   @Override
@@ -175,19 +189,10 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
     lStore.committed(windowId);
     lStore.committed(windowId);
   }
-  public void setTimeBased(boolean isTimeBased)
-  {
-    this.isTimeBased = isTimeBased;
-  }
 
   public void setExpiryTime(long expiryTime)
   {
     this.expiryTime = expiryTime;
-  }
-
-  public void setWindowSize(int windowSize)
-  {
-    this.windowSize = windowSize;
   }
 
   public void setKeyFields(String keyFields)
@@ -203,25 +208,29 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
   @Override public void activate(Context.OperatorContext operatorContext)
   {
     isAlive = true;
-    startThread();
+    //startThread();
   }
 
   @Override public void deactivate()
   {
     isAlive = false;
+    lStore.shutdown();
+    rStore.shutdown();
   }
 
   protected abstract T createOutputTuple();
 
-  protected abstract void addValue(T output, String field, Object extractTuple);
+  protected abstract void addValue(T output, Object extractTuple, Boolean isFirst);
 
   public abstract Object getValue(String keyField, Object tuple);
 
-  public Object getObject(Object tuple) {
-    if(isTimeBased) {
-      return ((MutablePair<Object,Long>)tuple).getLeft();
-    }
-    return tuple;
+  public long getExpiryTime()
+  {
+    return expiryTime;
   }
 
+  public void setBucketSpanInMillis(int bucketSpanInMillis)
+  {
+    this.bucketSpanInMillis = bucketSpanInMillis;
+  }
 }
