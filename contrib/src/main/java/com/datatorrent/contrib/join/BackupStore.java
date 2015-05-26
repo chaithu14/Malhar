@@ -1,8 +1,10 @@
 package com.datatorrent.contrib.join;
 
+import com.datatorrent.api.Context;
+
 public interface BackupStore
 {
-  void setup();
+  void setup(Context.OperatorContext context);
 
   Object getValidTuples(Object tuple);
 
@@ -14,5 +16,5 @@ public interface BackupStore
 
   void shutdown();
 
-  void endWindow();
+  void endWindow(long windowId);
 }

@@ -2,6 +2,7 @@ package com.datatorrent.contrib.join;
 
 import com.datatorrent.api.BaseOperator;
 import com.datatorrent.api.Context;
+import com.datatorrent.api.DAG;
 import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.DefaultOutputPort;
 import com.datatorrent.api.Operator;
@@ -30,16 +31,26 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
 
   public final transient DefaultOutputPort<List<T>> outputPort = new DefaultOutputPort<List<T>>();
 
+  private transient long currentWId;
+
   @Override
   public void setup(Context.OperatorContext context)
   {
+    String appPath = context.getValue(DAG.APPLICATION_PATH);
     keys = keyFields.split(",");
-    store[0] = new InMemoryStore<TimeEvent>(expiryTime, bucketSpanInMillis);
-    store[1] = new InMemoryStore<TimeEvent>(expiryTime, bucketSpanInMillis);
+    String path = appPath + "/" + "buckets/"+context.getId();
+    store[0] = new InMemoryStore<TimeEvent>(expiryTime, bucketSpanInMillis, path + "/UP");
+    store[1] = new InMemoryStore<TimeEvent>(expiryTime, bucketSpanInMillis, path + "/DOWN");
 
-    store[0].setup();
-    store[1].setup();
+    store[0].setup(context);
+    store[1].setup(context);
     populateIncludeFields();
+  }
+
+  @Override
+  public void beginWindow(long windowId)
+  {
+    currentWId = windowId;
   }
 
   @InputPortFieldAnnotation(optional = true)
@@ -63,6 +74,17 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
       join(t, false);
     }
   };
+
+  private static long readLong(byte[] bytes, int offset)
+  {
+    long r = 0;
+    for (int i = offset; i < offset + 8 & i < bytes.length ; i++) {
+      r = r << 8;
+      r += bytes[i];
+    }
+    return r;
+  }
+
 
   private void populateIncludeFields()
   {
@@ -128,6 +150,8 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
   @Override
   public void endWindow()
   {
+    store[0].endWindow(currentWId);
+    store[1].endWindow(currentWId);
   }
 
   @Override

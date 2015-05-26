@@ -1,7 +1,8 @@
 package com.datatorrent.contrib.join;
 
-import com.datatorrent.lib.bucket.*;
-import com.datatorrent.lib.bucket.TimeBasedStore;
+import com.datatorrent.api.Context;
+import com.datatorrent.lib.bucket.Bucketable;
+import com.datatorrent.lib.bucket.Event;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -9,26 +10,22 @@ public class InMemoryStore<T extends Event & Bucketable> extends TimeBasedStore 
 {
   private static transient final Logger logger = LoggerFactory.getLogger(InMemoryStore.class);
 
-  public InMemoryStore(long spanTime, int bucketSpanInMillis)
+  public InMemoryStore(long spanTime, int bucketSpanInMillis, String basePath)
   {
     super();
+    setBucketRoot(basePath);
     setSpanTime(spanTime);
     setBucketSpanInMillis((int)(spanTime > (long)bucketSpanInMillis ? bucketSpanInMillis : spanTime));
   }
 
-  public void setup()
+  public void setup(Context.OperatorContext context)
   {
-    super.setup();
+    super.setup(context);
   }
 
   public void shutdown()
   {
     super.shutdown();
-  }
-
-  @Override public void endWindow()
-  {
-
   }
 
   @Override public Object getValidTuples(Object tuple)

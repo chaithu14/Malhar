@@ -14,9 +14,8 @@ import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 
-public class BeanTimeBasedJoinOperatorTest
+public class BeanTimeBasedJoinOpBckt
 {
-
   @Rule public final TestUtils.TestInfo testInfo = new TestUtils.TestInfo();
 
   public static class Customer {
@@ -89,7 +88,8 @@ public class BeanTimeBasedJoinOperatorTest
   @Test public void testJoinOperator() throws IOException, InterruptedException
   {
     BeanJoinOperator oper = new BeanJoinOperator();
-    oper.setExpiryTime(200);
+    oper.setExpiryTime(1000);
+    //oper.setBucketSpanInMillis(100);
     oper.setIncludeFieldStr("ID,Name;OID,Amount");
     oper.setKeyFields("ID,CID");
     oper.outputClass = CustOrder.class;
@@ -122,6 +122,12 @@ public class BeanTimeBasedJoinOperatorTest
 
     Order order3 = new Order(104, 7, 300);
     oper.input2.process(kryo.copy(order3));
+    oper.endWindow();
+
+    latch.await(100, TimeUnit.MILLISECONDS);
+    oper.beginWindow(2);
+    Order order4 = new Order(106, 1, 300);
+    oper.input2.process(kryo.copy(order4));
 
     latch.await(3000, TimeUnit.MILLISECONDS);
 
