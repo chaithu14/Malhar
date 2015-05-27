@@ -15,4 +15,6 @@ public interface BackupStore
   void shutdown();
 
   void endWindow();
+
+  Object getUnMatchedTuples();
 }

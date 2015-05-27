@@ -27,6 +27,7 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
 
   protected int bucketSpanInMillis = 30000;
   private String[] keys;
+  protected JoinStrategy strategy = JoinStrategy.INNER_JOIN;
 
   public final transient DefaultOutputPort<List<T>> outputPort = new DefaultOutputPort<List<T>>();
 
@@ -35,8 +36,10 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
   {
     keys = keyFields.split(",");
     if(store[0] == null && store[1] == null) {
-      store[0] = new InMemoryStore<TimeEvent>(expiryTime, bucketSpanInMillis);
-      store[1] = new InMemoryStore<TimeEvent>(expiryTime, bucketSpanInMillis);
+      boolean isOuterJoin = strategy.equals(JoinStrategy.LEFT_OUTER_JOIN) || strategy.equals(JoinStrategy.OUTER_JOIN);
+      store[0] = new InMemoryStore<TimeEvent>(expiryTime, bucketSpanInMillis, isOuterJoin);
+      isOuterJoin = strategy.equals(JoinStrategy.RIGHT_OUTER_JOIN) || strategy.equals(JoinStrategy.OUTER_JOIN);
+      store[1] = new InMemoryStore<TimeEvent>(expiryTime, bucketSpanInMillis, isOuterJoin);
     }
 
     store[0].setup();
@@ -85,9 +88,17 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
     // Get the valid tuples from the store based on key
     Object value ;
     if(isFirst) {
-      value = store[1].getValidTuples(tuple);
+      if(tuple != null) {
+        value = store[1].getValidTuples(tuple);
+      } else {
+        value = store[1].getUnMatchedTuples();
+      }
     } else {
-      value = store[0].getValidTuples(tuple);
+      if(tuple != null) {
+        value = store[0].getValidTuples(tuple);
+      } else {
+        value = store[0].getUnMatchedTuples();
+      }
     }
     // Join the input tuple with the joined tuples
     if(value != null) {
@@ -95,9 +106,17 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
       List<T> result = new ArrayList<T>();
       for(int idx = 0; idx < joinedValues.size(); idx++) {
         T output = createOutputTuple();
-        addValue(output, ((TimeEvent)tuple).getValue(), isFirst);
+        Object tupleValue = null;
+        if(tuple != null) {
+          tupleValue = ((TimeEvent)tuple).getValue();
+        }
+        addValue(output, tupleValue, isFirst);
         addValue(output, ((TimeEvent)joinedValues.get(idx)).getValue(), !isFirst);
         result.add(output);
+        ((TimeEvent)joinedValues.get(idx)).setMatch(true);
+      }
+      if(tuple != null) {
+        ((TimeEvent)tuple).setMatch(true);
       }
       if(result.size() != 0) {
         outputPort.emit(result);
@@ -130,6 +149,12 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
   @Override
   public void endWindow()
   {
+    if(strategy.equals(JoinStrategy.LEFT_OUTER_JOIN) || strategy.equals(JoinStrategy.OUTER_JOIN)) {
+      join(null, false);
+    }
+    if(strategy.equals(JoinStrategy.RIGHT_OUTER_JOIN) || strategy.equals(JoinStrategy.OUTER_JOIN)) {
+      join(null, true);
+    }
   }
 
   @Override
@@ -174,5 +199,17 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
   public void setBucketSpanInMillis(int bucketSpanInMillis)
   {
     this.bucketSpanInMillis = bucketSpanInMillis;
+  }
+
+  public static enum JoinStrategy
+  {
+    INNER_JOIN,
+    LEFT_OUTER_JOIN,
+    RIGHT_OUTER_JOIN,
+    OUTER_JOIN
+  }
+  public void setStrategy(String policy)
+  {
+    this.strategy = JoinStrategy.valueOf(policy.toUpperCase());
   }
 }

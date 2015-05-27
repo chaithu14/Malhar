@@ -18,7 +18,11 @@ public class MapJoinOperator extends AbstractJoinOperator<Map<String, Object>>
     else
       fields = includeFields[1];
     for(int i=0; i < fields.length; i++) {
-      output.put(fields[i], ((Map<String, Object>)extractTuple).get(fields[i]));
+      Object value = null;
+      if(extractTuple != null) {
+        value = ((Map<String, Object>)extractTuple).get(fields[i]);
+      }
+      output.put(fields[i], value);
     }
   }
 

@@ -31,6 +31,8 @@ public class TimeBasedStore<T extends Event & Bucketable>
   private Map<Object, List<Long>> key2Buckets;
   private transient Timer bucketSlidingTimer;
   private long expiryTime;
+  private boolean isOuter=false;
+  private List<T> unmatchedEvents = new ArrayList<T>();
 
   protected Map<Long, TimeBucket> dirtyBuckets;
 
@@ -57,7 +59,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
   {
     if(buckets == null) {
       recomputeNumBuckets();
-    } 
+    }
     startService();
   }
 
@@ -203,6 +205,13 @@ public class TimeBasedStore<T extends Event & Bucketable>
 
   }
 
+  public List<T> getUnmatchedEvents()
+  {
+    List<T> copyEvents = new ArrayList<T>(unmatchedEvents);
+    unmatchedEvents.clear();
+    return copyEvents;
+  }
+
   private void deleteBucket(TimeBucket bucket) {
     if(bucket == null) {
       return;
@@ -212,6 +221,13 @@ public class TimeBasedStore<T extends Event & Bucketable>
       return;
     }
     for(Map.Entry<Object, List<T>> e: writtens.entrySet()) {
+      if(isOuter) {
+        for (T event : e.getValue()) {
+          if (!((TimeEvent) (event)).isMatch()) {
+            unmatchedEvents.add(event);
+          }
+        }
+      }
       key2Buckets.get(e.getKey()).remove(bucket.bucketKey);
       if(key2Buckets.get(e.getKey()).size() == 0) {
         key2Buckets.remove(e.getKey());
@@ -237,5 +253,10 @@ public class TimeBasedStore<T extends Event & Bucketable>
   public void shutdown()
   {
     bucketSlidingTimer.cancel();
+  }
+
+  public void setOuter(boolean isOuter)
+  {
+    this.isOuter = isOuter;
   }
 }

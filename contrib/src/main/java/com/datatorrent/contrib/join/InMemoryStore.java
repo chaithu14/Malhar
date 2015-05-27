@@ -1,6 +1,7 @@
 package com.datatorrent.contrib.join;
 
-import com.datatorrent.lib.bucket.*;
+import com.datatorrent.lib.bucket.Bucketable;
+import com.datatorrent.lib.bucket.Event;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -12,10 +13,11 @@ public class InMemoryStore<T extends Event & Bucketable> extends TimeBasedStore 
 
   }
 
-  public InMemoryStore(long spanTime, int bucketSpanInMillis)
+  public InMemoryStore(long spanTime, int bucketSpanInMillis, boolean isOuterJoin)
   {
     super();
     setSpanTime(spanTime);
+    setOuter(isOuterJoin);
     setBucketSpanInMillis((int)(spanTime > (long)bucketSpanInMillis ? bucketSpanInMillis : spanTime));
   }
 
@@ -32,6 +34,11 @@ public class InMemoryStore<T extends Event & Bucketable> extends TimeBasedStore 
   @Override public void endWindow()
   {
 
+  }
+
+  @Override public Object getUnMatchedTuples()
+  {
+    return super.getUnmatchedEvents();
   }
 
   @Override public Object getValidTuples(Object tuple)

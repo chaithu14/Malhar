@@ -21,16 +21,17 @@ import com.datatorrent.lib.bucket.Event;
 import javax.annotation.Nonnull;
 
 /**
- * Test event.
+ * Time event.
  */
 public class TimeEvent implements Event, Bucketable, Comparable<TimeEvent>
 {
-  Object key;
-  long time;
-  Object tuple;
+  protected Object key;
+  protected long time;
+  protected Object tuple;
+  protected boolean match;
 
   @SuppressWarnings("unused")
-  TimeEvent()
+  public TimeEvent()
   {
   }
 
@@ -39,6 +40,7 @@ public class TimeEvent implements Event, Bucketable, Comparable<TimeEvent>
     this.key = key;
     this.time = time;
     this.tuple = tuple;
+    this.match = false;
   }
 
   @Override
@@ -106,7 +108,18 @@ public class TimeEvent implements Event, Bucketable, Comparable<TimeEvent>
         "key=" + key +
         ", time=" + time +
         ", tuple=" + tuple +
+        ", match=" + match +
         '}';
+  }
+
+  public boolean isMatch()
+  {
+    return match;
+  }
+
+  public void setMatch(boolean match)
+  {
+    this.match = match;
   }
 }
 

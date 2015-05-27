@@ -26,6 +26,7 @@ public class MapJoinDemo implements StreamingApplication
     MapJoinOperator joinOper = dag.addOperator("Join", new MapJoinOperator());
     joinOper.setExpiryTime(3000);
     joinOper.setBucketSpanInMillis(1000);
+    joinOper.setStrategy("right_outer_join");
     joinOper.setIncludeFieldStr("timestamp,customerId,productId,regionId,amount;productCategory");
     joinOper.setKeyFields("productId,productId");
 

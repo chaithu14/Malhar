@@ -20,6 +20,9 @@ public class BeanJoinOperator extends AbstractJoinOperator
   @Override protected void addValue(Object output, Object extractTuple, Boolean isFirst)
   {
     String[] fields ;
+    if(extractTuple == null) {
+      return;
+    }
     if(isFirst)
       fields = includeFields[0];
     else
