@@ -16,7 +16,7 @@ import org.slf4j.LoggerFactory;
 public abstract class AbstractJoinOperator<T> extends BaseOperator implements Operator.CheckpointListener
 {
   static final org.slf4j.Logger logger = LoggerFactory.getLogger(AbstractJoinOperator.class);
-  private transient BackupStore store[] = (BackupStore[]) Array.newInstance(BackupStore.class, 2);
+  private BackupStore store[] = (BackupStore[]) Array.newInstance(BackupStore.class, 2);
 
   private long expiryTime;
 

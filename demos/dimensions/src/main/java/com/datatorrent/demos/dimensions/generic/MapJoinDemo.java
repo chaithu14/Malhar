@@ -1,15 +1,28 @@
 package com.datatorrent.demos.dimensions.generic;
 
+import com.datatorrent.api.BaseOperator;
 import com.datatorrent.api.DAG;
+import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.StreamingApplication;
 import com.datatorrent.api.annotation.ApplicationAnnotation;
 import com.datatorrent.contrib.join.MapJoinOperator;
-import com.datatorrent.lib.io.ConsoleOutputOperator;
 import org.apache.hadoop.conf.Configuration;
 
 @ApplicationAnnotation(name="GenericSalesMapJoinDemo")
 public class MapJoinDemo implements StreamingApplication
 {
+  public static class CollectorModule extends BaseOperator
+  {
+    public final transient DefaultInputPort<Object> inputPort = new DefaultInputPort<Object>() {
+
+      @Override
+      public void process(Object arg0)
+      {
+      }
+    };
+
+  }
+
   @Override public void populateDAG(DAG dag, Configuration conf)
   {
     JsonSalesGenerator input = dag.addOperator("Input", JsonSalesGenerator.class);
@@ -24,19 +37,19 @@ public class MapJoinDemo implements StreamingApplication
     input2.setTuplesPerWindowDeviation(0);
 
     MapJoinOperator joinOper = dag.addOperator("Join", new MapJoinOperator());
-    joinOper.setExpiryTime(3000);
-    joinOper.setBucketSpanInMillis(1000);
+    joinOper.setExpiryTime(60000*10*15);
+    joinOper.setBucketSpanInMillis(60000*5);
     joinOper.setIncludeFieldStr("timestamp,customerId,productId,regionId,amount;productCategory");
     joinOper.setKeyFields("productId,productId");
 
-    ConsoleOutputOperator console = dag.addOperator("Console", new ConsoleOutputOperator());
+    CollectorModule console = dag.addOperator("Console", new CollectorModule());
 
     //dag.setInputPortAttribute(converter.input, Context.PortContext.PARTITION_PARALLEL, true);
     // Removing setLocality(Locality.CONTAINER_LOCAL) from JSONStream and MapStream to isolate performance bottleneck
     dag.addStream("SalesInput", input.jsonBytes, converter.input).setLocality(DAG.Locality.THREAD_LOCAL);
     dag.addStream("JSONStream", converter.outputMap, joinOper.input1);
     dag.addStream("JsonProductStream", input2.outputMap, joinOper.input2);
-    dag.addStream("Output", joinOper.outputPort, console.input);
+    dag.addStream("Output", joinOper.outputPort, console.inputPort).setLocality(DAG.Locality.CONTAINER_LOCAL);
 
   }
 }
