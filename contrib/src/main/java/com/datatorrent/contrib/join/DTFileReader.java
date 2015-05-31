@@ -18,10 +18,13 @@ package com.datatorrent.contrib.join;
 import com.datatorrent.common.util.Slice;
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.Comparator;
 import java.util.TreeMap;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.io.file.tfile.DTFile;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * TFileReader
@@ -30,17 +33,19 @@ import org.apache.hadoop.io.file.tfile.DTFile;
  */
 public class DTFileReader implements Closeable
 {
-
+  private static transient final Logger logger = LoggerFactory.getLogger(DTFileReader.class);
   private final DTFile.Reader reader;
   private final DTFile.Reader.Scanner scanner;
   private final FSDataInputStream fsdis;
   private boolean closed = false;
+  private String path;
 
-  public DTFileReader(FSDataInputStream fsdis, long fileLength, Configuration conf) throws IOException
+  public DTFileReader(FSDataInputStream fsdis, long fileLength, Configuration conf, String path) throws IOException
   {
     this.fsdis = fsdis;
     reader = new DTFile.Reader(fsdis, fileLength, conf);
     scanner = reader.createScanner();
+    this.path = path;
   }
 
   /**
@@ -70,6 +75,41 @@ public class DTFileReader implements Closeable
       data.put(new Slice(key, 0, key.length), value);
     }
 
+  }
+
+  public TreeMap<byte[], byte[]> readFully() throws IOException
+  {
+    logger.info("ReadFull start");
+    TreeMap<byte[], byte[]> data = new TreeMap<byte[], byte[]>(new Comparator<byte[]>()
+    {
+      @Override public int compare(byte[] bytes, byte[] bytes2)
+      {
+        int end1 = bytes.length;
+        int end2 = bytes2.length;
+        for (int i = 0, j = 0; i < end1 && j < end2; i++, j++) {
+          int a = (bytes[i] & 0xff);
+          int b = (bytes2[j] & 0xff);
+          if (a != b) {
+            return a - b;
+          }
+        }
+        return end1 - end2;
+      }
+    });
+    scanner.rewind();
+    for (; !scanner.atEnd(); scanner.advance()) {
+      DTFile.Reader.Scanner.Entry en = scanner.entry();
+      int klen = en.getKeyLength();
+      int vlen = en.getValueLength();
+      byte[] key = new byte[klen];
+      byte[] value = new byte[vlen];
+      en.getKey(key);
+      en.getValue(value);
+      data.put(key, value);
+    }
+    logger.info("ReadFull end");
+    scanner.rewind();
+    return data;
   }
 
   public void reset() throws IOException
@@ -123,5 +163,10 @@ public class DTFileReader implements Closeable
 
     scanner.advance();
     return true;
+  }
+
+  public String getPath()
+  {
+    return path;
   }
 }

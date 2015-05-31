@@ -37,7 +37,7 @@ public class MapJoinDemo implements StreamingApplication
     input2.setTuplesPerWindowDeviation(0);
 
     MapJoinOperator joinOper = dag.addOperator("Join", new MapJoinOperator());
-    joinOper.setExpiryTime(60000*10*15);
+    joinOper.setExpiryTime(60000*10*2);
     joinOper.setBucketSpanInMillis(60000*5);
     joinOper.setIncludeFieldStr("timestamp,customerId,productId,regionId,amount;productCategory");
     joinOper.setKeyFields("productId,productId");

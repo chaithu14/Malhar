@@ -13,12 +13,25 @@ public class TimeBucket<T extends Bucketable> extends AbstractBucket<T>
 {
   private static transient final Logger logger = LoggerFactory.getLogger(TimeBucket.class);
   private Map<Object, List<T>> unwrittenEvents;
+  private transient Map<Object, List<T>> writtenEvents;
   private boolean isDataOnDiskLoaded;
 
   protected TimeBucket(long bucketKey)
   {
     super(bucketKey);
     isDataOnDiskLoaded = false;
+  }
+
+  public void transferEvents()
+  {
+    writtenEvents = unwrittenEvents;
+
+    unwrittenEvents = null;
+  }
+
+  Map<Object, List<T>> getWrittenEvents()
+  {
+    return writtenEvents;
   }
 
   @Override
@@ -29,8 +42,8 @@ public class TimeBucket<T extends Bucketable> extends AbstractBucket<T>
 
   void transferDataFromMemoryToStore()
   {
-    System.out.println("===================================");
-    unwrittenEvents = null;
+    System.out.println("===== TransferDataFromMemoryToStore ====== " + bucketKey);
+    writtenEvents = null;
     isDataOnDiskLoaded = true;
   }
 
@@ -55,10 +68,21 @@ public class TimeBucket<T extends Bucketable> extends AbstractBucket<T>
     return unwrittenEvents; }
 
   public List<T> get(Object key) {
-    if(unwrittenEvents == null) {
+    if(unwrittenEvents == null && writtenEvents == null) {
       return null;
     }
-    return unwrittenEvents.get(key);
+    List<T> value = null;
+    if(unwrittenEvents != null)
+      value = unwrittenEvents.get(key);
+    if(writtenEvents != null) {
+      if(value != null && writtenEvents.get(key) != null) {
+        value.addAll(writtenEvents.get(key));
+      } else if(value == null) {
+        value = writtenEvents.get(key);
+      }
+    }
+    return value;
+    //return unwrittenEvents.get(key);
   }
 }
 

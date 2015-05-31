@@ -10,6 +10,10 @@ public class InMemoryStore<T extends Event & Bucketable> extends TimeBasedStore 
 {
   private static transient final Logger logger = LoggerFactory.getLogger(InMemoryStore.class);
 
+  public InMemoryStore()
+  {
+
+  }
   public InMemoryStore(long spanTime, int bucketSpanInMillis, String basePath)
   {
     super();
