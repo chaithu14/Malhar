@@ -59,9 +59,9 @@ import org.codehaus.jackson.type.TypeReference;
 public class JsonProductGenerator implements InputOperator
 {
   @Min(1)
-  private int maxProductId = 1000;
+  private int maxProductId = 1000000000;
   @Min(1)
-  private int maxProductCategories = 200;
+  private int maxProductCategories = 900;
 
   // Limit number of emitted tuples per window
   @Min(0)

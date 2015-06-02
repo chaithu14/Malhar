@@ -27,13 +27,13 @@ public class MapJoinDemo implements StreamingApplication
   {
     JsonSalesGenerator input = dag.addOperator("Input", JsonSalesGenerator.class);
     input.setAddProductCategory(false);
-    input.setMaxTuplesPerWindow(100);
+    input.setMaxTuplesPerWindow(500);
     input.setTuplesPerWindowDeviation(0);
 
     JsonToMapConverter converter = dag.addOperator("Parse", JsonToMapConverter.class);
 
     JsonProductGenerator input2 = dag.addOperator("Prodcut", JsonProductGenerator.class);
-    input2.setMaxTuplesPerWindow(20);
+    input2.setMaxTuplesPerWindow(500);
     input2.setTuplesPerWindowDeviation(0);
 
     MapJoinOperator joinOper = dag.addOperator("Join", new MapJoinOperator());

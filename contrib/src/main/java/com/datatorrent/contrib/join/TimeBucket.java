@@ -1,25 +1,29 @@
 package com.datatorrent.contrib.join;
 
-import com.datatorrent.lib.bucket.AbstractBucket;
 import com.datatorrent.lib.bucket.Bucketable;
 import com.google.common.collect.Lists;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class TimeBucket<T extends Bucketable> extends AbstractBucket<T>
+public class TimeBucket<T extends Bucketable>
 {
   private static transient final Logger logger = LoggerFactory.getLogger(TimeBucket.class);
   private Map<Object, List<T>> unwrittenEvents;
   private transient Map<Object, List<T>> writtenEvents;
   private boolean isDataOnDiskLoaded;
+  public long bucketKey;
 
+  protected TimeBucket()
+  {
+
+  }
   protected TimeBucket(long bucketKey)
   {
-    super(bucketKey);
     isDataOnDiskLoaded = false;
+    this.bucketKey = bucketKey;
   }
 
   public void transferEvents()
@@ -34,7 +38,6 @@ public class TimeBucket<T extends Bucketable> extends AbstractBucket<T>
     return writtenEvents;
   }
 
-  @Override
   protected Object getEventKey(T event)
   {
     return event.getEventKey();
@@ -54,7 +57,7 @@ public class TimeBucket<T extends Bucketable> extends AbstractBucket<T>
   void addNewEvent(Object eventKey, T event)
   {
     if (unwrittenEvents == null) {
-      unwrittenEvents = new TreeMap<Object, List<T>>();
+      unwrittenEvents = new HashMap<Object, List<T>>();
     }
     List<T> listEvents = unwrittenEvents.get(eventKey);
     if(listEvents == null) {

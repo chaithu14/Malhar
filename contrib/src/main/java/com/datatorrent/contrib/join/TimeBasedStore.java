@@ -190,6 +190,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
     }
     long diffFromStart = eventTime - startOfBucketsInMillis;
     long key = diffFromStart / bucketSpanInMillis;
+
     synchronized (lock) {
       if (eventTime > endOBucketsInMillis) {
         long move = ((eventTime - endOBucketsInMillis) / bucketSpanInMillis + 1) * bucketSpanInMillis;
@@ -260,10 +261,13 @@ public class TimeBasedStore<T extends Event & Bucketable>
       public void run()
       {
         long time = 0;
+
         synchronized (lock) {
           time = (expiryTime += bucketSpanInMillis);
           endOBucketsInMillis += bucketSpanInMillis;
+
         }
+
         try {
           deleteExpiredBuckets(time);
         } catch (IOException e) {
@@ -343,32 +347,6 @@ public class TimeBasedStore<T extends Event & Bucketable>
 
   public void endWindow(long window)
   {
-    //logger.info("-------------End Window: ----------: {}", window);
-    /*if(!currentBucketId.equals(latestBucketId)  && !latestBucketId.equals(0L)) {
-      logger.info("-------------Save Data: ----------: {} -> {}", window, latestBucketId);
-      int bucketIdx = (int) (latestBucketId % noOfBuckets);
-      try {
-        logger.info("-------------Saving Data: ----------: {} -> {} ", window, latestBucketId);
-        saveData(window);
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-      latestBucketId = currentBucketId;
-    }*/
-    /*if(dirtyBuckets.size() >= 2) {
-      int bucketIdx = (int) (latestBucketId % noOfBuckets);
-      try {
-        logger.info("-------------Saving Data: ----------: {} -> {} ", window, latestBucketId);
-        saveData(window);
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-      dirtyBuckets.remove(bucketIdx);
-      if(dirtyBuckets.size() != 0) {
-        latestBucketId = dirtyBuckets.keySet().iterator().next();
-      }
-    }*/
-
     if (mergeBucketId != 0L) {
       TimeBucket bucket = buckets[((int) (mergeBucketId % noOfBuckets))];
       bucket.transferDataFromMemoryToStore();
@@ -446,8 +424,11 @@ public class TimeBasedStore<T extends Event & Bucketable>
     String readerPath = null;
     logger.info("-------------Saving Data - 2: ----------: {} -> {} ", latestBucketId);
     if(bcktReader != null) {
-      storedData = bcktReader.readFully();
+      //storedData = bcktReader.readFully();
       readerPath = bcktReader.getPath();
+      DTFileReader br = createDTReader(readerPath);
+      storedData = br.readFully();
+      br.close();
     }
     logger.info("-------------Saving Data - 3: ----------: {} -> {} ", latestBucketId);
     int eventsCount = 0;
@@ -483,25 +464,24 @@ public class TimeBasedStore<T extends Event & Bucketable>
   public void startMergeService()
   {
     bucketMergeTimer = new Timer();
-    logger.debug("bucket time params: start {}, end {}", startOfBucketsInMillis, endOBucketsInMillis);
+
+    logger.info("Merge bucket time : ");
 
     bucketMergeTimer.scheduleAtFixedRate(new TimerTask()
     {
       @Override
       public void run()
       {
-        logger.info("run-------------------");
-        long time = 0;
-        synchronized (lock) {
-          logger.info("In lock");
-          int bucketIdx = (int) (latestBucketId % noOfBuckets);
-          if(buckets[bucketIdx].getEvents() == null && !currentBucketId.equals(latestBucketId)) {
-            latestBucketId = currentBucketId;
-          }
+        long start = System.currentTimeMillis();
+        logger.info("run Merge Service------------------- {} ");
+        int bucketIdx = (int) (latestBucketId % noOfBuckets);
+        if(buckets[bucketIdx].getEvents() == null && !currentBucketId.equals(latestBucketId)) {
+          latestBucketId = currentBucketId;
         }
         try {
           logger.info("-------------Saving Data: ----------: {} ", latestBucketId);
           saveData();
+          logger.info("-------------End of Saving Data: ----------: {} -> {}", latestBucketId, System.currentTimeMillis() - start);
         } catch (IOException e) {
           throw new RuntimeException(e);
         }
@@ -544,8 +524,8 @@ public class TimeBasedStore<T extends Event & Bucketable>
     logger.info("-------------StoreBucketData - 1: ----------: {} ", latestBucketId);
     //Write the size of data and then data
     //dataStream.writeInt(bucketData.size());
+    Kryo kryo = new Kryo();
     for (Map.Entry<Object, List<T>> entry : bucketData.entrySet()) {
-      Kryo kryo = new Kryo();
       ByteArrayOutputStream bos = new ByteArrayOutputStream();
       Output output2 = new Output(bos);
       kryo.writeObject(output2, entry.getKey());
@@ -682,6 +662,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
   public void shutdown()
   {
     bucketSlidingTimer.cancel();
+    bucketMergeTimer.cancel();
   }
 }
 
