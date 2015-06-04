@@ -421,7 +421,10 @@ public class TimeBasedStore<T extends Event & Bucketable>
     if(bucket == null || bucket.getEvents() == null || bucket.getEvents().isEmpty()) {
       return;
     }
-    bucket.transferEvents();
+    synchronized (bucket) {
+      bucket.transferEvents();
+    }
+
     Map<Object, List<T>> events = new HashMap<Object, List<T>>(bucket.getWrittenEvents());
     //long bucketKey = bucket.bucketKey;
     DTFileReader bcktReader = readers.get(bucketKey);
