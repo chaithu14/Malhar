@@ -1,6 +1,7 @@
 package com.datatorrent.contrib.join;
 
 import com.datatorrent.api.Context;
+import com.datatorrent.common.util.NameableThreadFactory;
 import com.datatorrent.lib.bucket.Bucketable;
 import com.datatorrent.lib.bucket.Event;
 import com.esotericsoftware.kryo.Kryo;
@@ -14,12 +15,21 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.TreeMap;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import javax.validation.constraints.Min;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -42,7 +52,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
   protected long startOfBucketsInMillis;
   protected long endOBucketsInMillis;
   private final transient Lock lock;
-  private transient Map<Object, List<Long>> key2Buckets;
+  //private transient Map<Object, List<Long>> key2Buckets;
   private transient Timer bucketSlidingTimer;
   private transient Timer bucketMergeTimer;
   private transient long bucketMergeSpanInMillis = 23000;
@@ -50,14 +60,17 @@ public class TimeBasedStore<T extends Event & Bucketable>
   private String bucketRoot;
   private transient Kryo writeSerde;
   private transient long mergeBucketId = 0L;
+  private Set<Long> mergeBuckets;
 
   //@NotNull
   //protected final Map<Integer, TimeBucket<T>> dirtyBuckets;
+  protected transient Set<Long> dirtyBuckets;
   static transient final String PATH_SEPARATOR = "/";
   protected transient Configuration configuration;
   protected Long latestBucketId = 0L;
   protected Long currentBucketId = 0L;
   protected transient Map<Long, DTFileReader> readers = new HashMap<Long, DTFileReader>();
+  protected transient ThreadPoolExecutor threadPoolExecutor;
 
   protected Map<Long, TimeBucket> expiredBuckets;
 
@@ -70,7 +83,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
   {
     lock = new Lock();
     expiredBuckets = new HashMap<Long, TimeBucket>();
-    key2Buckets = new HashMap<Object, List<Long>>();
+    //key2Buckets = new HashMap<Object, List<Long>>();
     //dirtyBuckets = new HashMap<Integer, TimeBucket<T>>();
   }
 
@@ -95,6 +108,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
     writeSerde.setClassLoader(classLoader);
     startMergeService();
     startService();
+    dirtyBuckets = new HashSet<Long>();
 
   }
 
@@ -105,7 +119,6 @@ public class TimeBasedStore<T extends Event & Bucketable>
 
   public Object getValidTuples(T tuple)
   {
-    //logger.info("GetValidTuples: " + tuple);
     Object key = tuple.getEventKey();
     Kryo kryo = new Kryo();
     ByteArrayOutputStream bos = new ByteArrayOutputStream();
@@ -113,8 +126,27 @@ public class TimeBasedStore<T extends Event & Bucketable>
     kryo.writeObject(output2, key);
     output2.close();
     byte[] keyBytes = bos.toByteArray();
+    List<Event> validTuples = new ArrayList<Event>();
+    for(int i = 0; i < noOfBuckets; i++) {
+      TimeBucket tb = buckets[i];
+      if(tb == null) {
+        continue;
+      }
+      if(tb.contains(key)) {
+        List<T> events = tb.get(key);
+        if (tb.isDataOnDiskLoaded()) {
+          List<T> dataEvents = getDataFromFile(keyBytes, tb.bucketKey);
+          if (dataEvents != null) {
+            validTuples.addAll(dataEvents);
+          }
+        }
+        if (events != null) {
+          validTuples.addAll(events);
+        }
+      }
+    }
 
-    if (key2Buckets.get(key) == null) {
+    /*if (key2Buckets.get(key) == null) {
       //logger.info("GetValidTuples - 1: " + tuple);
       return null;
     }
@@ -155,25 +187,9 @@ public class TimeBasedStore<T extends Event & Bucketable>
           validTuples.addAll(events);
         }
       }
-    }
+    }*/
     //logger.info("Time took for {} Valid Tuples: {}", validTuples.size(), System.currentTimeMillis() - start);
     return validTuples;
-  }
-
-  private void updateBuckets(long time)
-  {
-    if (time < endOBucketsInMillis) {
-      return;
-    }
-    int count = (int) ((time - endOBucketsInMillis) / (bucketSpanInMillis * 1.0));
-    for (int i = 0; i < count; i++) {
-      TimeBucket<T> b = buckets[i];
-      if (b != null) {
-        logger.info("updateBuckets:  {}  --- {} -> {} -> {}", b.bucketKey, time, endOBucketsInMillis, bucketRoot);
-        expiredBuckets.put(b.bucketKey, b);
-        buckets[i] = null;
-      }
-    }
   }
 
   public void put(T tuple)
@@ -214,12 +230,10 @@ public class TimeBasedStore<T extends Event & Bucketable>
   {
     int bucketIdx = (int) (bucketKey % noOfBuckets);
 
-    //logger.info("Bucket IDx: {}", bucketIdx);
     TimeBucket<T> bucket = buckets[bucketIdx];
 
     if (bucket == null || bucket.bucketKey != bucketKey) {
       if (bucket != null) {
-        //logger.info("NewEvent:    --- {}", bucket.bucketKey);
         expiredBuckets.put(bucket.bucketKey, bucket);
       }
       if (latestBucketId.equals(0L)) {
@@ -237,14 +251,15 @@ public class TimeBasedStore<T extends Event & Bucketable>
       dirtyBuckets.put(bucketIdx, bucket);
     }*/
 
-    Object key = bucket.getEventKey(event);
+    /*Object key = bucket.getEventKey(event);
     List<Long> keyBuckets = key2Buckets.get(key);
     if (keyBuckets == null) {
       key2Buckets.put(key, Lists.newArrayList(bucketKey));
     } else {
       key2Buckets.get(key).add(bucketKey);
-    }
+    }*/
     bucket.addNewEvent(bucket.getEventKey(event), event);
+    dirtyBuckets.add(bucketKey);
     //logger.info("Bucket IDx: {}", bucketIdx);
   }
 
@@ -337,92 +352,81 @@ public class TimeBasedStore<T extends Event & Bucketable>
     if (writtens == null) {
       return;
     }
-    for (Map.Entry<Object, List<T>> e : writtens.entrySet()) {
+    /*for (Map.Entry<Object, List<T>> e : writtens.entrySet()) {
       key2Buckets.get(e.getKey()).remove(bucket.bucketKey);
       if (key2Buckets.get(e.getKey()).size() == 0) {
         key2Buckets.remove(e.getKey());
       }
-    }
+    }*/
   }
 
   public void endWindow(long window)
   {
-    if (mergeBucketId != 0L) {
-      TimeBucket bucket = buckets[((int) (mergeBucketId % noOfBuckets))];
-      bucket.transferDataFromMemoryToStore();
+    if(mergeBuckets != null && mergeBuckets.size() != 0) {
+      for(long mergeBucketId: mergeBuckets) {
+        TimeBucket bucket = buckets[((int) (mergeBucketId % noOfBuckets))];
+        bucket.transferDataFromMemoryToStore();
 
-      String merge = "";
-      DTFileReader bcktReader = readers.get(mergeBucketId);
-      String readerPath = null;
-      if(bcktReader != null)
-        readerPath = bcktReader.getPath();
-      if (readerPath != null) {
-        if (!readerPath.endsWith("_MERGE")) {
-          merge = "_MERGE";
+        String merge = "";
+        DTFileReader bcktReader = readers.get(mergeBucketId);
+        String readerPath = null;
+        if(bcktReader != null)
+          readerPath = bcktReader.getPath();
+        if (readerPath != null) {
+          if (!readerPath.endsWith("_MERGE")) {
+            merge = "_MERGE";
+          }
         }
-      }
-      String path = new String(bucketRoot + PATH_SEPARATOR + ((TimeBucket) bucket).bucketKey + merge);
-      DTFileReader tr = createDTReader(path);
-      if (tr != null) {
-        readers.put(((TimeBucket) bucket).bucketKey, tr);
-        if (bcktReader != null) {
+        String path = new String(bucketRoot + PATH_SEPARATOR + ((TimeBucket) bucket).bucketKey + merge);
+        DTFileReader tr = createDTReader(path);
+        if (tr != null) {
+          readers.put(((TimeBucket) bucket).bucketKey, tr);
+          if (bcktReader != null) {
+            try {
+              bcktReader.close();
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
+          }
+        }
+        if (readerPath != null) {
+          Path dataFilePath = new Path(readerPath);
+          FileSystem fs = null;
           try {
-            bcktReader.close();
+            fs = FileSystem.newInstance(dataFilePath.toUri(), configuration);
+            if (fs.exists(dataFilePath)) {
+              logger.debug("start delete {}", bucket.bucketKey);
+              fs.delete(dataFilePath, true);
+              logger.debug("end delete {}", bucket.bucketKey);
+            }
           } catch (IOException e) {
             throw new RuntimeException(e);
+          } finally {
+            try {
+              fs.close();
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
           }
         }
       }
-      if (readerPath != null) {
-        Path dataFilePath = new Path(readerPath);
-        FileSystem fs = null;
-        try {
-          fs = FileSystem.newInstance(dataFilePath.toUri(), configuration);
-          if (fs.exists(dataFilePath)) {
-            logger.debug("start delete {}", bucket.bucketKey);
-            fs.delete(dataFilePath, true);
-            logger.debug("end delete {}", bucket.bucketKey);
-          }
-        } catch (IOException e) {
-          throw new RuntimeException(e);
-        } finally {
-          try {
-            fs.close();
-          } catch (IOException e) {
-            throw new RuntimeException(e);
-          }
-        }
-      }
-      mergeBucketId = 0L;
+      mergeBuckets = null;
     }
-
-    /*if(!latestBucketId.equals(0)) {
-      int bucketIdx = (int) (latestBucketId % noOfBuckets);
-      TimeBucket<T> bucket = buckets[bucketIdx];
-      if(bucket == null || bucket.getEvents() == null || bucket.getEvents().isEmpty()) {
-        return;
-      }
-      //logger.info("-------------Saving Data: ----------: {} -> {} ", latestBucketId);
-      bucket.transferEvents();
-    }*/
 }
 
-  protected void saveData() throws IOException
+  protected void saveData(long bucketKey) throws IOException
   {
-    int bucketIdx = (int) (latestBucketId % noOfBuckets);
+    int bucketIdx = (int) (bucketKey % noOfBuckets);
     TimeBucket<T> bucket = buckets[bucketIdx];
     if(bucket == null || bucket.getEvents() == null || bucket.getEvents().isEmpty()) {
       return;
     }
-    logger.info("-------------Saving Data: ----------: {} -> {} ", latestBucketId);
     bucket.transferEvents();
     Map<Object, List<T>> events = new HashMap<Object, List<T>>(bucket.getWrittenEvents());
-    long bucketKey = bucket.bucketKey;
-    logger.info("-------------Saving Data - 1: ----------: {} -> {} ", latestBucketId);
+    //long bucketKey = bucket.bucketKey;
     DTFileReader bcktReader = readers.get(bucketKey);
     TreeMap<byte[], byte[]> storedData = null;
     String readerPath = null;
-    logger.info("-------------Saving Data - 2: ----------: {} -> {} ", latestBucketId);
     if(bcktReader != null) {
       //storedData = bcktReader.readFully();
       readerPath = bcktReader.getPath();
@@ -430,42 +434,19 @@ public class TimeBasedStore<T extends Event & Bucketable>
       storedData = br.readFully();
       br.close();
     }
-    logger.info("-------------Saving Data - 3: ----------: {} -> {} ", latestBucketId);
     int eventsCount = 0;
     if(events != null)
       eventsCount = events.size();
     long start = System.currentTimeMillis();
-    logger.info("start store {}", latestBucketId);
-    logger.info("-------------Saving Data - 4: ----------: {} -> {} ", latestBucketId);
     storeBucketData(events, storedData, bucketKey, readerPath);
-    logger.info("end store {} num {} took {}", latestBucketId, eventsCount, System.currentTimeMillis() - start);
-    mergeBucketId = bucketKey;
-    events.clear();
-    /*bucket.transferDataFromMemoryToStore();
 
-    String merge = "";
-    if(readerPath != null) {
-      if(!readerPath.endsWith("_MERGE")) {
-        merge = "_MERGE";
-      }
-    }
-    String path = new String(bucketRoot + PATH_SEPARATOR + ((TimeBucket) bucket).bucketKey + merge);
-    DTFileReader tr = createDTReader(path);
-    if(tr != null) {
-      synchronized (lock) {
-        readers.put(((TimeBucket) bucket).bucketKey, tr);
-      }
-      if(bcktReader != null) {
-        bcktReader.close();
-      }
-    }*/
+    //mergeBucketId = bucketKey;
+    events.clear();
   }
 
   public void startMergeService()
   {
     bucketMergeTimer = new Timer();
-
-    logger.info("Merge bucket time : ");
 
     bucketMergeTimer.scheduleAtFixedRate(new TimerTask()
     {
@@ -473,17 +454,34 @@ public class TimeBasedStore<T extends Event & Bucketable>
       public void run()
       {
         long start = System.currentTimeMillis();
-        logger.info("run Merge Service------------------- {} ");
-        int bucketIdx = (int) (latestBucketId % noOfBuckets);
-        if(buckets[bucketIdx].getEvents() == null && !currentBucketId.equals(latestBucketId)) {
-          latestBucketId = currentBucketId;
-        }
-        try {
-          logger.info("-------------Saving Data: ----------: {} ", latestBucketId);
-          saveData();
-          logger.info("-------------End of Saving Data: ----------: {} -> {}", latestBucketId, System.currentTimeMillis() - start);
-        } catch (IOException e) {
-          throw new RuntimeException(e);
+        //logger.info("run Merge Service------------------- {} ", dirtyBuckets.size());
+        if(dirtyBuckets.size() != 0) {
+          Set<Long> keyList ;
+          synchronized (dirtyBuckets) {
+            keyList = new HashSet<Long>(dirtyBuckets);
+            dirtyBuckets.clear();
+          }
+          BlockingQueue<Runnable> queue = new LinkedBlockingQueue<Runnable>();
+          NameableThreadFactory threadFactory = new NameableThreadFactory("BucketFetchFactory");
+          threadPoolExecutor = new ThreadPoolExecutor(keyList.size(), keyList.size(), bucketMergeSpanInMillis, TimeUnit.MILLISECONDS, queue, threadFactory);
+          List<Future<Boolean>> futures = Lists.newArrayList();
+          for(Long key: keyList) {
+            futures.add(threadPoolExecutor.submit(new BucketWriteCallable(key)));
+          }
+          for (Future<Boolean> future : futures) {
+            try {
+              if(future.get()) {
+
+              }
+            } catch (InterruptedException e) {
+              throw new RuntimeException(e);
+            } catch (ExecutionException e) {
+              throw new RuntimeException(e);
+            }
+          }
+          mergeBuckets = keyList;
+          //logger.info(" End of run Merge Service------------------- {} -> {}", System.currentTimeMillis() - start, mergeBuckets.size());
+          threadPoolExecutor.shutdownNow();
         }
       }
 
@@ -503,7 +501,6 @@ public class TimeBasedStore<T extends Event & Bucketable>
 
   public void storeBucketData(Map<Object, List<T>> bucketData, TreeMap<byte[], byte[]> storedData, long bucketKey, String basePath)
   {
-    logger.info("BucketData: {}", bucketRoot);
     TreeMap<byte[], byte[]> sortedData = new TreeMap<byte[], byte[]>(new Comparator<byte[]>()
     {
       @Override public int compare(byte[] bytes, byte[] bytes2)
@@ -521,7 +518,6 @@ public class TimeBasedStore<T extends Event & Bucketable>
       }
     });
 
-    logger.info("-------------StoreBucketData - 1: ----------: {} ", latestBucketId);
     //Write the size of data and then data
     //dataStream.writeInt(bucketData.size());
     Kryo kryo = new Kryo();
@@ -536,9 +532,6 @@ public class TimeBasedStore<T extends Event & Bucketable>
       output1.close();
       sortedData.put(bos.toByteArray(), bos1.toByteArray());
     }
-
-    logger.info("-------------StoreBucketData - 2: ----------: {} ", latestBucketId);
-
     String merge = "";
     if(basePath != null) {
       if(storedData != null) {
@@ -548,7 +541,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
         merge = "_MERGE";
       }
     }
-    logger.info("-------------StoreBucketData - 3: ----------: {} ", latestBucketId);
+
     Path dataFilePath = new Path(bucketRoot + PATH_SEPARATOR + bucketKey + merge);
     FSDataOutputStream dataStream = null;
     FileSystem fs = null;
@@ -664,6 +657,25 @@ public class TimeBasedStore<T extends Event & Bucketable>
     bucketSlidingTimer.cancel();
     bucketMergeTimer.cancel();
   }
+
+  private class BucketWriteCallable implements Callable<Boolean>
+  {
+
+    final long bucketKey;
+
+    BucketWriteCallable(long bucketKey)
+    {
+      this.bucketKey = bucketKey;
+    }
+
+    @Override
+    public Boolean call() throws IOException
+    {
+      saveData(bucketKey);
+      return true;
+    }
+  }
+
 }
 
 

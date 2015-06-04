@@ -385,6 +385,11 @@
       <version>2.2.0</version>
       <type>jar</type>
     </dependency>
+      <dependency>
+          <groupId>com.sangupta</groupId>
+          <artifactId>murmur</artifactId>
+          <version>1.0.0</version>
+      </dependency>
   </dependencies>
 
 </project>

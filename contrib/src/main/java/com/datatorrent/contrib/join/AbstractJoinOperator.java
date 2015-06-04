@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.slf4j.LoggerFactory;
 
-public abstract class AbstractJoinOperator<T> extends BaseOperator implements Operator.CheckpointListener
+public abstract class AbstractJoinOperator<T> extends BaseOperator implements Operator.CheckpointListener, Operator.ActivationListener<Context.OperatorContext>
 {
   static final org.slf4j.Logger logger = LoggerFactory.getLogger(AbstractJoinOperator.class);
   private BackupStore store[] = (BackupStore[]) Array.newInstance(BackupStore.class, 2);
@@ -168,6 +168,17 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
     store[1].committed(windowId);
   }
 
+  @Override public void deactivate()
+  {
+    store[0].shutdown();
+    store[1].shutdown();
+  }
+
+  @Override
+  public void activate(Context.OperatorContext ctx)
+  {
+    logger.info("Activate the Join Operator");
+  }
   public void setExpiryTime(long expiryTime)
   {
     this.expiryTime = expiryTime;

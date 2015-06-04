@@ -665,5 +665,10 @@
 	  <version>1.0.4</version>
 	  <optional>true</optional>
 	</dependency>
+      <dependency>
+          <groupId>com.sangupta</groupId>
+          <artifactId>murmur</artifactId>
+          <version>1.0.0</version>
+      </dependency>
   </dependencies>
 </project>

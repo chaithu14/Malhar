@@ -59,7 +59,7 @@ import org.codehaus.jackson.type.TypeReference;
 public class JsonProductGenerator implements InputOperator
 {
   @Min(1)
-  private int maxProductId = 1000000000;
+  private int maxProductId = 100000;
   @Min(1)
   private int maxProductCategories = 900;
 

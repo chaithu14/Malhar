@@ -1,5 +1,6 @@
 package com.datatorrent.contrib.join;
 
+import com.datatorrent.contrib.join.bloomFilter.BloomFilterOperatorObject;
 import com.datatorrent.lib.bucket.Bucketable;
 import com.google.common.collect.Lists;
 import java.util.HashMap;
@@ -12,7 +13,8 @@ public class TimeBucket<T extends Bucketable>
 {
   private static transient final Logger logger = LoggerFactory.getLogger(TimeBucket.class);
   private Map<Object, List<T>> unwrittenEvents;
-  private transient Map<Object, List<T>> writtenEvents;
+  private Map<Object, List<T>> writtenEvents;
+  private BloomFilterOperatorObject bloomFilter;
   private boolean isDataOnDiskLoaded;
   public long bucketKey;
 
@@ -24,6 +26,7 @@ public class TimeBucket<T extends Bucketable>
   {
     isDataOnDiskLoaded = false;
     this.bucketKey = bucketKey;
+    bloomFilter = new BloomFilterOperatorObject(300000, 0.001);
   }
 
   public void transferEvents()
@@ -65,6 +68,7 @@ public class TimeBucket<T extends Bucketable>
     } else {
       unwrittenEvents.get(eventKey).add(event);
     }
+    bloomFilter.add(eventKey);
   }
 
   public Map<Object, List<T>> getEvents() {
@@ -86,6 +90,11 @@ public class TimeBucket<T extends Bucketable>
     }
     return value;
     //return unwrittenEvents.get(key);
+  }
+
+  public boolean contains(Object key)
+  {
+    return bloomFilter.contains(key);
   }
 }
 
