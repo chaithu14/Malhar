@@ -144,6 +144,22 @@ public class DTFileReader implements Closeable
     return false;
   }
 
+
+  public byte[] get(byte[] keyBytes) throws IOException
+  {
+    if (scanner.atEnd()) return null;
+    if(scanner.seekTo(keyBytes, 0, keyBytes.length)) {
+      DTFile.Reader.Scanner.Entry en = scanner.entry();
+      byte[] rkey = new byte[en.getKeyLength()];
+      byte[] value = new byte[en.getValueLength()];
+      en.getKey(rkey);
+      en.getValue(value);
+      //scanner.advance();
+      return value;
+    }
+    return null;
+  }
+
   public boolean next(Slice key, Slice value) throws IOException
   {
     if (scanner.atEnd()) return false;

@@ -390,7 +390,7 @@
           <artifactId>murmur</artifactId>
           <version>1.0.0</version>
       </dependency>
-      <dependency>
+      <!--dependency>
       <groupId>org.apache.hbase</groupId>
       <artifactId>hbase-server</artifactId>
       <version>0.98.2-hadoop2</version>
@@ -448,7 +448,7 @@
                <artifactId>jetty-util</artifactId>
            </exclusion>
        </exclusions>
-      </dependency>
+      </dependency!-->
   </dependencies>
 
 </project>
