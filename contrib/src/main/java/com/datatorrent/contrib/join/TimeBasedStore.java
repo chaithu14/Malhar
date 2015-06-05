@@ -5,7 +5,6 @@ import com.datatorrent.common.util.NameableThreadFactory;
 import com.datatorrent.lib.bucket.Bucketable;
 import com.datatorrent.lib.bucket.Event;
 import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import com.google.common.collect.Lists;
 import java.io.ByteArrayOutputStream;
@@ -36,7 +35,13 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.file.tfile.TFile;
+import org.apache.hadoop.hbase.KeyValue;
+import org.apache.hadoop.hbase.io.compress.Compression;
+import org.apache.hadoop.hbase.io.hfile.CacheConfig;
+import org.apache.hadoop.hbase.io.hfile.HFile;
+import org.apache.hadoop.hbase.io.hfile.HFileContext;
+import org.apache.hadoop.hbase.io.hfile.HFileContextBuilder;
+import org.apache.hadoop.hbase.io.hfile.HFileWriterV3;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,7 +74,8 @@ public class TimeBasedStore<T extends Event & Bucketable>
   protected transient Configuration configuration;
   protected Long latestBucketId = 0L;
   protected Long currentBucketId = 0L;
-  protected transient Map<Long, DTFileReader> readers = new HashMap<Long, DTFileReader>();
+  //protected transient Map<Long, DTFileReader> readers = new HashMap<Long, DTFileReader>();
+  protected transient Map<Long, HFileReader> readers = new HashMap<Long, HFileReader>();
   protected transient ThreadPoolExecutor threadPoolExecutor;
 
   protected Map<Long, TimeBucket> expiredBuckets;
@@ -317,7 +323,8 @@ public class TimeBasedStore<T extends Event & Bucketable>
     }
     String bucketPath = null;
     try {
-      DTFileReader bcktReader = readers.remove(bucket.bucketKey);
+      //DTFileReader bcktReader = readers.remove(bucket.bucketKey);
+      HFileReader bcktReader = readers.remove(bucket.bucketKey);
       if (bcktReader != null) {
         bucketPath = bcktReader.getPath();
         bcktReader.close();
@@ -368,7 +375,8 @@ public class TimeBasedStore<T extends Event & Bucketable>
         bucket.transferDataFromMemoryToStore();
 
         String merge = "";
-        DTFileReader bcktReader = readers.get(mergeBucketId);
+        //DTFileReader bcktReader = readers.get(mergeBucketId);
+        HFileReader bcktReader = readers.get(mergeBucketId);
         String readerPath = null;
         if(bcktReader != null)
           readerPath = bcktReader.getPath();
@@ -378,7 +386,8 @@ public class TimeBasedStore<T extends Event & Bucketable>
           }
         }
         String path = new String(bucketRoot + PATH_SEPARATOR + ((TimeBucket) bucket).bucketKey + merge);
-        DTFileReader tr = createDTReader(path);
+        //DTFileReader tr = createDTReader(path);
+        HFileReader tr = createHReader(path);
         if (tr != null) {
           readers.put(((TimeBucket) bucket).bucketKey, tr);
           if (bcktReader != null) {
@@ -421,13 +430,12 @@ public class TimeBasedStore<T extends Event & Bucketable>
     if(bucket == null || bucket.getEvents() == null || bucket.getEvents().isEmpty()) {
       return;
     }
-    synchronized (bucket) {
-      bucket.transferEvents();
-    }
+    bucket.transferEvents();
 
     Map<Object, List<T>> events = new HashMap<Object, List<T>>(bucket.getWrittenEvents());
     //long bucketKey = bucket.bucketKey;
-    DTFileReader bcktReader = readers.get(bucketKey);
+    //DTFileReader bcktReader = readers.get(bucketKey);
+    HFileReader bcktReader = readers.get(bucketKey);
     TreeMap<byte[], byte[]> storedData = null;
     String readerPath = null;
     if(bcktReader != null) {
@@ -548,7 +556,44 @@ public class TimeBasedStore<T extends Event & Bucketable>
     Path dataFilePath = new Path(bucketRoot + PATH_SEPARATOR + bucketKey + merge);
     FSDataOutputStream dataStream = null;
     FileSystem fs = null;
-    TFile.Writer writer = null;
+    CacheConfig cacheConf = new CacheConfig(configuration);
+    cacheConf.shouldEvictOnClose();
+    KeyValue.KVComparator comparator = new KeyValue.RawBytesComparator();
+    HFileContext context = new HFileContextBuilder()
+        .withBlockSize(65536)
+        .withCompression(Compression.Algorithm.NONE)
+        .build();
+
+    HFile.Writer writer = null;
+    try {
+      fs = FileSystem.newInstance(dataFilePath.toUri(), configuration);
+      dataStream = fs.create(dataFilePath);
+      logger.info("data FilePath: {}", dataFilePath.getName());
+      setupConfig(fs.getConf());
+      writer = new HFileWriterV3(configuration, cacheConf, fs, dataFilePath, dataStream, comparator, context);
+      for(Map.Entry<byte[], byte[]> entry : sortedData.entrySet()) {
+        logger.info("----------Key: {} ", entry.getKey());
+        writer.append(entry.getKey(), entry.getValue());
+      }
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    } finally {
+      try {
+        writer.close();
+        dataStream.close();
+        fs.close();
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }
+
+
+
+
+
+
+
+    /*TFile.Writer writer = null;
     try {
       fs = FileSystem.newInstance(dataFilePath.toUri(), configuration);
       dataStream = fs.create(dataFilePath);
@@ -578,7 +623,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
         }
 
       }
-    }
+    }*/
 
   }
 
@@ -593,6 +638,22 @@ public class TimeBasedStore<T extends Event & Bucketable>
       }
       FSDataInputStream fsdis = fs.open(dataFile);
       return new TFileReader(fsdis, fs.getFileStatus(dataFile).getLen(), configuration);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private HFileReader createHReader(String path)
+  {
+    Path dataFile = new Path(path);
+    FileSystem fs = null;
+    try {
+      fs = FileSystem.newInstance(dataFile.toUri(), configuration);
+      if(!fs.exists(dataFile)) {
+        return null;
+      }
+      //FSDataInputStream fsdis = fs.open(dataFile);
+      return new HFileReader(fs.getFileStatus(dataFile).getLen(), configuration, path);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -620,7 +681,9 @@ public class TimeBasedStore<T extends Event & Bucketable>
       return null;
     }*/
 
-    DTFileReader reader = readers.get(bucketKey);
+    HFileReader reader ;
+
+    /*DTFileReader reader = readers.get(bucketKey);
     if(reader == null)
       return null;
     byte[] value = null;
@@ -636,7 +699,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
       }
     } catch (IOException e) {
       throw new RuntimeException("Excetpion from " + reader.getPath() + " ==>  " + e);
-    }
+    }*/
     return null;
   }
 

@@ -31,9 +31,10 @@ public class TimeBucket<T extends Bucketable>
 
   public void transferEvents()
   {
-    writtenEvents = unwrittenEvents;
-
-    unwrittenEvents = null;
+    synchronized (this) {
+      writtenEvents = unwrittenEvents;
+      unwrittenEvents = null;
+    }
   }
 
   Map<Object, List<T>> getWrittenEvents()
@@ -59,14 +60,16 @@ public class TimeBucket<T extends Bucketable>
   }
   void addNewEvent(Object eventKey, T event)
   {
-    if (unwrittenEvents == null) {
-      unwrittenEvents = new HashMap<Object, List<T>>();
-    }
-    List<T> listEvents = unwrittenEvents.get(eventKey);
-    if(listEvents == null) {
-      unwrittenEvents.put(eventKey, Lists.newArrayList(event));
-    } else {
-      unwrittenEvents.get(eventKey).add(event);
+    synchronized (this) {
+      if (unwrittenEvents == null) {
+        unwrittenEvents = new HashMap<Object, List<T>>();
+      }
+      List<T> listEvents = unwrittenEvents.get(eventKey);
+      if(listEvents == null) {
+        unwrittenEvents.put(eventKey, Lists.newArrayList(event));
+      } else {
+        unwrittenEvents.get(eventKey).add(event);
+      }
     }
     bloomFilter.add(eventKey);
   }
