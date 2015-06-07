@@ -90,6 +90,23 @@ public class HFileReader implements Closeable
     return false;
   }
 
+
+  public byte[] get(byte[] keyBytes) throws IOException
+  {
+    if(scanner.seekTo(keyBytes) == 0)
+    {
+      KeyValue kv = scanner.getKeyValue();
+      if (kv == null) {
+        // cursor is already at the end
+        return null;
+      }
+      byte[] value = kv.getValue();
+      //scanner.next();
+      return value;
+    }
+    return null;
+  }
+
   public String getPath()
   {
     return path;

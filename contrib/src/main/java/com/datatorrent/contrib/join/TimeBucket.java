@@ -1,8 +1,9 @@
 package com.datatorrent.contrib.join;
 
-import com.datatorrent.contrib.join.bloomFilter.BloomFilterOperatorObject;
 import com.datatorrent.lib.bucket.Bucketable;
 import com.google.common.collect.Lists;
+import com.google.common.hash.BloomFilter;
+import com.google.common.hash.Funnels;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,7 +15,7 @@ public class TimeBucket<T extends Bucketable>
   private static transient final Logger logger = LoggerFactory.getLogger(TimeBucket.class);
   private Map<Object, List<T>> unwrittenEvents;
   private Map<Object, List<T>> writtenEvents;
-  private BloomFilterOperatorObject bloomFilter;
+  private transient BloomFilter bloomFilter;
   private boolean isDataOnDiskLoaded;
   public long bucketKey;
 
@@ -26,7 +27,7 @@ public class TimeBucket<T extends Bucketable>
   {
     isDataOnDiskLoaded = false;
     this.bucketKey = bucketKey;
-    bloomFilter = new BloomFilterOperatorObject(300000, 0.001);
+    bloomFilter = BloomFilter.create(Funnels.byteArrayFunnel(), 300000, 0.001);
   }
 
   public void transferEvents()
@@ -71,7 +72,8 @@ public class TimeBucket<T extends Bucketable>
         unwrittenEvents.get(eventKey).add(event);
       }
     }
-    bloomFilter.add(eventKey);
+    bloomFilter.put(eventKey.toString().getBytes());
+    //bloomFilter.add(eventKey);
   }
 
   public Map<Object, List<T>> getEvents() {
@@ -97,7 +99,8 @@ public class TimeBucket<T extends Bucketable>
 
   public boolean contains(Object key)
   {
-    return bloomFilter.contains(key);
+    //return bloomFilter.contains(key);
+    return bloomFilter.mightContain(key.toString().getBytes());
   }
 }
 

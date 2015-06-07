@@ -5,7 +5,6 @@ import com.datatorrent.common.util.NameableThreadFactory;
 import com.datatorrent.lib.bucket.Bucketable;
 import com.datatorrent.lib.bucket.Event;
 import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import com.google.common.collect.Lists;
 import java.io.ByteArrayOutputStream;
@@ -70,7 +69,9 @@ public class TimeBasedStore<T extends Event & Bucketable>
   protected Long latestBucketId = 0L;
   protected Long currentBucketId = 0L;
   protected transient Map<Long, DTFileReader> readers = new HashMap<Long, DTFileReader>();
+  //protected transient Map<Long, HFileReader> readers = new HashMap<Long, HFileReader>();
   protected transient ThreadPoolExecutor threadPoolExecutor;
+  protected transient ThreadPoolExecutor threadFetchExecutor;
 
   protected Map<Long, TimeBucket> expiredBuckets;
 
@@ -127,6 +128,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
     output2.close();
     byte[] keyBytes = bos.toByteArray();
     List<Event> validTuples = new ArrayList<Event>();
+
     for(int i = 0; i < noOfBuckets; i++) {
       TimeBucket tb = buckets[i];
       if(tb == null) {
@@ -318,6 +320,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
     String bucketPath = null;
     try {
       DTFileReader bcktReader = readers.remove(bucket.bucketKey);
+      //HFileReader bcktReader = readers.remove(bucket.bucketKey);
       if (bcktReader != null) {
         bucketPath = bcktReader.getPath();
         bcktReader.close();
@@ -348,11 +351,11 @@ public class TimeBasedStore<T extends Event & Bucketable>
       }
     }
 
-    Map<Object, List<T>> writtens = bucket.getEvents();
+    /*Map<Object, List<T>> writtens = bucket.getEvents();
     if (writtens == null) {
       return;
     }
-    /*for (Map.Entry<Object, List<T>> e : writtens.entrySet()) {
+    for (Map.Entry<Object, List<T>> e : writtens.entrySet()) {
       key2Buckets.get(e.getKey()).remove(bucket.bucketKey);
       if (key2Buckets.get(e.getKey()).size() == 0) {
         key2Buckets.remove(e.getKey());
@@ -369,6 +372,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
 
         String merge = "";
         DTFileReader bcktReader = readers.get(mergeBucketId);
+        //HFileReader bcktReader = readers.get(mergeBucketId);
         String readerPath = null;
         if(bcktReader != null)
           readerPath = bcktReader.getPath();
@@ -379,6 +383,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
         }
         String path = new String(bucketRoot + PATH_SEPARATOR + ((TimeBucket) bucket).bucketKey + merge);
         DTFileReader tr = createDTReader(path);
+        //HFileReader tr = createHReader(path);
         if (tr != null) {
           readers.put(((TimeBucket) bucket).bucketKey, tr);
           if (bcktReader != null) {
@@ -426,6 +431,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
     Map<Object, List<T>> events = new HashMap<Object, List<T>>(bucket.getWrittenEvents());
     //long bucketKey = bucket.bucketKey;
     DTFileReader bcktReader = readers.get(bucketKey);
+    //HFileReader bcktReader = readers.get(bucketKey);
     TreeMap<byte[], byte[]> storedData = null;
     String readerPath = null;
     if(bcktReader != null) {
@@ -490,11 +496,11 @@ public class TimeBasedStore<T extends Event & Bucketable>
   }
   private void setupConfig(Configuration conf)
   {
-    int chunkSize = 1024 * 1024;
+    int chunkSize = 1024 * 1024 * 12;
 
-    int inputBufferSize = 256 * 1024;
+    int inputBufferSize = 256 * 1024 * 12;
 
-    int outputBufferSize = 256 * 1024;
+    int outputBufferSize = 256 * 1024 * 12;
     conf.set("tfile.io.chunk.size", String.valueOf(chunkSize));
     conf.set("tfile.fs.input.buffer.size", String.valueOf(inputBufferSize));
     conf.set("tfile.fs.output.buffer.size", String.valueOf(outputBufferSize));
@@ -681,9 +687,10 @@ public class TimeBasedStore<T extends Event & Bucketable>
       byte[] value = reader.get(keyBytes);
       if(value != null)
       {
-        Input lInput = new Input(value);
+        return null;
+        /*Input lInput = new Input(value);
         Kryo kro = new Kryo();
-        return (List<T>)kro.readObject(lInput, ArrayList.class);
+        return (List<T>)kro.readObject(lInput, ArrayList.class);*/
       }
     } catch (IOException e) {
       throw new RuntimeException("Excetpion from " + reader.getPath() + " ==>  " + e);
@@ -729,7 +736,6 @@ public class TimeBasedStore<T extends Event & Bucketable>
       return true;
     }
   }
-
 }
 
 

@@ -94,7 +94,7 @@ public class JsonProductGenerator implements InputOperator
   private transient RandomWeightedMovableGenerator<Integer> regionalGenerator = new RandomWeightedMovableGenerator<Integer>();
   private transient RandomWeightedMovableGenerator<Integer> channelGenerator = new RandomWeightedMovableGenerator<Integer>();
   public final transient DefaultOutputPort<Map<String, Object>> outputMap = new DefaultOutputPort<Map<String, Object>>();
-
+  public final transient DefaultOutputPort<ProductEvent> outputPort = new DefaultOutputPort<ProductEvent>();
 
   @Override
   public void beginWindow(long windowId)
@@ -130,8 +130,13 @@ public class JsonProductGenerator implements InputOperator
       try {
 
         ProductEvent salesEvent = generateProductEvent();
-        Map<String, Object> tuple = reader.readValue(mapper.writeValueAsBytes(salesEvent));
-        this.outputMap.emit(tuple);
+        if(outputMap.isConnected()) {
+          Map<String, Object> tuple = reader.readValue(mapper.writeValueAsBytes(salesEvent));
+          this.outputMap.emit(tuple);
+        }
+        if(outputPort.isConnected()) {
+          this.outputPort.emit(salesEvent);
+        }
 
       } catch (Exception ex) {
         throw new RuntimeException(ex);
@@ -202,11 +207,3 @@ public class JsonProductGenerator implements InputOperator
 
 }
 
-/**
- * A single sales event
- */
-class ProductEvent {
-
-  public int productId;
-  public int productCategory;
-}

@@ -1,6 +1,7 @@
 package com.datatorrent.contrib.join;
 
 import com.datatorrent.lib.util.PojoUtils;
+import org.apache.commons.lang3.ClassUtils;
 
 public class BeanJoinOperator extends AbstractJoinOperator
 {
@@ -38,7 +39,20 @@ public class BeanJoinOperator extends AbstractJoinOperator
 
   public Object getValue(String keyField, Object tuple)
   {
-    PojoUtils.Getter getter = PojoUtils.createGetter(tuple.getClass(), keyField, Object.class);
+    /*try {
+      return tuple.getClass().getField(keyField).get(tuple);
+    } catch (IllegalAccessException e) {
+      e.printStackTrace();
+    } catch (NoSuchFieldException e) {
+      e.printStackTrace();
+    }
+    return null;*/
+    PojoUtils.Getter getter = null;
+    try {
+      getter = PojoUtils.createGetter(tuple.getClass(), keyField, ClassUtils.primitiveToWrapper(tuple.getClass().getField(keyField).getType()));
+    } catch (NoSuchFieldException e) {
+      e.printStackTrace();
+    }
     return getter.get(tuple);
   }
 }
