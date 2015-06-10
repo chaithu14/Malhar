@@ -5,6 +5,7 @@ import com.datatorrent.common.util.NameableThreadFactory;
 import com.datatorrent.lib.bucket.Bucketable;
 import com.datatorrent.lib.bucket.Event;
 import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import com.google.common.collect.Lists;
 import java.io.ByteArrayOutputStream;
@@ -687,10 +688,9 @@ public class TimeBasedStore<T extends Event & Bucketable>
       byte[] value = reader.get(keyBytes);
       if(value != null)
       {
-        return null;
-        /*Input lInput = new Input(value);
+        Input lInput = new Input(value);
         Kryo kro = new Kryo();
-        return (List<T>)kro.readObject(lInput, ArrayList.class);*/
+        return (List<T>)kro.readObject(lInput, ArrayList.class);
       }
     } catch (IOException e) {
       throw new RuntimeException("Excetpion from " + reader.getPath() + " ==>  " + e);
