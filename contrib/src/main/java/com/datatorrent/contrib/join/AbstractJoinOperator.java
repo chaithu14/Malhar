@@ -27,7 +27,7 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
   private String includeFieldStr;
 
   protected int bucketSpanInMillis = 30000;
-  private String[] keys;
+  protected String[] keys;
 
   public final transient DefaultOutputPort<List<T>> outputPort = new DefaultOutputPort<List<T>>();
 
@@ -58,9 +58,7 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
   {
     @Override public void process(T tuple)
     {
-      TimeEvent t = createEvent(keys[0], tuple);
-      store[0].put(t);
-      join(t, true);
+      processTuple(tuple, true);
     }
   };
 
@@ -69,12 +67,20 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
   {
     @Override public void process(T tuple)
     {
-      TimeEvent t = createEvent(keys[1], tuple);
-      store[1].put(t);
-      join(t, false);
+   processTuple(tuple, false);
     }
   };
 
+  protected void processTuple(T tuple, Boolean isLeft)
+  {
+    int idx = 0;
+    if(!isLeft) {
+      idx = 1;
+    }
+    TimeEvent t = createEvent(keys[idx], tuple);
+    store[idx].put(t);
+    join(t, isLeft);
+  }
   private static long readLong(byte[] bytes, int offset)
   {
     long r = 0;

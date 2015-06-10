@@ -1,12 +1,95 @@
 package com.datatorrent.contrib.join;
 
 import com.datatorrent.lib.util.PojoUtils;
+import java.lang.reflect.Array;
+import java.lang.reflect.Field;
+import java.util.LinkedList;
+import java.util.List;
 import org.apache.commons.lang3.ClassUtils;
 
 public class BeanJoinOperator extends AbstractJoinOperator
 {
   public Class outputClass;
+  protected Class leftClass;
+  protected Class rightClass;
+  private transient List<FieldObjectMap>[] fieldMap = (List<FieldObjectMap>[]) Array.newInstance((new LinkedList<FieldObjectMap>()).getClass(), 2);
+  private transient PojoUtils.Getter[] keyGetters = (PojoUtils.Getter[]) Array.newInstance(PojoUtils.Getter.class, 2);
+  //private transient PojoUtils.Getter[] timeGetters = (PojoUtils.Getter[]) Array.newInstance(PojoUtils.Getter.class, 2);
 
+  // Populate the getters from the input tuple
+  @Override protected void processTuple(Object tuple, Boolean isLeft)
+  {
+    if(isLeft && leftClass == null) {
+      leftClass = tuple.getClass();
+      populateGettersFromInput(isLeft);
+    }
+    if(!isLeft && rightClass == null) {
+      rightClass = tuple.getClass();
+      populateGettersFromInput(isLeft);
+    }
+    super.processTuple(tuple, isLeft);
+  }
+
+  /**
+   * Populate the getters from the input class
+   * @param isLeft isLeft specifies whether the class is left or right
+   */
+  private void populateGettersFromInput(Boolean isLeft)
+  {
+    Class inputClass;
+    int idx ;
+    if(isLeft) {
+      idx = 0;
+      inputClass = leftClass;
+    } else {
+      idx = 1;
+      inputClass = rightClass;
+    }
+
+    // Create getter for the key field
+    try {
+      Class c = ClassUtils.primitiveToWrapper(inputClass.getField(keys[idx]).getType());
+      keyGetters[idx] = PojoUtils.createGetter(inputClass, keys[idx], c);
+    } catch (NoSuchFieldException e) {
+      throw new RuntimeException(e);
+    }
+
+    // Create getter for time field
+    /*if(timeFields != null) {
+      try {
+        Class c = ClassUtils.primitiveToWrapper(inputClass.getField(timeFields[idx]).getType());
+        keyGetters[idx] = PojoUtils.createGetter(inputClass, timeFields[idx], c);
+      } catch (NoSuchFieldException e) {
+        throw new RuntimeException(e);
+      }
+    }*/
+
+    String[] fields = includeFields[idx];
+    fieldMap[idx] = new LinkedList<FieldObjectMap>();
+    List<FieldObjectMap> fieldsMap = fieldMap[idx];
+    // Create getters for the include fields
+    for (String f : fields) {
+      try {
+        Field field = inputClass.getField(f);
+        Class c ;
+        if(field.getType().isPrimitive())
+          c = ClassUtils.primitiveToWrapper(field.getType());
+        else
+          c = field.getType();
+        FieldObjectMap fm = new FieldObjectMap();
+        fm.get = PojoUtils.createGetter(inputClass, f, c);
+        fm.set = PojoUtils.createSetter(outputClass, f, c);
+        fieldsMap.add(fm);
+      } catch (Throwable e) {
+        throw new RuntimeException("Failed to populate gettter for field: " + f, e);
+      }
+    }
+  }
+
+  /**
+   * Create the output class object
+   * @return
+   */
   @Override protected Object createOutputTuple()
   {
     try {
@@ -18,41 +101,70 @@ public class BeanJoinOperator extends AbstractJoinOperator
     }
   }
 
-  @Override protected void addValue(Object output, Object extractTuple, Boolean isFirst)
+  /**
+   * Copy the field values of extractTuple to output object
+   * @param output
+   * @param extractTuple
+   * @param isLeft
+   */
+  @Override protected void addValue(Object output, Object extractTuple, Boolean isLeft)
   {
-    String[] fields ;
-    if(isFirst)
-      fields = includeFields[0];
-    else
-      fields = includeFields[1];
-    for(int i=0; i < fields.length; i++) {
-      try {
-        outputClass.getField(fields[i]).set(output, getValue(fields[i], extractTuple));
-      } catch (IllegalAccessException e) {
-        throw  new RuntimeException(e);
-      } catch (NoSuchFieldException e) {
-        throw new RuntimeException(e);
-      }
+    if(extractTuple == null)
+      return;
+
+    List<FieldObjectMap> fieldsMap;
+    if(isLeft) {
+      fieldsMap = fieldMap[0];
+    } else {
+      fieldsMap = fieldMap[1];
     }
 
+    for (FieldObjectMap map : fieldsMap) {
+      map.set.set(output, map.get.get(extractTuple));
+    }
   }
 
+  /**
+   * Return the keyField value of tuple object
+   * @param keyField
+   * @param tuple
+   * @return
+   */
   public Object getValue(String keyField, Object tuple)
   {
-    /*try {
-      return tuple.getClass().getField(keyField).get(tuple);
-    } catch (IllegalAccessException e) {
-      e.printStackTrace();
-    } catch (NoSuchFieldException e) {
-      e.printStackTrace();
+    if(tuple.getClass().equals(leftClass)) {
+      return keyGetters[0].get(tuple);
     }
-    return null;*/
-    PojoUtils.Getter getter = null;
+    return keyGetters[1].get(tuple);
+  }
+
+  /*@Override protected Object getTime(String field, Object tuple)
+  {
+    if(timeFields != null) {
+      if(tuple.getClass().equals(leftClass)) {
+        return timeGetters[0].get(tuple);
+      }
+      return timeGetters[1].get(tuple);
+    }
+    return Calendar.getInstance().getTimeInMillis();
+  }*/
+
+  /**
+   * Load the output class
+   * @param outputClass
+   */
+  public void setOutputClass(String outputClass)
+  {
     try {
-      getter = PojoUtils.createGetter(tuple.getClass(), keyField, ClassUtils.primitiveToWrapper(tuple.getClass().getField(keyField).getType()));
-    } catch (NoSuchFieldException e) {
-      e.printStackTrace();
+      this.outputClass = this.getClass().getClassLoader().loadClass(outputClass);
+    } catch (ClassNotFoundException e) {
+      throw new RuntimeException(e);
     }
-    return getter.get(tuple);
+  }
+
+  private class FieldObjectMap
+  {
+    public PojoUtils.Getter get;
+    public PojoUtils.Setter set;
   }
 }
