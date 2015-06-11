@@ -19,8 +19,8 @@ public class MapTimeBasedJoinOperator
   @Test public void testJoinOperator() throws IOException, InterruptedException
   {
     AbstractJoinOperator oper = new MapJoinOperator();
-    oper.setLeftStore(new InMemoryStore(200, 200));
-    oper.setRightStore(new InMemoryStore(200, 200));
+    oper.setLeftStore(new HDHTBasedStore(200, "buckets/UP/", 1));
+    oper.setRightStore(new HDHTBasedStore(200, "buckets/DOWN/", 2));
     oper.setIncludeFieldStr("ID,Name;OID,Amount");
     oper.setKeyFields("ID,CID");
 
