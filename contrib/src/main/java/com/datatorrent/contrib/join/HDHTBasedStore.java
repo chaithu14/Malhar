@@ -31,8 +31,8 @@ public class HDHTBasedStore implements BackupStore
     store = new HDHTStore();
     BUCKET = bucketId;
     store.setFileStore(hdsFile);
-    store.setMaxFileSize(1500); // limit to single entry per file
-    store.setFlushSize(1500); // flush after every key
+    store.setMaxFileSize(1500000); // limit to single entry per file
+    store.setFlushSize(150000); // flush after every key
 
     store.writeExecutor = MoreExecutors.sameThreadExecutor(); // synchronous flush on endWindow
   }

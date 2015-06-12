@@ -37,8 +37,8 @@ public class MapJoinDemo implements StreamingApplication
     input2.setTuplesPerWindowDeviation(0);
 
     MapJoinOperator joinOper = dag.addOperator("Join", new MapJoinOperator());
-    joinOper.setLeftStore(new HDHTBasedStore(3000, "buckets/UP/", 1));
-    joinOper.setRightStore(new HDHTBasedStore(3000, "buckets/DOWN/", 1));
+    joinOper.setLeftStore(new HDHTBasedStore(30000, "buckets/UP/", 1));
+    joinOper.setRightStore(new HDHTBasedStore(30000, "buckets/DOWN/", 1));
     
     joinOper.setIncludeFieldStr("timestamp,customerId,productId,regionId,amount;productCategory");
     joinOper.setKeyFields("productId,productId");
