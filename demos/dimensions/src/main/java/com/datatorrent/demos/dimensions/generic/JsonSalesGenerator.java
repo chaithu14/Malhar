@@ -57,7 +57,7 @@ import java.util.Random;
 public class JsonSalesGenerator implements InputOperator
 {
   @Min(1)
-  private int maxProductId = 100000;
+  private int maxProductId = 1000000;
   @Min(1)
   private int maxCustomerId = 1000000;
   @Min(1)

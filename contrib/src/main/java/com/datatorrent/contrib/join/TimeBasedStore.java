@@ -67,8 +67,6 @@ public class TimeBasedStore<T extends Event & Bucketable>
   protected transient Set<Long> dirtyBuckets;
   static transient final String PATH_SEPARATOR = "/";
   protected transient Configuration configuration;
-  protected Long latestBucketId = 0L;
-  protected Long currentBucketId = 0L;
   protected transient Map<Long, DTFileReader> readers = new HashMap<Long, DTFileReader>();
   //protected transient Map<Long, HFileReader> readers = new HashMap<Long, HFileReader>();
   protected transient ThreadPoolExecutor threadPoolExecutor;
@@ -239,20 +237,9 @@ public class TimeBasedStore<T extends Event & Bucketable>
       if (bucket != null) {
         expiredBuckets.put(bucket.bucketKey, bucket);
       }
-      if (latestBucketId.equals(0L)) {
-        latestBucketId = bucketKey;
-      }
-      currentBucketId = bucketKey;
       bucket = createBucket(bucketKey);
       buckets[bucketIdx] = bucket;
     }
-      /*dirtyBuckets.put(bucketIdx, bucket);
-      if(dirtyBuckets.size() == 0) {
-        latestBucketId = bucketKey;
-      }
-    } else if (dirtyBuckets.get(bucketIdx) == null) {
-      dirtyBuckets.put(bucketIdx, bucket);
-    }*/
 
     /*Object key = bucket.getEventKey(event);
     List<Long> keyBuckets = key2Buckets.get(key);
@@ -665,6 +652,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
       if(!fs.exists(dataFile)) {
         return null;
       }
+      //setupConfig(fs.getConf());
       FSDataInputStream fsdis = fs.open(dataFile);
       return new DTFileReader(fsdis, fs.getFileStatus(dataFile).getLen(), configuration, path);
     } catch (IOException e) {
