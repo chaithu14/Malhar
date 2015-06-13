@@ -17,9 +17,12 @@ package com.datatorrent.contrib.join;
 
 import com.datatorrent.lib.bucket.Bucketable;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
+import com.google.common.hash.BloomFilter;
+import com.google.common.hash.Funnels;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
 /**
  * <p>
  * This is the base implementation of bucket which contains all the events which belong to the same bucket.
@@ -31,6 +34,10 @@ import java.util.Map;
 public class Bucket<T extends Bucketable>
 {
   private Map<Object, List<T>> unwrittenEvents;
+  private Map<Object, List<T>> writtenEvents;
+  private transient BloomFilter bloomFilter;
+  private boolean isDataOnDiskLoaded;
+
   public final long bucketKey;
 
   public Bucket() {
@@ -39,12 +46,38 @@ public class Bucket<T extends Bucketable>
 
   protected Bucket(long bucketKey)
   {
+    isDataOnDiskLoaded = false;
     this.bucketKey = bucketKey;
+    bloomFilter = BloomFilter.create(Funnels.byteArrayFunnel(), 300000, 0.001);
+  }
+
+  public void transferEvents()
+  {
+    synchronized (this) {
+      writtenEvents = unwrittenEvents;
+      unwrittenEvents = null;
+    }
+  }
+
+  public Map<Object, List<T>> getWrittenEvents()
+  {
+    return writtenEvents;
   }
 
   protected Object getEventKey(T event)
   {
     return event.getEventKey();
+  }
+
+  void transferDataFromMemoryToStore()
+  {
+    writtenEvents = null;
+    isDataOnDiskLoaded = true;
+  }
+
+  public boolean isDataOnDiskLoaded()
+  {
+    return isDataOnDiskLoaded;
   }
 
   /**
@@ -54,19 +87,42 @@ public class Bucket<T extends Bucketable>
    */
   void addNewEvent(Object eventKey, T event)
   {
-    if (unwrittenEvents == null) {
-      unwrittenEvents = Maps.newHashMap();
+    synchronized (this) {
+      if (unwrittenEvents == null) {
+        unwrittenEvents = new HashMap<Object, List<T>>();
+      }
+      List<T> listEvents = unwrittenEvents.get(eventKey);
+      if(listEvents == null) {
+        unwrittenEvents.put(eventKey, Lists.newArrayList(event));
+      } else {
+        listEvents.add(event);
+      }
     }
-    List<T> listEvents = unwrittenEvents.get(eventKey);
-    if(listEvents == null) {
-      unwrittenEvents.put(eventKey, Lists.newArrayList(event));
-    } else {
-      unwrittenEvents.get(eventKey).add(event);
-    }
+    bloomFilter.put(eventKey.toString().getBytes());
+
   }
 
   public Map<Object, List<T>> getEvents() { return unwrittenEvents; }
+
   public List<T> get(Object key) {
-    return unwrittenEvents.get(key);
+    if(unwrittenEvents == null && writtenEvents == null) {
+      return null;
+    }
+    List<T> value = null;
+    if(unwrittenEvents != null)
+      value = unwrittenEvents.get(key);
+    if(writtenEvents != null) {
+      if(value != null && writtenEvents.get(key) != null) {
+        value.addAll(writtenEvents.get(key));
+      } else if(value == null) {
+        value = writtenEvents.get(key);
+      }
+    }
+    return value;
+  }
+
+  public boolean contains(Object key)
+  {
+    return bloomFilter.mightContain(key.toString().getBytes());
   }
 }
