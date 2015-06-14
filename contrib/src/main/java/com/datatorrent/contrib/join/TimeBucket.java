@@ -1,21 +1,19 @@
 package com.datatorrent.contrib.join;
 
 import com.datatorrent.lib.bucket.Bucketable;
-import com.google.common.collect.Lists;
-import com.google.common.hash.BloomFilter;
-import com.google.common.hash.Funnels;
-import java.util.HashMap;
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import java.util.List;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class TimeBucket<T extends Bucketable>
 {
   private static transient final Logger logger = LoggerFactory.getLogger(TimeBucket.class);
-  private Map<Object, List<T>> unwrittenEvents;
-  private Map<Object, List<T>> writtenEvents;
-  private transient BloomFilter bloomFilter;
+  private Multimap<Object, T> unwrittenEvents;
+  private Multimap<Object, T> allUnwrittenEvents;
+  private Multimap<Object, T> writtenEvents;
+  //private transient BloomFilter bloomFilter;
   private boolean isDataOnDiskLoaded;
   public long bucketKey;
 
@@ -27,18 +25,19 @@ public class TimeBucket<T extends Bucketable>
   {
     isDataOnDiskLoaded = false;
     this.bucketKey = bucketKey;
-    bloomFilter = BloomFilter.create(Funnels.byteArrayFunnel(), 300000, 0.001);
+    //bloomFilter = BloomFilter.create(Funnels.byteArrayFunnel(), 300000, 0.001);
   }
 
   public void transferEvents()
   {
-    synchronized (this) {
-      writtenEvents = unwrittenEvents;
-      unwrittenEvents = null;
+    if(allUnwrittenEvents == null) {
+      allUnwrittenEvents = ArrayListMultimap.create();
     }
+      allUnwrittenEvents.putAll(unwrittenEvents);
+      unwrittenEvents = null;
   }
 
-  Map<Object, List<T>> getWrittenEvents()
+  Multimap<Object, T> getWrittenEvents()
   {
     return writtenEvents;
   }
@@ -48,6 +47,11 @@ public class TimeBucket<T extends Bucketable>
     return event.getEventKey();
   }
 
+  public void snappshotEvents()
+  {
+    writtenEvents = allUnwrittenEvents;
+    allUnwrittenEvents = null;
+  }
   void transferDataFromMemoryToStore()
   {
     System.out.println("===== TransferDataFromMemoryToStore ====== " + bucketKey);
@@ -63,20 +67,15 @@ public class TimeBucket<T extends Bucketable>
   {
     synchronized (this) {
       if (unwrittenEvents == null) {
-        unwrittenEvents = new HashMap<Object, List<T>>();
+        unwrittenEvents = ArrayListMultimap.create();
       }
-      List<T> listEvents = unwrittenEvents.get(eventKey);
-      if(listEvents == null) {
-        unwrittenEvents.put(eventKey, Lists.newArrayList(event));
-      } else {
-        unwrittenEvents.get(eventKey).add(event);
-      }
+      unwrittenEvents.put(eventKey, event);
     }
-    bloomFilter.put(eventKey.toString().getBytes());
+    //bloomFilter.put(eventKey.toString().getBytes());
     //bloomFilter.add(eventKey);
   }
 
-  public Map<Object, List<T>> getEvents() {
+  public Multimap<Object, T> getEvents() {
     return unwrittenEvents; }
 
   public List<T> get(Object key) {
@@ -85,22 +84,30 @@ public class TimeBucket<T extends Bucketable>
     }
     List<T> value = null;
     if(unwrittenEvents != null)
-      value = unwrittenEvents.get(key);
+      value = (List<T>) unwrittenEvents.get(key);
     if(writtenEvents != null) {
       if(value != null && writtenEvents.get(key) != null) {
         value.addAll(writtenEvents.get(key));
       } else if(value == null) {
-        value = writtenEvents.get(key);
+        value = (List<T>) writtenEvents.get(key);
       }
     }
+    if(allUnwrittenEvents != null) {
+      if(value != null && allUnwrittenEvents.get(key) != null) {
+        value.addAll(allUnwrittenEvents.get(key));
+      } else if(value == null) {
+        value = (List<T>) allUnwrittenEvents.get(key);
+      }
+    }
+
     return value;
     //return unwrittenEvents.get(key);
   }
 
-  public boolean contains(Object key)
+  /*public boolean contains(Object key)
   {
     //return bloomFilter.contains(key);
     return bloomFilter.mightContain(key.toString().getBytes());
-  }
+  }*/
 }
 

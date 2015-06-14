@@ -28,11 +28,11 @@ public class BeanJoinApp implements StreamingApplication
   {
     JsonSalesGenerator input = dag.addOperator("Input", JsonSalesGenerator.class);
     input.setAddProductCategory(false);
-    input.setMaxTuplesPerWindow(200);
+    input.setMaxTuplesPerWindow(500);
     input.setTuplesPerWindowDeviation(0);
 
     JsonProductGenerator input2 = dag.addOperator("Prodcut", JsonProductGenerator.class);
-    input2.setMaxTuplesPerWindow(200);
+    input2.setMaxTuplesPerWindow(500);
     input2.setTuplesPerWindowDeviation(0);
 
     BeanJoinOperator joinOper = dag.addOperator("Join", new BeanJoinOperator());

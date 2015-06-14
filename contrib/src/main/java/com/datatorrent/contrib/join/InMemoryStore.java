@@ -44,7 +44,7 @@ public class InMemoryStore<T extends Event & Bucketable> extends TimeBasedStore 
 
   @Override public void checkpointed(long windowId)
   {
-
+    super.checkpointed();
   }
 
   @Override public void put(Object tuple)
