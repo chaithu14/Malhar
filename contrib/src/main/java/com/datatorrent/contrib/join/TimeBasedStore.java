@@ -54,7 +54,7 @@ public class TimeBasedStore<T extends TimeEvent>
   private boolean isOuter=false;
   private transient List<T> unmatchedEvents = new ArrayList<T>();
 
-  protected Map<Long, Bucket> dirtyBuckets = new HashMap<Long, Bucket>();;
+  protected Map<Long, Bucket> dirtyBuckets = new HashMap<Long, Bucket>();
 
   public TimeBasedStore()
   {
@@ -99,9 +99,12 @@ public class TimeBasedStore<T extends TimeEvent>
       return null;
     }
     List<Event> validTuples = new ArrayList<Event>();
+    Boolean[] isContained = new Boolean[noOfBuckets];
+    Boolean isContainedInDB = false;
     for(Long idx: keyBuckets) {
       // For the dirty bucket, check whether the time constraint is matching or not
-      if(dirtyBuckets.get(idx) != null) {
+      if(dirtyBuckets.get(idx) != null && isContainedInDB) {
+        isContainedInDB = true;
         Bucket tb = (Bucket)dirtyBuckets.get(idx);
         List<T> events = tb.get(key);
         if(events != null) {
@@ -113,6 +116,9 @@ public class TimeBasedStore<T extends TimeEvent>
         }
       } else {
         int bucketIdx = (int) (idx % noOfBuckets);
+        if(isContained[bucketIdx])
+          continue;
+        isContained[bucketIdx] = true;
         Bucket tb = (Bucket)buckets[bucketIdx];
         if(tb == null) {
           return validTuples;
