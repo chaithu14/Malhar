@@ -58,9 +58,9 @@ import org.apache.commons.lang3.ClassUtils;
  */
 public class POJOJoinOperator extends AbstractJoinOperator
 {
-  protected Class outputClass;
-  protected Class leftClass;
-  protected Class rightClass;
+  public Class outputClass;
+  protected transient Class leftClass;
+  protected transient Class rightClass;
   private transient List<FieldObjectMap>[] fieldMap = (List<FieldObjectMap>[]) Array.newInstance((new LinkedList<FieldObjectMap>()).getClass(), 2);
   private transient PojoUtils.Getter[] keyGetters = (PojoUtils.Getter[]) Array.newInstance(PojoUtils.Getter.class, 2);
   private transient PojoUtils.Getter[] timeGetters = (PojoUtils.Getter[]) Array.newInstance(PojoUtils.Getter.class, 2);

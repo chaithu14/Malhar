@@ -31,6 +31,8 @@ public interface BackupStore
 
   void checkpointed(long windowId);
 
+  void beginWindow(long windowId);
+
   void endWindow();
 
   /**

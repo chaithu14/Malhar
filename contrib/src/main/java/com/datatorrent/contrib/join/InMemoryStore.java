@@ -28,9 +28,10 @@ public class InMemoryStore extends TimeBasedStore<TimeEvent> implements BackupSt
   {
   }
 
-  public InMemoryStore(long spanTimeInMillis, int bucketSpanInMillis)
+  public InMemoryStore(long spanTimeInMillis, int bucketSpanInMillis, String basePath)
   {
     super();
+    setBucketRoot(basePath);
     setSpanTimeInMillis(spanTimeInMillis);
     setBucketSpanInMillis((int)(spanTimeInMillis > (long)bucketSpanInMillis ? bucketSpanInMillis : spanTimeInMillis));
   }
@@ -47,12 +48,16 @@ public class InMemoryStore extends TimeBasedStore<TimeEvent> implements BackupSt
 
   @Override public void checkpointed(long windowId)
   {
-
+    super.checkpointed(windowId);
   }
 
   @Override public void endWindow()
   {
+    super.endWindow();
+  }
 
+  public void beginWindow(long window) {
+    super.beginWindow(window);
   }
 
   public void shutdown()

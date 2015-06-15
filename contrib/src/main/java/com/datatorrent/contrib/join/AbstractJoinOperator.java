@@ -68,6 +68,12 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
   public final transient DefaultOutputPort<List<T>> outputPort = new DefaultOutputPort<List<T>>();
 
   @Override
+  public void beginWindow(long windowId) {
+    store[0].beginWindow(windowId);
+    store[1].beginWindow(windowId);
+  }
+
+  @Override
   public void setup(Context.OperatorContext context)
   {
     if(store[0] == null) {

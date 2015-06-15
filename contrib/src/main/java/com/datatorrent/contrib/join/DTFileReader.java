@@ -42,8 +42,8 @@ public class DTFileReader implements Closeable
 
   public DTFileReader(FSDataInputStream fsdis, long fileLength, Configuration conf, String path) throws IOException
   {
-    logger.info("---Chunk Size: {}, OutSTream: {}", conf.get("tfile.io.chunk.size"), conf.get("tfile.fs.output.buffer.size"));
-    logger.info("+++Chunk Size: {}, OutSTream: {}", fsdis);
+    //logger.info("---Chunk Size: {}, OutSTream: {}", conf.get("tfile.io.chunk.size"), conf.get("tfile.fs.output.buffer.size"));
+    //logger.info("+++Chunk Size: {}, OutSTream: {}", fsdis);
     this.fsdis = fsdis;
     reader = new DTFile.Reader(fsdis, fileLength, conf);
     scanner = reader.createScanner();
@@ -110,7 +110,6 @@ public class DTFileReader implements Closeable
       data.put(key, value);
     }
     logger.info("ReadFull end");
-    scanner.rewind();
     return data;
   }
 

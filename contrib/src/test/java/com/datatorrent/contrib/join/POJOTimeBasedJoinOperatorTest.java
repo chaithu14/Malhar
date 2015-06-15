@@ -89,9 +89,8 @@ public class POJOTimeBasedJoinOperatorTest
   {
     Kryo kryo = new Kryo();
     POJOJoinOperator oper = new POJOJoinOperator();
-    BackupStore store = new InMemoryStore(200, 200);
-    oper.setLeftStore(kryo.copy(store));
-    oper.setRightStore(kryo.copy(store));
+    oper.setLeftStore(new InMemoryStore(200, 200, "buckets/UP"));
+    oper.setRightStore(new InMemoryStore(200, 200, "buckets/DOWN"));
     oper.setIncludeFieldStr("ID,Name;OID,Amount");
     oper.setKeyFields("ID,CID");
     oper.outputClass = CustOrder.class;
@@ -142,9 +141,8 @@ public class POJOTimeBasedJoinOperatorTest
   {
     Kryo kryo = new Kryo();
     POJOJoinOperator oper = new POJOJoinOperator();
-    BackupStore store = new InMemoryStore(200, 200);
-    oper.setLeftStore(kryo.copy(store));
-    oper.setRightStore(kryo.copy(store));
+    oper.setLeftStore(new InMemoryStore(200, 200, "buckets/UP"));
+    oper.setRightStore(new InMemoryStore(200, 200, "buckets/DOWN"));
     oper.setIncludeFieldStr("ID,Name;OID,Amount");
     oper.setKeyFields("ID,CID");
     oper.outputClass = CustOrder.class;
@@ -217,9 +215,8 @@ public class POJOTimeBasedJoinOperatorTest
   {
     Kryo kryo = new Kryo();
     POJOJoinOperator oper = new POJOJoinOperator();
-    BackupStore store = new InMemoryStore(200, 200);
-    oper.setLeftStore(kryo.copy(store));
-    oper.setRightStore(kryo.copy(store));
+    oper.setLeftStore(new InMemoryStore(200, 200, "buckets/UP"));
+    oper.setRightStore(new InMemoryStore(200, 200, "buckets/DOWN"));
     oper.setIncludeFieldStr("ID,Name;OID,Amount");
     oper.setKeyFields("ID,CID");
     oper.outputClass = CustOrder.class;
@@ -288,9 +285,8 @@ public class POJOTimeBasedJoinOperatorTest
   {
     Kryo kryo = new Kryo();
     POJOJoinOperator oper = new POJOJoinOperator();
-    BackupStore store = new InMemoryStore(200, 200);
-    oper.setLeftStore(kryo.copy(store));
-    oper.setRightStore(kryo.copy(store));
+    oper.setLeftStore(new InMemoryStore(200, 200, "buckets/UP"));
+    oper.setRightStore(new InMemoryStore(200, 200, "buckets/DOWN"));
     oper.setIncludeFieldStr("ID,Name;OID,Amount");
     oper.setKeyFields("ID,CID");
     oper.outputClass = CustOrder.class;

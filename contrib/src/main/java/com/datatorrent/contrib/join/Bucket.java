@@ -17,8 +17,6 @@ package com.datatorrent.contrib.join;
 
 import com.datatorrent.lib.bucket.Bucketable;
 import com.google.common.collect.Lists;
-import com.google.common.hash.BloomFilter;
-import com.google.common.hash.Funnels;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,7 +33,7 @@ public class Bucket<T extends Bucketable>
 {
   private Map<Object, List<T>> unwrittenEvents;
   private Map<Object, List<T>> writtenEvents;
-  private transient BloomFilter bloomFilter;
+  //private transient BloomFilter bloomFilter;
   private boolean isDataOnDiskLoaded;
 
   public final long bucketKey;
@@ -48,7 +46,7 @@ public class Bucket<T extends Bucketable>
   {
     isDataOnDiskLoaded = false;
     this.bucketKey = bucketKey;
-    bloomFilter = BloomFilter.create(Funnels.byteArrayFunnel(), 300000, 0.001);
+    //bloomFilter = BloomFilter.create(Funnels.byteArrayFunnel(), 300000, 0.001);
   }
 
   public void transferEvents()
@@ -98,7 +96,7 @@ public class Bucket<T extends Bucketable>
         listEvents.add(event);
       }
     }
-    bloomFilter.put(eventKey.toString().getBytes());
+    //bloomFilter.put(eventKey.toString().getBytes());
 
   }
 
@@ -121,8 +119,8 @@ public class Bucket<T extends Bucketable>
     return value;
   }
 
-  public boolean contains(Object key)
+  /*public boolean contains(Object key)
   {
     return bloomFilter.mightContain(key.toString().getBytes());
-  }
+  }*/
 }
