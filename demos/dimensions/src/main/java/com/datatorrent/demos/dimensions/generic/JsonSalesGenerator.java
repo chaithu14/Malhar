@@ -101,6 +101,7 @@ public class JsonSalesGenerator implements InputOperator
    * Outputs sales event in JSON format as a byte array
    */
   public final transient DefaultOutputPort<byte[]> jsonBytes = new DefaultOutputPort<byte[]>();
+  public final transient DefaultOutputPort<SalesEvent> outputPort = new DefaultOutputPort<SalesEvent>();
 
   private static final ObjectMapper mapper = new ObjectMapper().setSerializationInclusion(JsonSerialize.Inclusion.NON_NULL);
   private final Random random = new Random();
@@ -166,8 +167,11 @@ public class JsonSalesGenerator implements InputOperator
       try {
 
         SalesEvent salesEvent = generateSalesEvent();
-        this.jsonBytes.emit(mapper.writeValueAsBytes(salesEvent));
+        if(jsonBytes.isConnected())
+          this.jsonBytes.emit(mapper.writeValueAsBytes(salesEvent));
 
+        if(outputPort.isConnected())
+          this.outputPort.emit(salesEvent);
       } catch (Exception ex) {
         throw new RuntimeException(ex);
       }
@@ -379,22 +383,4 @@ public class JsonSalesGenerator implements InputOperator
   public void setDiscountCycle(int discountCycle) {
     this.discountCycle = discountCycle;
   }
-}
-
-/**
- * A single sales event
- */
-class SalesEvent {
-
-  /* dimension keys */
-  public long timestamp;
-  public int productId;
-  public int customerId;
-  public int channelId;
-  public int regionId;
-  public int productCategory;
-  /* metrics */
-  public double amount;
-  public double discount;
-  public double tax;
 }
