@@ -9,7 +9,6 @@ import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Multimap;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.reflect.Array;
@@ -417,7 +416,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
   protected void mergeData(int bucketIdx, Long bucketKey) throws IOException
   {
     Map<Long, Long> bucketPos = bucketSavePositions[bucketIdx];
-    Map<Object, List<TimeEvent>> bucketDataPerWindow = Maps.newHashMap();
+    Map<Object, List<T>> bucketDataPerWindow = Maps.newHashMap();
 
     for(Map.Entry<Long, Long> e : bucketPos.entrySet()) {
       Kryo readSerde = new Kryo();
@@ -436,18 +435,18 @@ public class TimeBasedStore<T extends Event & Bucketable>
         for (int i = 0; i < length; i++) {
           Object key = readSerde.readObject(input, eventKeyClass);
           int entrySize = input.readInt();
-          TimeEvent event = null;
+          List<T> event = null;
           try {
-            event = readSerde.readObject(input, TimeEvent.class);
+            event = readSerde.readObject(input, ArrayList.class);
           } catch(RuntimeException ex) {
             ex.printStackTrace();
           }
           if(event != null) {
-            List<TimeEvent> events = bucketDataPerWindow.get(key);
+            List<T> events = bucketDataPerWindow.get(key);
             if(events == null) {
-              bucketDataPerWindow.put(key, Lists.newArrayList(event));
+              bucketDataPerWindow.put(key, event);
             } else {
-              events.add(event);
+              events.addAll(event);
             }
 
           }
@@ -554,7 +553,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
     conf.set("tfile.fs.output.buffer.size", String.valueOf(outputBufferSize));
   }
 
-  public void storeBucketData(Map<Object, List<TimeEvent>> bucketData, TreeMap<byte[], byte[]> storedData, long bucketKey, String basePath)
+  public void storeBucketData(Map<Object, List<T>> bucketData, TreeMap<byte[], byte[]> storedData, long bucketKey, String basePath)
   {
     TreeMap<byte[], byte[]> sortedData = new TreeMap<byte[], byte[]>(new Comparator<byte[]>()
     {
@@ -576,7 +575,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
     //Write the size of data and then data
     //dataStream.writeInt(bucketData.size());
     Kryo kryo = new Kryo();
-    for (Map.Entry<Object, List<TimeEvent>> entry : bucketData.entrySet()) {
+    for (Map.Entry<Object, List<T>> entry : bucketData.entrySet()) {
       ByteArrayOutputStream bos = new ByteArrayOutputStream();
       Output output2 = new Output(bos);
       kryo.writeObject(output2, entry.getKey());
@@ -752,7 +751,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
 
   protected void saveBucketData(long window)
   {
-    Map<Integer, Multimap<Object, T>> dataToStore = Maps.newHashMap();
+    Map<Integer, Map<Object, List<T>>> dataToStore = Maps.newHashMap();
     for (long key: dirtyBuckets) {
       int bucketIdx = (int) (key % noOfBuckets);
       TimeBucket<T> bucket = buckets[bucketIdx];
@@ -774,7 +773,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
     //committedWindow = window;
   }
 
-  public void storeBucketData(long window, Map<Integer, Multimap<Object, T>> data) throws IOException
+  public void storeBucketData(long window, Map<Integer, Map<Object, List<T>>> data) throws IOException
   {
     Path dataFilePath = new Path(bucketRoot + PATH_SEPARATOR + "Windows" + PATH_SEPARATOR + window);
     FileSystem fs = FileSystem.newInstance(dataFilePath.toUri(), configuration);
@@ -784,11 +783,11 @@ public class TimeBasedStore<T extends Event & Bucketable>
     try {
       long offset = 0;
       for (int bucketIdx : data.keySet()) {
-        Multimap<Object, T> bucketData = data.get(bucketIdx);
+        Map<Object, List<T>> bucketData = data.get(bucketIdx);
 
         //Write the size of data and then data
         dataStream.writeInt(bucketData.size());
-        for (Map.Entry<Object, T> entry : bucketData.entries()) {
+        for (Map.Entry<Object, List<T>> entry : bucketData.entrySet()) {
           writeSerde.writeObject(output, entry.getKey());
           int posLength = output.position();
           output.writeInt(0); //temporary place holder
