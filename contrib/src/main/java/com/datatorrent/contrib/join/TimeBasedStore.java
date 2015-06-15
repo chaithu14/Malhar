@@ -19,6 +19,7 @@ import com.datatorrent.lib.bucket.Event;
 import com.google.common.collect.Lists;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -100,6 +101,7 @@ public class TimeBasedStore<T extends TimeEvent>
     }
     List<Event> validTuples = new ArrayList<Event>();
     Boolean[] isContained = new Boolean[noOfBuckets];
+    Arrays.fill(isContained, false);
     Boolean isContainedInDB = false;
     for(Long idx: keyBuckets) {
       // For the dirty bucket, check whether the time constraint is matching or not
