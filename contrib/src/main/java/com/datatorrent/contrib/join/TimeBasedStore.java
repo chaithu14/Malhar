@@ -465,11 +465,11 @@ public class TimeBasedStore<T extends Event & Bucketable>
 
   private void setupConfig(Configuration conf)
   {
-    int chunkSize = 1024 * 1024 * 12;
+    int chunkSize = 1024 * 1024;
 
-    int inputBufferSize = 256 * 1024 * 12;
+    int inputBufferSize = 256 * 1024;
 
-    int outputBufferSize = 256 * 1024 * 12;
+    int outputBufferSize = 256 * 1024;
     conf.set("tfile.io.chunk.size", String.valueOf(chunkSize));
     conf.set("tfile.fs.input.buffer.size", String.valueOf(inputBufferSize));
     conf.set("tfile.fs.output.buffer.size", String.valueOf(outputBufferSize));
@@ -658,6 +658,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
         throw new RuntimeException(e);
       }
     }
+    checkPointedBuckets.clear();
   }
 
   private class BucketWriteCallable implements Callable<Boolean>
