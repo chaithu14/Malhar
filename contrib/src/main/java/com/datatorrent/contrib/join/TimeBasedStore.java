@@ -52,29 +52,26 @@ public class TimeBasedStore<T extends Event & Bucketable>
   protected int bucketSpanInMillis = 30000;
   protected long startOfBucketsInMillis;
   protected long endOBucketsInMillis;
-  private final transient Lock lock;
-  private long expiryTime;
   private String bucketRoot;
   private Set<Long> mergeBuckets;
-  protected Map<Long, Bucket> expiredBuckets;
-  private boolean isOuter=false;
+  private Map<Integer, Long> bucketWid = new HashMap<Integer, Long>();
 
+  protected transient List<Bucket> expiredBuckets;
+  private final transient Lock lock;
   private transient Timer bucketSlidingTimer;
   private transient Timer bucketMergeTimer;
   private transient long bucketMergeSpanInMillis = 10000;
-  private transient Map<Object, Set<Long>> key2Buckets;
+  private Map<Object, Set<Long>> key2Buckets = new HashMap<Object, Set<Long>>();
   private transient Kryo writeSerde;
   protected transient Set<Long> dirtyBuckets;
   static transient final String PATH_SEPARATOR = "/";
   protected transient Configuration configuration;
   protected transient Map<Long, DTFileReader> readers = new HashMap<Long, DTFileReader>();
   protected transient ThreadPoolExecutor threadPoolExecutor;
-  private transient List<T> unmatchedEvents = new ArrayList<T>();
   private transient long currentWID;
   private transient long mergeWID;
   private transient Set<Long> checkPointedBuckets;
   private transient String TMP_FILE = "._COPYING_";
-
 
   public void setBucketRoot(String bucketRoot)
   {
@@ -84,7 +81,6 @@ public class TimeBasedStore<T extends Event & Bucketable>
   public TimeBasedStore()
   {
     lock = new Lock();
-    expiredBuckets = new HashMap<Long, Bucket>();
   }
 
   public void beginWindow(long window) {
@@ -96,32 +92,67 @@ public class TimeBasedStore<T extends Event & Bucketable>
     Calendar calendar = Calendar.getInstance();
     long now = calendar.getTimeInMillis();
     startOfBucketsInMillis = now - spanTimeInMillis;
-    expiryTime = startOfBucketsInMillis;
     expiryTimeInMillis = startOfBucketsInMillis;
     endOBucketsInMillis = now;
     noOfBuckets = (int) Math.ceil((now - startOfBucketsInMillis) / (bucketSpanInMillis * 1.0));
     buckets = (Bucket<T>[]) Array.newInstance(Bucket.class, noOfBuckets);
-    key2Buckets = new HashMap<Object, Set<Long>>();
   }
 
   public void setup()
   {
     configuration = new Configuration();
-    recomputeNumBuckets();
+    dirtyBuckets = new HashSet<Long>();
+    checkPointedBuckets = new HashSet<Long>();
+    expiredBuckets = new ArrayList<Bucket>();
+    //key2Buckets = new HashMap<Object, Set<Long>>();
+    if(buckets == null) {
+      recomputeNumBuckets();
+    } else {
+      recoveryBuckets();
+    }
+
     //ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
     this.writeSerde = new Kryo();
     this.writeSerde.register(ArrayList.class, new CollectionSerializer());
-
     //writeSerde.setClassLoader(classLoader);
     startMergeService();
     startService();
-    dirtyBuckets = new HashSet<Long>();
-    checkPointedBuckets = new HashSet<Long>();
+
   }
 
-  public void setExpiryTime(long expiryTime)
+  private void recoveryBuckets()
   {
-    this.expiryTime = expiryTime;
+    long diffFromStart = expiryTimeInMillis - startOfBucketsInMillis;
+    long startkey = diffFromStart / bucketSpanInMillis;
+    Kryo kryo = new Kryo();
+    for(Map.Entry<Integer, Long> bck : bucketWid.entrySet()) {
+      Bucket t = buckets[bck.getKey()];
+      if(t == null || t.bucketKey < startkey) {
+        continue;
+      }
+      String path = new String(bucketRoot + PATH_SEPARATOR + t.bucketKey + PATH_SEPARATOR + bck.getValue());
+      DTFileReader tr = createDTReader(path);
+      if(tr != null) {
+        readers.put(t.bucketKey, tr);
+        /*try {
+          List<byte[]> keys = tr.getKeys();
+          for(byte[] b : keys) {
+            Input lInput = new Input(b);
+            Object key = kryo.readObject(lInput, Object.class);
+            Set<Long> bucks = key2Buckets.get(key);
+            if(bucks == null) {
+              bucks = new HashSet<Long>();
+              bucks.add(t.bucketKey);
+              key2Buckets.put(key, bucks);
+            } else {
+              bucks.add(t.bucketKey);
+            }
+          }
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }*/
+      }
+    }
   }
 
   public Object getValidTuples(T tuple)
@@ -139,12 +170,9 @@ public class TimeBasedStore<T extends Event & Bucketable>
     if(keyBuckets == null)
       return null;
     for(Long bucketKey : keyBuckets) {
-      if(expiredBuckets.get(bucketKey) != null) {
-        continue;
-      }
       int bucketIdx = (int) (bucketKey % noOfBuckets);
       Bucket tb = buckets[bucketIdx];
-      if(tb == null) {
+      if(tb == null || tb.bucketKey != bucketKey) {
         continue;
       }
       List<T> events = tb.get(key);
@@ -218,7 +246,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
 
     if (bucket == null || bucket.bucketKey != bucketKey) {
       if (bucket != null) {
-        expiredBuckets.put(bucket.bucketKey, bucket);
+        expiredBuckets.add(bucket);
       }
       bucket = createBucket(bucketKey);
       buckets[bucketIdx] = bucket;
@@ -239,7 +267,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
   public void startService()
   {
     bucketSlidingTimer = new Timer();
-    endOBucketsInMillis = expiryTime + (noOfBuckets * bucketSpanInMillis);
+    endOBucketsInMillis = expiryTimeInMillis + (noOfBuckets * bucketSpanInMillis);
     logger.debug("bucket properties {}, {}", spanTimeInMillis, bucketSpanInMillis);
     logger.debug("bucket time params: start {}, end {}", startOfBucketsInMillis, endOBucketsInMillis);
 
@@ -251,7 +279,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
         long time = 0;
 
         synchronized (lock) {
-          time = (expiryTime += bucketSpanInMillis);
+          time = (expiryTimeInMillis += bucketSpanInMillis);
           endOBucketsInMillis += bucketSpanInMillis;
         }
 
@@ -267,10 +295,12 @@ public class TimeBasedStore<T extends Event & Bucketable>
   private void deleteExpiredBuckets(long time) throws IOException
   {
     logger.info("DeleteExpiredB: File: {}, time: {}", bucketRoot, time);
-    Iterator<Long> exIterator = expiredBuckets.keySet().iterator();
+    Iterator<Bucket> exIterator = expiredBuckets.iterator();
     for (; exIterator.hasNext(); ) {
-      long key = exIterator.next();
-      Bucket t = (Bucket) expiredBuckets.get(key);
+      Bucket t = exIterator.next();
+      if(t == null) {
+        continue;
+      }
       logger.info("DeleteExpiredB - 1: File: {}, time: {}", bucketRoot, time);
       if (startOfBucketsInMillis + (t.bucketKey * noOfBuckets) < time) {
         logger.info("DeleteExpiredB - 2: File: {}, time: {},  key: {}", bucketRoot, time, t.bucketKey);
@@ -289,20 +319,6 @@ public class TimeBasedStore<T extends Event & Bucketable>
     try {
 
       DTFileReader bcktReader = readers.remove(bucket.bucketKey);
-      if(isOuter) {
-        // Check the events which are unmatched and add those into the unmatchedEvents list
-        TreeMap<byte[] , byte[]> data = bcktReader.readFully();
-
-        for(Map.Entry<byte[], byte[]> e: data.entrySet()) {
-          Input lInput = new Input(e.getValue());
-          List<T> eventList = (List<T>)this.writeSerde.readObject(lInput, ArrayList.class);
-          for (T event : eventList) {
-            if (!((TimeEvent) (event)).isMatch()) {
-              unmatchedEvents.add(event);
-            }
-          }
-        }
-      }
 
       if (bcktReader != null) {
         bucketPath = bcktReader.getPath();
@@ -341,7 +357,8 @@ public class TimeBasedStore<T extends Event & Bucketable>
       checkPointedBuckets.addAll(mergeBuckets);
       logger.info("End Window:  {} -> {}", bucketRoot, mergeBuckets.size());
       for(long mergeBucketId: mergeBuckets) {
-        Bucket bucket = buckets[((int) (mergeBucketId % noOfBuckets))];
+        int bckIdx = (int) (mergeBucketId % noOfBuckets);
+        Bucket bucket = buckets[bckIdx];
         bucket.transferDataFromMemoryToStore();
 
         DTFileReader bcktReader = readers.get(mergeBucketId);
@@ -360,27 +377,8 @@ public class TimeBasedStore<T extends Event & Bucketable>
         if (tr != null) {
           logger.info("Map Changed: {} -> {}", bucketRoot, path);
           readers.put(bucket.bucketKey, tr);
+          bucketWid.put(bckIdx, mergeWID);
         }
-        /*if (readerPath != null) {
-          Path dataFilePath = new Path(readerPath);
-          FileSystem fs = null;
-          try {
-            fs = FileSystem.newInstance(dataFilePath.toUri(), configuration);
-            if (fs.exists(dataFilePath)) {
-              logger.info("start delete {} -> {}", bucket.bucketKey, readerPath);
-              fs.delete(dataFilePath, true);
-              logger.info("end delete {} -> {}", bucket.bucketKey, readerPath);
-            }
-          } catch (IOException e) {
-            throw new RuntimeException(e);
-          } finally {
-            try {
-              fs.close();
-            } catch (IOException e) {
-              throw new RuntimeException(e);
-            }
-          }
-        }*/
       }
       mergeBuckets = null;
     }
@@ -503,9 +501,18 @@ public class TimeBasedStore<T extends Event & Bucketable>
       Output output2 = new Output(bos);
       this.writeSerde.writeObject(output2, entry.getKey());
       output2.close();
+      List<T> entriesList = entry.getValue();
+      if(storedData != null) {
+        byte[] valueBytes = storedData.remove(bos.toByteArray());
+        if(valueBytes != null) {
+          Input lInput = new Input(valueBytes);
+          Kryo kryo = new Kryo();
+          entriesList.addAll((List<T>)kryo.readObject(lInput, ArrayList.class));
+        }
+      }
       ByteArrayOutputStream bos1 = new ByteArrayOutputStream();
       Output output1 = new Output(bos1);
-      this.writeSerde.writeObject(output1, entry.getValue());
+      this.writeSerde.writeObject(output1, entriesList);
       output1.close();
       sortedData.put(bos.toByteArray(), bos1.toByteArray());
     }
@@ -596,9 +603,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
    */
   public List<T> getUnmatchedEvents()
   {
-    List<T> copyEvents = new ArrayList<T>(unmatchedEvents);
-    unmatchedEvents.clear();
-    return copyEvents;
+    return null;
   }
 
   public void setSpanTimeInMillis(long spanTimeInMillis)
@@ -609,11 +614,6 @@ public class TimeBasedStore<T extends Event & Bucketable>
   public void setBucketSpanInMillis(int bucketSpanInMillis)
   {
     this.bucketSpanInMillis = bucketSpanInMillis;
-  }
-
-  public void isOuterJoin(boolean isOuter)
-  {
-    this.isOuter = isOuter;
   }
 
   public void shutdown()

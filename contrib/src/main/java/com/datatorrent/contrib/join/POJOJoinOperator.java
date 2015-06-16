@@ -68,6 +68,12 @@ public class POJOJoinOperator extends AbstractJoinOperator
   // Populate the getters from the input tuple
   @Override protected void processTuple(Object tuple, Boolean isLeft)
   {
+    setAndPopulateGetters(tuple, isLeft);
+    super.processTuple(tuple, isLeft);
+  }
+
+  private void setAndPopulateGetters(Object tuple, Boolean isLeft)
+  {
     if(isLeft && leftClass == null) {
       leftClass = tuple.getClass();
       populateGettersFromInput(isLeft);
@@ -76,9 +82,7 @@ public class POJOJoinOperator extends AbstractJoinOperator
       rightClass = tuple.getClass();
       populateGettersFromInput(isLeft);
     }
-    super.processTuple(tuple, isLeft);
   }
-
   /**
    * Populate the getters from the input class
    * @param isLeft isLeft specifies whether the class is left or right
@@ -107,7 +111,7 @@ public class POJOJoinOperator extends AbstractJoinOperator
     if(timeFields != null) {
       try {
         Class c = ClassUtils.primitiveToWrapper(inputClass.getField(timeFields[idx]).getType());
-        keyGetters[idx] = PojoUtils.createGetter(inputClass, timeFields[idx], c);
+        timeGetters[idx] = PojoUtils.createGetter(inputClass, timeFields[idx], c);
       } catch (NoSuchFieldException e) {
         throw new RuntimeException(e);
       }
@@ -160,6 +164,8 @@ public class POJOJoinOperator extends AbstractJoinOperator
   {
     if(extractTuple == null)
       return;
+
+    setAndPopulateGetters(extractTuple, isLeft);
 
     List<FieldObjectMap> fieldsMap;
     if(isLeft) {

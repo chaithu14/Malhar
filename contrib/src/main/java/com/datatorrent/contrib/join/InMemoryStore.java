@@ -71,9 +71,7 @@ public class InMemoryStore extends TimeBasedStore<TimeEvent> implements BackupSt
   }
 
   @Override public void isOuterJoin(Boolean isOuter)
-  {
-    super.isOuterJoin(isOuter);
-  }
+  {  }
 
   @Override public Object getValidTuples(Object tuple)
   {

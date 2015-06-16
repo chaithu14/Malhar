@@ -18,7 +18,9 @@ package com.datatorrent.contrib.join;
 import com.datatorrent.common.util.Slice;
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.List;
 import java.util.TreeMap;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -113,6 +115,19 @@ public class DTFileReader implements Closeable
     return data;
   }
 
+  public List<byte[]> getKeys() throws IOException
+  {
+    List<byte[]> keys = new ArrayList<byte[]>();
+    scanner.rewind();
+    for (; !scanner.atEnd(); scanner.advance()) {
+      DTFile.Reader.Scanner.Entry en = scanner.entry();
+      int klen = en.getKeyLength();
+      byte[] key = new byte[klen];
+      en.getKey(key);
+      keys.add(key);
+    }
+    return keys;
+  }
   public void reset() throws IOException
   {
     scanner.rewind();
@@ -148,14 +163,10 @@ public class DTFileReader implements Closeable
 
   public byte[] get(byte[] keyBytes) throws IOException
   {
-    if (scanner.atEnd()) return null;
     if(scanner.seekTo(keyBytes, 0, keyBytes.length)) {
       DTFile.Reader.Scanner.Entry en = scanner.entry();
-      byte[] rkey = new byte[en.getKeyLength()];
       byte[] value = new byte[en.getValueLength()];
-      en.getKey(rkey);
       en.getValue(value);
-      //scanner.advance();
       return value;
     }
     return null;
