@@ -51,7 +51,6 @@ public class TimeBasedStore<T extends TimeEvent>
   private final transient Lock lock;
   private Map<Object, List<Long>> key2Buckets = new HashMap<Object, List<Long>>();
   private transient Timer bucketSlidingTimer;
-  private long expiryTime;
   private boolean isOuter=false;
   private transient List<T> unmatchedEvents = new ArrayList<T>();
 
@@ -70,7 +69,6 @@ public class TimeBasedStore<T extends TimeEvent>
     Calendar calendar = Calendar.getInstance();
     long now = calendar.getTimeInMillis();
     startOfBucketsInMillis = now - spanTimeInMillis;
-    expiryTime = startOfBucketsInMillis;
     expiryTimeInMillis = startOfBucketsInMillis;
     endOBucketsInMillis = now;
     noOfBuckets = (int) Math.ceil((now - startOfBucketsInMillis) / (bucketSpanInMillis * 1.0));
@@ -102,33 +100,18 @@ public class TimeBasedStore<T extends TimeEvent>
     List<Event> validTuples = new ArrayList<Event>();
     Boolean[] isContained = new Boolean[noOfBuckets];
     Arrays.fill(isContained, false);
-    Boolean isContainedInDB = false;
     for(Long idx: keyBuckets) {
-      // For the dirty bucket, check whether the time constraint is matching or not
-      if(dirtyBuckets.get(idx) != null && isContainedInDB) {
-        isContainedInDB = true;
-        Bucket tb = (Bucket)dirtyBuckets.get(idx);
-        List<T> events = tb.get(key);
-        if(events != null) {
-          for(T event: events) {
-            if(Math.abs(tuple.getTime() - event.getTime()) < spanTimeInMillis) {
-              validTuples.add(event);
-            }
-          }
-        }
-      } else {
-        int bucketIdx = (int) (idx % noOfBuckets);
-        if(isContained[bucketIdx])
-          continue;
-        isContained[bucketIdx] = true;
-        Bucket tb = (Bucket)buckets[bucketIdx];
-        if(tb == null) {
-          return validTuples;
-        }
-        List<T> events = tb.get(key);
-        if(events != null) {
-          validTuples.addAll(events);
-        }
+      int bucketIdx = (int) (idx % noOfBuckets);
+      Bucket tb = (Bucket)buckets[bucketIdx];
+      if(tb == null || tb.bucketKey != idx) {
+        continue;
+      }
+      if(isContained[bucketIdx])
+        continue;
+      isContained[bucketIdx] = true;
+      List<T> events = tb.get(key);
+      if(events != null) {
+        validTuples.addAll(events);
       }
     }
     return validTuples;
@@ -209,7 +192,7 @@ public class TimeBasedStore<T extends TimeEvent>
   public void startService()
   {
     bucketSlidingTimer = new Timer();
-    endOBucketsInMillis = expiryTime + (noOfBuckets * bucketSpanInMillis);
+    endOBucketsInMillis = expiryTimeInMillis + (noOfBuckets * bucketSpanInMillis);
     logger.debug("bucket properties {}, {}", spanTimeInMillis, bucketSpanInMillis);
     logger.debug("bucket time params: start {}, end {}", startOfBucketsInMillis, endOBucketsInMillis);
 
@@ -220,7 +203,7 @@ public class TimeBasedStore<T extends TimeEvent>
       {
         long time = 0;
         synchronized (lock) {
-          time = (expiryTime += bucketSpanInMillis);
+          time = (expiryTimeInMillis += bucketSpanInMillis);
           endOBucketsInMillis += bucketSpanInMillis;
         }
         deleteExpiredBuckets(time);
@@ -242,7 +225,6 @@ public class TimeBasedStore<T extends TimeEvent>
         iterator.remove();
       }
     }
-
   }
 
   /**
@@ -273,7 +255,7 @@ public class TimeBasedStore<T extends TimeEvent>
       // Check the events which are unmatched and add those into the unmatchedEvents list
       if(isOuter) {
         for (T event : e.getValue()) {
-          if (!((TimeEvent) (event)).isMatch()) {
+          if (!event.isMatch()) {
             unmatchedEvents.add(event);
           }
         }
