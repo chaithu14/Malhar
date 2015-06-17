@@ -29,18 +29,23 @@ public class BeanJoinApp implements StreamingApplication
   {
     JsonSalesGenerator input = dag.addOperator("Input", JsonSalesGenerator.class);
     input.setAddProductCategory(false);
-    input.setMaxTuplesPerWindow(200);
+    input.setMaxTuplesPerWindow(50);
     input.setTuplesPerWindowDeviation(0);
+    input.setTimeBucket(60000 * 5);
+    input.setTimeInterval(60000 * 10 * 2);
 
     JsonProductGenerator input2 = dag.addOperator("Prodcut", JsonProductGenerator.class);
-    input2.setMaxTuplesPerWindow(200);
+    input2.setMaxTuplesPerWindow(50);
     input2.setTuplesPerWindowDeviation(0);
+    input2.setTimeBucket(60000 * 5);
+    input2.setTimeInterval(60000 * 10 * 2);
 
     POJOJoinOperator joinOper = dag.addOperator("Join", new POJOJoinOperator());
     joinOper.setLeftStore(new InMemoryStore(60000 * 10 * 2, 60000 * 5, "buckets/3/UP/"));
     joinOper.setRightStore(new InMemoryStore(60000 * 10 * 2, 60000 * 5, "buckets/3/DOWN/"));
     joinOper.setIncludeFieldStr("timestamp,customerId,productId,regionId,amount;productCategory");
     joinOper.setKeyFields("productId,productId");
+    joinOper.setTimeFields("timestamp,timestamp");
 
     joinOper.outputClass = SalesEvent.class;
     CollectorModule console = dag.addOperator("Console", new CollectorModule());

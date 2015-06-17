@@ -209,10 +209,14 @@ public class TimeBasedStore<T extends Event & Bucketable>
     return validTuples;
   }
 
-  public void put(T tuple)
+  public Boolean put(T tuple)
   {
     long bucketKey = getBucketKeyFor(tuple);
+    if(bucketKey < 0) {
+      return false;
+    }
     newEvent(bucketKey, tuple);
+    return true;
   }
 
   public long getBucketKeyFor(T event)
@@ -268,8 +272,8 @@ public class TimeBasedStore<T extends Event & Bucketable>
   {
     bucketSlidingTimer = new Timer();
     endOBucketsInMillis = expiryTimeInMillis + (noOfBuckets * bucketSpanInMillis);
-    logger.debug("bucket properties {}, {}", spanTimeInMillis, bucketSpanInMillis);
-    logger.debug("bucket time params: start {}, end {}", startOfBucketsInMillis, endOBucketsInMillis);
+    logger.info("bucket properties {}, {}", spanTimeInMillis, bucketSpanInMillis);
+    logger.info("bucket time params: start {}, end {}", startOfBucketsInMillis, endOBucketsInMillis);
 
     bucketSlidingTimer.scheduleAtFixedRate(new TimerTask()
     {

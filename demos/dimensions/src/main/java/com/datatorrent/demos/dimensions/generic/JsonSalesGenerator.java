@@ -19,12 +19,13 @@ import com.datatorrent.api.Context;
 import com.datatorrent.api.DefaultOutputPort;
 import com.datatorrent.api.InputOperator;
 import com.google.common.collect.Maps;
-import org.codehaus.jackson.map.ObjectMapper;
-import org.codehaus.jackson.map.annotate.JsonSerialize;
-
-import javax.validation.constraints.Min;
 import java.util.Map;
 import java.util.Random;
+import java.util.Timer;
+import java.util.TimerTask;
+import javax.validation.constraints.Min;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.map.annotate.JsonSerialize;
 
 /**
  * Generates sales events data and sends them out as JSON encoded byte arrays.
@@ -70,7 +71,8 @@ public class JsonSalesGenerator implements InputOperator
   private double discountTiers[] = new double[] {0.0, 0.025, 0.05, 0.10, 0.15, 0.50};
   private double maxDiscountPercent = 0.75;
 
-
+  private long timeBucket;
+  private long timeInterval;
   // Should not be included by default - only used for testing when running without enrichment operator
   private boolean addProductCategory = false;
   @Min(1)
@@ -113,12 +115,12 @@ public class JsonSalesGenerator implements InputOperator
   private transient Map<Integer, Double> regionalTax = Maps.newHashMap();
   private transient RandomWeightedMovableGenerator<Integer> regionalGenerator = new RandomWeightedMovableGenerator<Integer>();
   private transient RandomWeightedMovableGenerator<Integer> channelGenerator = new RandomWeightedMovableGenerator<Integer>();
-
+  private transient Timer slidingTimer;
+  private long startTime = System.currentTimeMillis();
 
   @Override
   public void beginWindow(long windowId)
   {
-    tuplesCounter = 0;
     // Generate new output rate after tuplesRateCycle windows ONLY if tuplesPerWindowDeviation is non-zero
     if (windowId % tuplesRateCycle == 0 && tuplesPerWindowDeviation > 0) {
       tuplesPerCurrentWindow = maxTuplesPerWindow - random.nextInt(tuplesPerWindowDeviation);
@@ -153,11 +155,13 @@ public class JsonSalesGenerator implements InputOperator
     generateDiscounts();
     generateRegionalTax();
     initializeDataGenerators();
+    startService();
   }
 
   @Override
   public void teardown()
   {
+    slidingTimer.cancel();
   }
 
   @Override
@@ -220,8 +224,11 @@ public class JsonSalesGenerator implements InputOperator
   }
 
   SalesEvent generateSalesEvent() throws Exception {
+
     SalesEvent salesEvent = new SalesEvent();
-    salesEvent.timestamp = System.currentTimeMillis();
+    synchronized (this) {
+      salesEvent.timestamp = startTime + random.nextInt((int) timeInterval);
+    }
     salesEvent.productId = randomId(maxProductId);
     salesEvent.channelId = channelGenerator.next();
     salesEvent.regionId = regionalGenerator.next();
@@ -314,6 +321,21 @@ public class JsonSalesGenerator implements InputOperator
     this.maxChannelId = maxChannelId;
   }
 
+  public void startService()
+  {
+    slidingTimer = new Timer();
+    slidingTimer.scheduleAtFixedRate(new TimerTask()
+    {
+      @Override
+      public void run()
+      {
+        synchronized (this) {
+          startTime += timeBucket;
+        }
+
+      }
+    }, timeBucket, timeBucket);
+  }
   public double getMinAmount() {
     return minAmount;
   }
@@ -385,5 +407,15 @@ public class JsonSalesGenerator implements InputOperator
 
   public void setDiscountCycle(int discountCycle) {
     this.discountCycle = discountCycle;
+  }
+
+  public void setTimeBucket(long timeBucket)
+  {
+    this.timeBucket = timeBucket;
+  }
+
+  public void setTimeInterval(long timeInterval)
+  {
+    this.timeInterval = timeInterval;
   }
 }

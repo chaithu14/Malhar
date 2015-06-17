@@ -46,7 +46,7 @@ public interface BackupStore
    * Insert the given tuple
    * @param tuple
    */
-  void put(Object tuple);
+  Boolean put(Object tuple);
 
   /**
    * Shutdown the services.
