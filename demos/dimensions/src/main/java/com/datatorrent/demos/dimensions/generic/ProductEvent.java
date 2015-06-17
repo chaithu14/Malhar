@@ -7,6 +7,8 @@ public class ProductEvent {
 
   public int productId;
   public int productCategory;
+  public long timestamp;
+
 
   public int getProductId()
   {
@@ -28,11 +30,22 @@ public class ProductEvent {
     this.productCategory = productCategory;
   }
 
+  public long getTimestamp()
+  {
+    return timestamp;
+  }
+
+  public void setTimestamp(long timestamp)
+  {
+    this.timestamp = timestamp;
+  }
+
   @Override public String toString()
   {
     return "ProductEvent{" +
         "productId=" + productId +
         ", productCategory=" + productCategory +
+        ", timestamp=" + timestamp +
         '}';
   }
 }

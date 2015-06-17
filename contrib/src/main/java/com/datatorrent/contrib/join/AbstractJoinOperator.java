@@ -113,8 +113,9 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
       idx = 1;
     }
     TimeEvent t = createEvent(isLeft, tuple);
-    store[idx].put(t);
-    join(t, isLeft);
+    if(store[idx].put(t)) {
+      join(t, isLeft);
+    }
   }
   /**
    * Populate the fields from the includeFiledStr

@@ -75,9 +75,9 @@ public class InMemoryStore extends TimeBasedStore<TimeEvent> implements BackupSt
     return super.getValidTuples((TimeEvent) tuple);
   }
 
-  @Override public void put(Object tuple)
+  @Override public Boolean put(Object tuple)
   {
-    super.put((TimeEvent)tuple);
+    return super.put((TimeEvent)tuple);
   }
 
   public void setSpanTimeInMillis(long spanTimeInMillis)

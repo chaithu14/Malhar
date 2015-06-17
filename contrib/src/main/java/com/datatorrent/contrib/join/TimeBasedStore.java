@@ -16,15 +16,15 @@
 package com.datatorrent.contrib.join;
 
 import com.datatorrent.lib.bucket.Event;
-import com.google.common.collect.Lists;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Calendar;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import javax.validation.constraints.Min;
@@ -49,7 +49,7 @@ public class TimeBasedStore<T extends TimeEvent>
   protected long startOfBucketsInMillis;
   protected long endOBucketsInMillis;
   private final transient Lock lock;
-  private Map<Object, List<Long>> key2Buckets = new HashMap<Object, List<Long>>();
+  private Map<Object, Set<Long>> key2Buckets = new HashMap<Object, Set<Long>>();
   private transient Timer bucketSlidingTimer;
   private boolean isOuter=false;
   private transient List<T> unmatchedEvents = new ArrayList<T>();
@@ -93,22 +93,17 @@ public class TimeBasedStore<T extends TimeEvent>
     // Get the key from the given tuple
     Object key = tuple.getEventKey();
     // Get the buckets where the key is present
-    List<Long> keyBuckets = key2Buckets.get(key);
+    Set<Long> keyBuckets = key2Buckets.get(key);
     if(keyBuckets == null) {
       return null;
     }
     List<Event> validTuples = new ArrayList<Event>();
-    Boolean[] isContained = new Boolean[noOfBuckets];
-    Arrays.fill(isContained, false);
     for(Long idx: keyBuckets) {
       int bucketIdx = (int) (idx % noOfBuckets);
-      Bucket tb = (Bucket)buckets[bucketIdx];
+      Bucket tb = buckets[bucketIdx];
       if(tb == null || tb.bucketKey != idx) {
         continue;
       }
-      if(isContained[bucketIdx])
-        continue;
-      isContained[bucketIdx] = true;
       List<T> events = tb.get(key);
       if(events != null) {
         validTuples.addAll(events);
@@ -121,10 +116,13 @@ public class TimeBasedStore<T extends TimeEvent>
    * Insert the given tuple into the bucket
    * @param tuple
    */
-  public void put(T tuple)
+  public Boolean put(T tuple)
   {
     long bucketKey = getBucketKeyFor(tuple);
+    if(bucketKey < 0)
+      return false;
     newEvent(bucketKey, tuple);
+    return true;
   }
 
   /**
@@ -177,11 +175,13 @@ public class TimeBasedStore<T extends TimeEvent>
 
     // Insert the key into the key2Buckets map
     Object key = bucket.getEventKey(event);
-    List<Long> keyBuckets = key2Buckets.get(key);
+    Set<Long> keyBuckets = key2Buckets.get(key);
     if(keyBuckets == null) {
-      key2Buckets.put(key, Lists.newArrayList(bucketKey));
+      keyBuckets = new HashSet<Long>();
+      keyBuckets.add(bucketKey);
+      key2Buckets.put(key, keyBuckets);
     } else {
-      key2Buckets.get(key).add(bucketKey);
+      keyBuckets.add(bucketKey);
     }
     bucket.addNewEvent(key, event);
   }
@@ -219,7 +219,7 @@ public class TimeBasedStore<T extends TimeEvent>
     Iterator<Long> iterator = dirtyBuckets.keySet().iterator();
     for (; iterator.hasNext(); ) {
       long key = iterator.next();
-      Bucket t = (Bucket)dirtyBuckets.get(key);
+      Bucket t = dirtyBuckets.get(key);
       if(startOfBucketsInMillis + (t.bucketKey * noOfBuckets) < time) {
         deleteBucket(t);
         iterator.remove();
