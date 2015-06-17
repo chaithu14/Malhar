@@ -4,6 +4,8 @@ import com.datatorrent.api.Context;
 import com.datatorrent.api.DefaultOutputPort;
 import com.datatorrent.api.InputOperator;
 import com.google.common.collect.Maps;
+import java.util.Timer;
+import java.util.TimerTask;
 import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.map.ObjectReader;
 import org.codehaus.jackson.map.annotate.JsonSerialize;
@@ -44,7 +46,7 @@ import org.codehaus.jackson.type.TypeReference;
 public class JsonProductGenerator implements InputOperator
 {
   @Min(1)
-  private int maxProductId = 1000000;
+  private int maxProductId = 10000;
   @Min(1)
   private int maxProductCategories = 900;
 
@@ -80,6 +82,10 @@ public class JsonProductGenerator implements InputOperator
   private transient RandomWeightedMovableGenerator<Integer> channelGenerator = new RandomWeightedMovableGenerator<Integer>();
   public final transient DefaultOutputPort<Map<String, Object>> outputMap = new DefaultOutputPort<Map<String, Object>>();
   public final transient DefaultOutputPort<ProductEvent> outputPort = new DefaultOutputPort<ProductEvent>();
+  private transient Timer slidingTimer;
+  private long startTime = System.currentTimeMillis();
+  private long timeBucket;
+  private long timeInterval;
 
   @Override
   public void beginWindow(long windowId)
@@ -100,12 +106,14 @@ public class JsonProductGenerator implements InputOperator
   @Override
   public void setup(Context.OperatorContext context)
   {
+    startService();
     tuplesPerCurrentWindow = maxTuplesPerWindow;
   }
 
   @Override
   public void teardown()
   {
+    slidingTimer.cancel();
   }
 
   @Override
@@ -129,10 +137,30 @@ public class JsonProductGenerator implements InputOperator
     }
   }
 
+
+  public void startService()
+  {
+    slidingTimer = new Timer();
+    slidingTimer.scheduleAtFixedRate(new TimerTask()
+    {
+      @Override
+      public void run()
+      {
+        synchronized (this) {
+          startTime += timeBucket;
+        }
+
+      }
+    }, timeBucket, timeBucket);
+  }
+
   ProductEvent generateProductEvent() throws Exception {
     ProductEvent salesEvent = new ProductEvent();
     salesEvent.productId = randomId(maxProductId);
     salesEvent.productCategory = 1 + (salesEvent.productId % maxProductCategories);
+    synchronized (this) {
+      salesEvent.timestamp = startTime + random.nextInt((int) timeInterval);
+    }
     return salesEvent;
   }
 
@@ -190,4 +218,23 @@ public class JsonProductGenerator implements InputOperator
     this.tuplesRateCycle = tuplesRateCycle;
   }
 
+  public long getTimeInterval()
+  {
+    return timeInterval;
+  }
+
+  public void setTimeInterval(long timeInterval)
+  {
+    this.timeInterval = timeInterval;
+  }
+
+  public long getTimeBucket()
+  {
+    return timeBucket;
+  }
+
+  public void setTimeBucket(long timeBucket)
+  {
+    this.timeBucket = timeBucket;
+  }
 }
