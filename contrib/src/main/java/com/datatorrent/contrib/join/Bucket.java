@@ -16,8 +16,13 @@
 package com.datatorrent.contrib.join;
 
 import com.datatorrent.lib.bucket.Bucketable;
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 /**
@@ -30,7 +35,7 @@ import java.util.Map;
  */
 public class Bucket<T extends Bucketable>
 {
-  private Map<Object, List<T>> unwrittenEvents;
+  private Map<Object, byte[]> unwrittenEvents;
   public final long bucketKey;
 
   public Bucket() {
@@ -57,16 +62,26 @@ public class Bucket<T extends Bucketable>
     if (unwrittenEvents == null) {
       unwrittenEvents = Maps.newHashMap();
     }
-    List<T> listEvents = unwrittenEvents.get(eventKey);
+    byte[] listEvents = unwrittenEvents.get(eventKey);
+    Kryo kryo = new Kryo();
+    List<T> events = null;
     if(listEvents == null) {
-      unwrittenEvents.put(eventKey, Lists.newArrayList(event));
+      events = Lists.newArrayList(event);
     } else {
-      unwrittenEvents.get(eventKey).add(event);
+      Input lInput = new Input(listEvents);
+      events =  (List<T>)kryo.readObject(lInput, ArrayList.class);
+      events.add(event);
+      //unwrittenEvents.get(eventKey).add(event);
     }
+    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+    Output output = new Output(bos);
+    kryo.writeObject(output, events);
+    output.close();
+    unwrittenEvents.put(eventKey, bos.toByteArray());
   }
 
-  public Map<Object, List<T>> getEvents() { return unwrittenEvents; }
-  public List<T> get(Object key) {
+  public Map<Object, byte[]> getEvents() { return unwrittenEvents; }
+  public byte[] get(Object key) {
     return unwrittenEvents.get(key);
   }
 }

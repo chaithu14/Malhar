@@ -16,6 +16,8 @@
 package com.datatorrent.contrib.join;
 
 import com.datatorrent.lib.bucket.Event;
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.io.Input;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -54,7 +56,7 @@ public class TimeBasedStore<T extends TimeEvent>
   private boolean isOuter=false;
   private transient List<T> unmatchedEvents = new ArrayList<T>();
 
-  protected Map<Long, Bucket> dirtyBuckets = new HashMap<Long, Bucket>();
+  protected transient Map<Long, Bucket> dirtyBuckets = new HashMap<Long, Bucket>();
 
   public TimeBasedStore()
   {
@@ -98,15 +100,17 @@ public class TimeBasedStore<T extends TimeEvent>
       return null;
     }
     List<Event> validTuples = new ArrayList<Event>();
+    Kryo kryo = new Kryo();
     for(Long idx: keyBuckets) {
       int bucketIdx = (int) (idx % noOfBuckets);
       Bucket tb = buckets[bucketIdx];
       if(tb == null || tb.bucketKey != idx) {
         continue;
       }
-      List<T> events = tb.get(key);
+      byte[] events = tb.get(key);
       if(events != null) {
-        validTuples.addAll(events);
+        Input lInput = new Input(events);
+        validTuples.addAll((List<T>)kryo.readObject(lInput, ArrayList.class));
       }
     }
     return validTuples;
