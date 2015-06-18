@@ -61,7 +61,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
   private transient Timer bucketSlidingTimer;
   private transient Timer bucketMergeTimer;
   private transient long bucketMergeSpanInMillis = 10000;
-  private Map<Object, Set<Long>> key2Buckets = new HashMap<Object, Set<Long>>();
+  //private Map<Object, Set<Long>> key2Buckets = new HashMap<Object, Set<Long>>();
   private transient Kryo writeSerde;
   protected transient Set<Long> dirtyBuckets;
   static transient final String PATH_SEPARATOR = "/";
@@ -70,7 +70,6 @@ public class TimeBasedStore<T extends Event & Bucketable>
   protected transient ThreadPoolExecutor threadPoolExecutor;
   private transient long currentWID;
   private transient long mergeWID;
-  private transient Set<Long> checkPointedBuckets;
   private transient String TMP_FILE = "._COPYING_";
 
   public void setBucketRoot(String bucketRoot)
@@ -102,7 +101,6 @@ public class TimeBasedStore<T extends Event & Bucketable>
   {
     configuration = new Configuration();
     dirtyBuckets = new HashSet<Long>();
-    checkPointedBuckets = new HashSet<Long>();
     expiredBuckets = new ArrayList<Bucket>();
     //key2Buckets = new HashMap<Object, Set<Long>>();
     if(buckets == null) {
@@ -166,7 +164,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
     byte[] keyBytes = bos.toByteArray();
     List<Event> validTuples = new ArrayList<Event>();
 
-    Set<Long> keyBuckets = key2Buckets.get(key);
+    /*Set<Long> keyBuckets = key2Buckets.get(key);
     if(keyBuckets == null)
       return null;
     for(Long bucketKey : keyBuckets) {
@@ -185,27 +183,25 @@ public class TimeBasedStore<T extends Event & Bucketable>
           validTuples.addAll(dataEvents);
         }
       }
-    }
+    }*/
 
 
-    /*for(int i = 0; i < noOfBuckets; i++) {
+    for(int i = 0; i < noOfBuckets; i++) {
       Bucket tb = buckets[i];
       if(tb == null) {
         continue;
       }
-      if(tb.contains(key)) {
-        List<T> events = tb.get(key);
-        if (events != null) {
-          validTuples.addAll(events);
-        }
-        if (tb.isDataOnDiskLoaded()) {
-          List<T> dataEvents = getDataFromFile(keyBytes, tb.bucketKey);
-          if (dataEvents != null) {
-            validTuples.addAll(dataEvents);
-          }
+      List<T> events = tb.get(key);
+      if (events != null) {
+        validTuples.addAll(events);
+      }
+      if (tb.isDataOnDiskLoaded()) {
+        List<T> dataEvents = getDataFromFile(keyBytes, tb.bucketKey);
+        if (dataEvents != null) {
+          validTuples.addAll(dataEvents);
         }
       }
-    }*/
+    }
     return validTuples;
   }
 
@@ -257,14 +253,14 @@ public class TimeBasedStore<T extends Event & Bucketable>
     }
     bucket.addNewEvent(bucket.getEventKey(event), event);
     Object key = bucket.getEventKey(event);
-    Set<Long> keyBcks =  key2Buckets.get(key);
+    /*Set<Long> keyBcks =  key2Buckets.get(key);
     if(keyBcks == null) {
       keyBcks = new HashSet<Long>();
       keyBcks.add(bucketKey);
       key2Buckets.put(key, keyBcks);
     } else {
       keyBcks.add(bucketKey);
-    }
+    }*/
     dirtyBuckets.add(bucketKey);
   }
 
@@ -298,16 +294,15 @@ public class TimeBasedStore<T extends Event & Bucketable>
 
   private void deleteExpiredBuckets(long time) throws IOException
   {
-    logger.info("DeleteExpiredB: File: {}, time: {}", bucketRoot, time);
+    logger.info("DeleteExpiredB: File: {}, time: {} -> {}", bucketRoot, time, expiredBuckets.size());
     Iterator<Bucket> exIterator = expiredBuckets.iterator();
     for (; exIterator.hasNext(); ) {
       Bucket t = exIterator.next();
       if(t == null) {
         continue;
       }
-      logger.info("DeleteExpiredB - 1: File: {}, time: {}", bucketRoot, time);
-      if (startOfBucketsInMillis + (t.bucketKey * noOfBuckets) < time) {
-        logger.info("DeleteExpiredB - 2: File: {}, time: {},  key: {}", bucketRoot, time, t.bucketKey);
+      logger.info("DeleteExpiredB - 1: File: {}, time: {} -> {}", bucketRoot, time, t.bucketKey);
+      if (startOfBucketsInMillis + (t.bucketKey * bucketSpanInMillis) < time) {
         deleteBucket(t);
         exIterator.remove();
       }
@@ -319,34 +314,57 @@ public class TimeBasedStore<T extends Event & Bucketable>
     if (bucket == null) {
       return;
     }
-    String bucketPath = null;
-    try {
 
+    try {
       DTFileReader bcktReader = readers.remove(bucket.bucketKey);
 
       if (bcktReader != null) {
-        bucketPath = bcktReader.getPath();
         bcktReader.close();
       }
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
 
-    if (bucketPath == null) {
-      return;
-    }
-    Path dataFilePath = new Path(bucketPath);
+    String bucketPath = bucketRoot + PATH_SEPARATOR + bucket.bucketKey + PATH_SEPARATOR;
+    Path dataFile = new Path(bucketPath);
     FileSystem fs = null;
     try {
-      fs = FileSystem.newInstance(dataFilePath.toUri(), configuration);
-      if (fs.exists(dataFilePath)) {
-        logger.debug("start delete {}", bucket.bucketKey);
-        fs.delete(dataFilePath, true);
-        logger.debug("end delete {}", bucket.bucketKey);
+      fs = FileSystem.newInstance(dataFile.toUri(), configuration);
+      if (fs.exists(dataFile)) {
+        FileStatus[] fileStatuses = fs.listStatus(dataFile);
+
+        for (FileStatus operatorDirStatus : fileStatuses) {
+          FileSystem fsSys = null;
+          try{
+            String fileName = operatorDirStatus.getPath().getName();
+            if(fileName.endsWith(TMP_FILE)) {
+              continue;
+            }
+            long wId = Long.parseLong(fileName);
+            Path file = new Path(bucketRoot + PATH_SEPARATOR + bucket.bucketKey + PATH_SEPARATOR + wId);
+            fsSys = FileSystem.newInstance(file.toUri(), configuration);
+            if (fsSys.exists(file)) {
+              logger.info("start delete {} -> {}", bucket.bucketKey, wId);
+              fsSys.delete(file, true);
+              logger.info("end delete {} -> {}", bucket.bucketKey, wId);
+            }
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+          finally {
+            try {
+              fs.close();
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
+          }
+
+        }
       }
     } catch (IOException e) {
       throw new RuntimeException(e);
-    } finally {
+    }
+    finally {
       try {
         fs.close();
       } catch (IOException e) {
@@ -358,17 +376,17 @@ public class TimeBasedStore<T extends Event & Bucketable>
   public void endWindow()
   {
     if(mergeBuckets != null && mergeBuckets.size() != 0) {
-      checkPointedBuckets.addAll(mergeBuckets);
+
       logger.info("End Window:  {} -> {}", bucketRoot, mergeBuckets.size());
       for(long mergeBucketId: mergeBuckets) {
         int bckIdx = (int) (mergeBucketId % noOfBuckets);
         Bucket bucket = buckets[bckIdx];
+        if(bucket.bucketKey != mergeBucketId)
+          continue;
         bucket.transferDataFromMemoryToStore();
 
         DTFileReader bcktReader = readers.get(mergeBucketId);
-        String readerPath = null;
         if(bcktReader != null) {
-          readerPath = bcktReader.getPath();
           try {
             bcktReader.close();
           } catch (IOException e) {
@@ -376,7 +394,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
           }
         }
 
-        String path = new String(bucketRoot + PATH_SEPARATOR + ((Bucket) bucket).bucketKey + PATH_SEPARATOR + mergeWID);
+        String path = new String(bucketRoot + PATH_SEPARATOR + bucket.bucketKey + PATH_SEPARATOR + mergeWID);
         DTFileReader tr = createDTReader(path);
         if (tr != null) {
           logger.info("Map Changed: {} -> {}", bucketRoot, path);
@@ -390,7 +408,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
 
   protected void saveData(long bucketKey, long windowId) throws IOException
   {
-
+    logger.info("Save - 0 : {} -> {} -> {}", bucketRoot, windowId, bucketKey);
     int bucketIdx = (int) (bucketKey % noOfBuckets);
     Bucket<T> bucket = buckets[bucketIdx];
     if(bucket == null || bucket.getEvents() == null || bucket.getEvents().isEmpty()) {
@@ -402,23 +420,23 @@ public class TimeBasedStore<T extends Event & Bucketable>
     DTFileReader bcktReader = readers.get(bucketKey);
     TreeMap<byte[], byte[]> storedData = null;
     String readerPath = null;
-    logger.info("Save - 1 : {} -> {}", bucketRoot, windowId);
+    logger.info("Save - 1 : {} -> {} -> {}", bucketRoot, windowId, bucketKey);
     if(bcktReader != null) {
       readerPath = bcktReader.getPath();
-      logger.info("Save - 2 : {} -> {}", bucketRoot, windowId);
+      logger.info("Save - 2 : {} -> {} -> {}", bucketRoot, windowId, bucketKey);
       DTFileReader br = createDTReader(readerPath);
-      logger.info("Save - 3 : {} -> {}", bucketRoot, windowId);
+      logger.info("Save - 3 : {} -> {}-> {}", bucketRoot, windowId);
       if(br == null) {
-        logger.info("Empty File------: {} -> {}", bucketRoot, readerPath);
+        logger.info("Empty File------: {} -> {}-> {}", bucketRoot, readerPath, bucketKey);
       }
       storedData = br.readFully();
-      logger.info("Save - 4 : {} -> {} -> {}", bucketRoot, windowId, storedData.size());
+      logger.info("Save - 4 : {} -> {} -> {}-> {}", bucketRoot, windowId, storedData.size(), bucketKey);
       br.close();
     }
-    logger.info("Save - 5 : {} -> {}", bucketRoot, windowId);
+    logger.info("Save - 5 : {} -> {}-> {}", bucketRoot, windowId, bucketKey);
     storeBucketData(events, storedData, bucketKey, windowId);
     events.clear();
-    logger.info("Save - 6 : {} -> {}", bucketRoot, windowId);
+    logger.info("Save - 6 : {} -> {}-> {}", bucketRoot, windowId, bucketKey);
   }
 
   public void startMergeService()
@@ -431,7 +449,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
       public void run()
       {
         long start = System.currentTimeMillis();
-        //logger.info("run Merge Service------------------- {} ", dirtyBuckets.size());
+        logger.info("run Merge Service------------------- {} ", dirtyBuckets.size());
         Long windowId = currentWID;
         if(dirtyBuckets.size() != 0) {
           Set<Long> keyList ;
@@ -457,6 +475,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
               throw new RuntimeException(e);
             }
           }
+          logger.info("End of Save --++ {}: ", bucketRoot);
           mergeBuckets = keyList;
           mergeWID = windowId;
           logger.info(" End of run Merge Service------------------- {} -> {}", System.currentTimeMillis() - start, mergeBuckets.size());
@@ -497,36 +516,38 @@ public class TimeBasedStore<T extends Event & Bucketable>
         return end1 - end2;
       }
     });
-
+    //logger.info("StoreBucketData - 0 : {} -> {} -> {}", bucketRoot, bucketKey, bucketData.size());
     //Write the size of data and then data
     //dataStream.writeInt(bucketData.size());
+    Kryo kryo = new Kryo();
     for (Map.Entry<Object, List<T>> entry : bucketData.entrySet()) {
+      //logger.info("StoreBucketData - 1 : {} -> {}", bucketRoot, bucketKey);
       ByteArrayOutputStream bos = new ByteArrayOutputStream();
       Output output2 = new Output(bos);
-      this.writeSerde.writeObject(output2, entry.getKey());
+      kryo.writeObject(output2, entry.getKey());
       output2.close();
       List<T> entriesList = entry.getValue();
       if(storedData != null) {
         byte[] valueBytes = storedData.remove(bos.toByteArray());
         if(valueBytes != null) {
           Input lInput = new Input(valueBytes);
-          Kryo kryo = new Kryo();
           entriesList.addAll((List<T>)kryo.readObject(lInput, ArrayList.class));
         }
       }
       ByteArrayOutputStream bos1 = new ByteArrayOutputStream();
       Output output1 = new Output(bos1);
-      this.writeSerde.writeObject(output1, entriesList);
+      kryo.writeObject(output1, entriesList);
       output1.close();
       sortedData.put(bos.toByteArray(), bos1.toByteArray());
     }
-
+    //logger.info("StoreBucketData - 2 : {} -> {}", bucketRoot, bucketKey);
     if(storedData != null)
       sortedData.putAll(storedData);
     Path dataFilePath = new Path(bucketRoot + PATH_SEPARATOR + bucketKey + PATH_SEPARATOR + windoId);
     FSDataOutputStream dataStream = null;
     FileSystem fs = null;
     TFile.Writer writer = null;
+    //logger.info("StoreBucketData - 3 : {} -> {}", bucketRoot, bucketKey);
     try {
       fs = FileSystem.newInstance(dataFilePath.toUri(), configuration);
       dataStream = fs.create(dataFilePath);
@@ -543,7 +564,9 @@ public class TimeBasedStore<T extends Event & Bucketable>
         //logger.info("----------Key: {} ", entry.getKey());
         writer.append(entry.getKey(), entry.getValue());
       }
+      //logger.info("End StoreBucketData - 5 : {} -> {}", bucketRoot, bucketKey);
     } catch (IOException e) {
+      logger.info("Danger - 4 : {} -> {} -> {}", bucketRoot, bucketKey, e);
       throw new RuntimeException(e);
     } finally {
       if(fs != null) {
@@ -628,46 +651,10 @@ public class TimeBasedStore<T extends Event & Bucketable>
 
   public void checkpointed(long windowId)
   {
-    for(Long key: checkPointedBuckets) {
-      logger.info("CheckPointed - 1 : {} -> {} -> {}", bucketRoot, mergeWID, windowId);
-      String bucketPath = bucketRoot + PATH_SEPARATOR + key + PATH_SEPARATOR;
-      String bWid = readers.get(key).getPath().substring(bucketPath.length());
-      Long maxWId = Long.parseLong(bWid);
-      Path dataFile = new Path(bucketPath);
-      FileSystem fs = null;
-      try {
-        fs = FileSystem.newInstance(dataFile.toUri(), configuration);
-        if (fs.exists(dataFile)) {
-          FileStatus[] fileStatuses = fs.listStatus(dataFile);
-
-          for (FileStatus operatorDirStatus : fileStatuses) {
-            String fileName = operatorDirStatus.getPath().getName();
-            if(fileName.endsWith(TMP_FILE)) {
-              continue;
-            }
-            long wId = Long.parseLong(fileName);
-            //long wId = Long.parseLong(fileName, 16);
-            if(wId < maxWId) {
-              Path file = new Path(bucketRoot + PATH_SEPARATOR + key + PATH_SEPARATOR + wId);
-              FileSystem fsSys = FileSystem.newInstance(file.toUri(), configuration);
-              if (fs.exists(file)) {
-                logger.info("start delete {} -> {}", key, wId);
-                fs.delete(file, true);
-                logger.info("end delete {} -> {}", key, wId);
-              }
-            }
-          }
-        }
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-    }
-    checkPointedBuckets.clear();
   }
 
   private class BucketWriteCallable implements Callable<Boolean>
   {
-
     final long bucketKey;
     final long windowId;
 

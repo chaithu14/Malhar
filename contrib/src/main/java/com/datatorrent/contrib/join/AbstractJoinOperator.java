@@ -67,6 +67,7 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
 
   public final transient DefaultOutputPort<List<T>> outputPort = new DefaultOutputPort<List<T>>();
 
+  protected Boolean isLeft;
   @Override
   public void beginWindow(long windowId) {
     store[0].beginWindow(windowId);
@@ -98,7 +99,8 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
   {
     @Override public void process(T tuple)
     {
-      processTuple(tuple, true);
+      isLeft = true;
+      processTuple(tuple);
     }
   };
 
@@ -107,22 +109,21 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
   {
     @Override public void process(T tuple)
     {
-      processTuple(tuple, false);
+      isLeft = false;
+      processTuple(tuple);
     }
   };
 
-  protected void processTuple(T tuple, Boolean isLeft)
+  protected void processTuple(T tuple)
   {
 
     int idx = 0;
     if(!isLeft) {
       idx = 1;
     }
-    TimeEvent t = createEvent(isLeft, tuple);
+    TimeEvent t = createEvent(tuple);
     if(store[idx].put(t)) {
       join(t, isLeft);
-    } else {
-      logger.info("Invalid T: {}" , tuple);
     }
   }
   /**
@@ -214,11 +215,10 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
 
   /**
    * Create the event
-   * @param isLeft
    * @param tuple
    * @return
    */
-  protected TimeEvent createEvent(Boolean isLeft, Object tuple)
+  protected TimeEvent createEvent(Object tuple)
   {
     int idx = 0;
     if(!isLeft) {
