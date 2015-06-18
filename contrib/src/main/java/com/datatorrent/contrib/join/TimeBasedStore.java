@@ -328,6 +328,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
       throw new RuntimeException(e);
     }
 
+    bucket.clear();
     String bucketPath = bucketRoot + PATH_SEPARATOR + bucket.bucketKey + PATH_SEPARATOR;
     Path dataFile = new Path(bucketPath);
     FileSystem fs = null;
@@ -381,16 +382,14 @@ public class TimeBasedStore<T extends Event & Bucketable>
     if(mergeBuckets != null && mergeBuckets.size() != 0) {
 
       logger.info("End Window:  {} -> {}", bucketRoot, mergeBuckets.size());
-      readers.putAll(updatedReaders);
-      updatedReaders.clear();
-      /*for(long mergeBucketId: mergeBuckets) {
+      for(long mergeBucketId: mergeBuckets) {
         int bckIdx = (int) (mergeBucketId % noOfBuckets);
         Bucket bucket = buckets[bckIdx];
         if(bucket.bucketKey != mergeBucketId)
           continue;
         bucket.transferDataFromMemoryToStore();
 
-        DTFileReader bcktReader = readers.get(mergeBucketId);
+        /*DTFileReader bcktReader = readers.get(mergeBucketId);
         if(bcktReader != null) {
           try {
             bcktReader.close();
@@ -405,8 +404,10 @@ public class TimeBasedStore<T extends Event & Bucketable>
           logger.info("Map Changed: {} -> {}", bucketRoot, path);
           readers.put(bucket.bucketKey, tr);
           bucketWid.put(bckIdx, mergeWID);
-        }
-      }*/
+        }*/
+      }
+      readers.putAll(updatedReaders);
+      updatedReaders.clear();
       mergeBuckets = null;
     }
 }

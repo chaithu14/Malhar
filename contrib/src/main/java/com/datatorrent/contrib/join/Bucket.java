@@ -123,6 +123,18 @@ public class Bucket<T extends Bucketable>
 
   public boolean contains(Object key)
   {
+    if(bloomFilter == null || key == null)
+      return false;
     return bloomFilter.mightContain(key.toString().getBytes());
+  }
+
+  public void clear()
+  {
+    if(writtenEvents != null)
+      writtenEvents.clear();
+    if(unwrittenEvents != null)
+      unwrittenEvents.clear();
+    if(bloomFilter != null)
+      bloomFilter=null;
   }
 }
