@@ -191,14 +191,16 @@ public class TimeBasedStore<T extends Event & Bucketable>
       if(tb == null) {
         continue;
       }
-      List<T> events = tb.get(key);
-      if (events != null) {
-        validTuples.addAll(events);
-      }
-      if (tb.isDataOnDiskLoaded()) {
-        List<T> dataEvents = getDataFromFile(keyBytes, tb.bucketKey);
-        if (dataEvents != null) {
-          validTuples.addAll(dataEvents);
+      if(tb.contains(key)) {
+        List<T> events = tb.get(key);
+        if (events != null) {
+          validTuples.addAll(events);
+        }
+        if (tb.isDataOnDiskLoaded()) {
+          List<T> dataEvents = getDataFromFile(keyBytes, tb.bucketKey);
+          if (dataEvents != null) {
+            validTuples.addAll(dataEvents);
+          }
         }
       }
     }
@@ -302,7 +304,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
         continue;
       }
       logger.info("DeleteExpiredB - 1: File: {}, time: {} -> {}", bucketRoot, time, t.bucketKey);
-      if (startOfBucketsInMillis + (t.bucketKey * bucketSpanInMillis) < time) {
+      if (startOfBucketsInMillis + ((t.bucketKey + 1) * bucketSpanInMillis) < time) {
         deleteBucket(t);
         exIterator.remove();
       }
