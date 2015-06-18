@@ -66,10 +66,10 @@ public class POJOJoinOperator extends AbstractJoinOperator
   private transient PojoUtils.Getter[] timeGetters = (PojoUtils.Getter[]) Array.newInstance(PojoUtils.Getter.class, 2);
 
   // Populate the getters from the input tuple
-  @Override protected void processTuple(Object tuple, Boolean isLeft)
+  @Override protected void processTuple(Object tuple)
   {
     setAndPopulateGetters(tuple, isLeft);
-    super.processTuple(tuple, isLeft);
+    super.processTuple(tuple);
   }
 
   private void setAndPopulateGetters(Object tuple, Boolean isLeft)
@@ -187,7 +187,7 @@ public class POJOJoinOperator extends AbstractJoinOperator
    */
   public Object getKeyValue(String keyField, Object tuple)
   {
-    if(tuple.getClass().equals(leftClass)) {
+    if(isLeft) {
       return keyGetters[0].get(tuple);
     }
     return keyGetters[1].get(tuple);
@@ -196,7 +196,7 @@ public class POJOJoinOperator extends AbstractJoinOperator
   @Override protected Object getTime(String field, Object tuple)
   {
     if(timeFields != null) {
-      if(tuple.getClass().equals(leftClass)) {
+      if(isLeft) {
         return timeGetters[0].get(tuple);
       }
       return timeGetters[1].get(tuple);

@@ -54,7 +54,7 @@ public class TimeBasedStore<T extends TimeEvent>
   private boolean isOuter=false;
   private transient List<T> unmatchedEvents = new ArrayList<T>();
 
-  protected Map<Long, Bucket> dirtyBuckets = new HashMap<Long, Bucket>();
+  protected transient Map<Long, Bucket> dirtyBuckets = new HashMap<Long, Bucket>();
 
   public TimeBasedStore()
   {
