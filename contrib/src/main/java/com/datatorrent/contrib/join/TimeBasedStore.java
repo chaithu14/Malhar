@@ -67,6 +67,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
   static transient final String PATH_SEPARATOR = "/";
   protected transient Configuration configuration;
   protected transient Map<Long, DTFileReader> readers = new HashMap<Long, DTFileReader>();
+  protected transient Map<Long, DTFileReader> updatedReaders = new HashMap<Long, DTFileReader>();
   protected transient ThreadPoolExecutor threadPoolExecutor;
   private transient long currentWID;
   private transient long mergeWID;
@@ -380,7 +381,9 @@ public class TimeBasedStore<T extends Event & Bucketable>
     if(mergeBuckets != null && mergeBuckets.size() != 0) {
 
       logger.info("End Window:  {} -> {}", bucketRoot, mergeBuckets.size());
-      for(long mergeBucketId: mergeBuckets) {
+      readers.putAll(updatedReaders);
+      updatedReaders.clear();
+      /*for(long mergeBucketId: mergeBuckets) {
         int bckIdx = (int) (mergeBucketId % noOfBuckets);
         Bucket bucket = buckets[bckIdx];
         if(bucket.bucketKey != mergeBucketId)
@@ -403,7 +406,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
           readers.put(bucket.bucketKey, tr);
           bucketWid.put(bckIdx, mergeWID);
         }
-      }
+      }*/
       mergeBuckets = null;
     }
 }
@@ -545,7 +548,8 @@ public class TimeBasedStore<T extends Event & Bucketable>
     //logger.info("StoreBucketData - 2 : {} -> {}", bucketRoot, bucketKey);
     if(storedData != null)
       sortedData.putAll(storedData);
-    Path dataFilePath = new Path(bucketRoot + PATH_SEPARATOR + bucketKey + PATH_SEPARATOR + windoId);
+    String path = bucketRoot + PATH_SEPARATOR + bucketKey + PATH_SEPARATOR + windoId;
+    Path dataFilePath = new Path(path);
     FSDataOutputStream dataStream = null;
     FileSystem fs = null;
     TFile.Writer writer = null;
@@ -566,6 +570,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
         //logger.info("----------Key: {} ", entry.getKey());
         writer.append(entry.getKey(), entry.getValue());
       }
+      updatedReaders.put(bucketKey, createDTReader(path));
       //logger.info("End StoreBucketData - 5 : {} -> {}", bucketRoot, bucketKey);
     } catch (IOException e) {
       logger.info("Danger - 4 : {} -> {} -> {}", bucketRoot, bucketKey, e);
