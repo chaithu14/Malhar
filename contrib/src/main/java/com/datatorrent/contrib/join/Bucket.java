@@ -61,7 +61,7 @@ public class Bucket<T extends Bucketable>
     if(listEvents == null) {
       unwrittenEvents.put(eventKey, Lists.newArrayList(event));
     } else {
-      unwrittenEvents.get(eventKey).add(event);
+      listEvents.add(event);
     }
   }
 

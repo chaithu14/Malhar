@@ -220,7 +220,7 @@ public class TimeBasedStore<T extends TimeEvent>
     for (; iterator.hasNext(); ) {
       long key = iterator.next();
       Bucket t = dirtyBuckets.get(key);
-      if(startOfBucketsInMillis + (t.bucketKey * noOfBuckets) < time) {
+      if(startOfBucketsInMillis + (t.bucketKey * bucketSpanInMillis) < time) {
         deleteBucket(t);
         iterator.remove();
       }
