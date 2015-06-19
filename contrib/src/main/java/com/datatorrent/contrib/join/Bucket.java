@@ -48,7 +48,7 @@ public class Bucket<T extends Bucketable>
   {
     isDataOnDiskLoaded = false;
     this.bucketKey = bucketKey;
-    bloomFilter = BloomFilter.create(Funnels.byteArrayFunnel(), 300000, 0.001);
+    bloomFilter = BloomFilter.create(Funnels.byteArrayFunnel(), 1000000, 0.001);
   }
 
   public void transferEvents()
@@ -94,12 +94,11 @@ public class Bucket<T extends Bucketable>
       List<T> listEvents = unwrittenEvents.get(eventKey);
       if(listEvents == null) {
         unwrittenEvents.put(eventKey, Lists.newArrayList(event));
+        bloomFilter.put(eventKey.toString().getBytes());
       } else {
         listEvents.add(event);
       }
     }
-    bloomFilter.put(eventKey.toString().getBytes());
-
   }
 
   public Map<Object, List<T>> getEvents() { return unwrittenEvents; }

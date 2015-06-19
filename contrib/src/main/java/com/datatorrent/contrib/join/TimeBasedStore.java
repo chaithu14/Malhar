@@ -571,7 +571,6 @@ public class TimeBasedStore<T extends Event & Bucketable>
         //logger.info("----------Key: {} ", entry.getKey());
         writer.append(entry.getKey(), entry.getValue());
       }
-      updatedReaders.put(bucketKey, createDTReader(path));
       //logger.info("End StoreBucketData - 5 : {} -> {}", bucketRoot, bucketKey);
     } catch (IOException e) {
       logger.info("Danger - 4 : {} -> {} -> {}", bucketRoot, bucketKey, e);
@@ -588,6 +587,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
 
       }
     }
+    updatedReaders.put(bucketKey, createDTReader(path));
   }
 
   private DTFileReader createDTReader(String path)
