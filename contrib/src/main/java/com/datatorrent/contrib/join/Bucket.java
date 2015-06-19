@@ -30,7 +30,7 @@ import java.util.Map;
  */
 public class Bucket<T extends Bucketable>
 {
-  private Map<Object, List<T>> unwrittenEvents;
+  protected Map<Object, List<T>> unwrittenEvents;
   public final long bucketKey;
 
   public Bucket() {
@@ -42,17 +42,12 @@ public class Bucket<T extends Bucketable>
     this.bucketKey = bucketKey;
   }
 
-  protected Object getEventKey(T event)
-  {
-    return event.getEventKey();
-  }
-
   /**
    * Add the given event into the unwritternEvents map
    * @param eventKey
    * @param event
    */
-  void addNewEvent(Object eventKey, T event)
+  protected void addNewEvent(Object eventKey, T event)
   {
     if (unwrittenEvents == null) {
       unwrittenEvents = Maps.newHashMap();
@@ -65,7 +60,17 @@ public class Bucket<T extends Bucketable>
     }
   }
 
+  /**
+   * Return the unwritten events in the bucket
+   * @return
+   */
   public Map<Object, List<T>> getEvents() { return unwrittenEvents; }
+
+  /**
+   * Return the list of events for the given key
+   * @param key
+   * @return
+   */
   public List<T> get(Object key) {
     return unwrittenEvents.get(key);
   }

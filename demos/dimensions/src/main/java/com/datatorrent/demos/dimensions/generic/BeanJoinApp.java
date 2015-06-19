@@ -27,17 +27,17 @@ public class BeanJoinApp implements StreamingApplication
 
   @Override public void populateDAG(DAG dag, Configuration conf)
   {
-    long timeInterval = 60000 * 10 * 2;
+    long timeInterval = 60000 * 60;
     long bucketTime = 60000 * 5;
     JsonSalesGenerator input = dag.addOperator("Input", JsonSalesGenerator.class);
     input.setAddProductCategory(false);
-    input.setMaxTuplesPerWindow(200);
+    input.setMaxTuplesPerWindow(500);
     input.setTuplesPerWindowDeviation(0);
     input.setTimeInterval(timeInterval);
     input.setTimeBucket(bucketTime);
 
     JsonProductGenerator input2 = dag.addOperator("Prodcut", JsonProductGenerator.class);
-    input2.setMaxTuplesPerWindow(200);
+    input2.setMaxTuplesPerWindow(500);
     input2.setTuplesPerWindowDeviation(0);
     input2.setTimeInterval(timeInterval);
     input2.setTimeBucket(bucketTime);
@@ -47,7 +47,7 @@ public class BeanJoinApp implements StreamingApplication
     joinOper.setRightStore(new InMemoryStore(timeInterval, (int) bucketTime));
     joinOper.setIncludeFieldStr("timestamp,customerId,productId,regionId,amount;productCategory");
     joinOper.setKeyFields("productId,productId");
-    joinOper.setTimeFields("timestamp,timestamp");
+    //joinOper.setTimeFields("timestamp,timestamp");
 
     joinOper.setOutputClass("com.datatorrent.demos.dimensions.generic.SalesEvent");
     CollectorModule console = dag.addOperator("Console", new CollectorModule());

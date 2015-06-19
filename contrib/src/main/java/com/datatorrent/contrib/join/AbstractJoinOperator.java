@@ -54,30 +54,32 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
   static final org.slf4j.Logger logger = LoggerFactory.getLogger(AbstractJoinOperator.class);
   // Stores for each of the input port
   private BackupStore store[] = (BackupStore[]) Array.newInstance(BackupStore.class, 2);
-  // Fields to compare from both the streams
 
   protected String[] timeFields;
 
   protected String[][] includeFields;
 
   private String includeFieldStr;
-
+  // Fields to compare from both the streams
   protected String[] keys;
+  // Strategy of Join operation, by default the option is inner join
   protected JoinStrategy strategy = JoinStrategy.INNER_JOIN;
 
-  public final transient DefaultOutputPort<List<T>> outputPort = new DefaultOutputPort<List<T>>();
-
+  // This represents whether the processing tuple is from left port or not
   protected Boolean isLeft;
+
+  public final transient DefaultOutputPort<List<T>> outputPort = new DefaultOutputPort<List<T>>();
 
   @Override
   public void setup(Context.OperatorContext context)
   {
     if(store[0] == null) {
-      logger.error("Left Store is Empty");
+      throw new RuntimeException("Left Store is Empty");
     }
     if(store[1] == null) {
-      logger.error("Right Store is Empty");
+      throw new RuntimeException("Right Store is Empty");
     }
+    // Checks whether the strategy is outer join and set it to store
     boolean isOuter = strategy.equals(JoinStrategy.LEFT_OUTER_JOIN) || strategy.equals(JoinStrategy.OUTER_JOIN);
     store[0].isOuterJoin(isOuter);
     isOuter = strategy.equals(JoinStrategy.RIGHT_OUTER_JOIN) || strategy.equals(JoinStrategy.OUTER_JOIN);
@@ -109,9 +111,13 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
     }
   };
 
+  /**
+   * Create the event with the given tuple. If it successfully inserted it into the store
+   * then it does the join operation
+   * @param tuple
+   */
   protected void processTuple(T tuple)
   {
-
     int idx = 0;
     if(!isLeft) {
       idx = 1;

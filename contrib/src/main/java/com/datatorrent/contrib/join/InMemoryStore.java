@@ -32,7 +32,7 @@ public class InMemoryStore extends TimeBasedStore<TimeEvent> implements BackupSt
   {
     super();
     setSpanTimeInMillis(spanTimeInMillis);
-    setBucketSpanInMillis((int)(spanTimeInMillis > (long)bucketSpanInMillis ? bucketSpanInMillis : spanTimeInMillis));
+    setBucketSpanInMillis(bucketSpanInMillis);
   }
 
   public void setup()

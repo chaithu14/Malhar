@@ -58,7 +58,7 @@ import org.codehaus.jackson.map.annotate.JsonSerialize;
 public class JsonSalesGenerator implements InputOperator
 {
   @Min(1)
-  private int maxProductId = 10000;
+  private int maxProductId = 500000;
   @Min(1)
   private int maxCustomerId = 1000000;
   @Min(1)

@@ -72,6 +72,11 @@ public class POJOJoinOperator extends AbstractJoinOperator
     super.processTuple(tuple);
   }
 
+  /**
+   * Populate the class and getters from the given tuple
+   * @param tuple
+   * @param isLeft
+   */
   private void setAndPopulateGetters(Object tuple, Boolean isLeft)
   {
     if(isLeft && leftClass == null) {

@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.validation.constraints.Min;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,11 +49,12 @@ public class TimeBasedStore<T extends TimeEvent>
   protected int bucketSpanInMillis ;
   protected long startOfBucketsInMillis;
   protected long endOBucketsInMillis;
-  private final transient Lock lock;
-  private Map<Object, Set<Long>> key2Buckets = new HashMap<Object, Set<Long>>();
-  private transient Timer bucketSlidingTimer;
   private boolean isOuter=false;
-  private transient List<T> unmatchedEvents = new ArrayList<T>();
+  private List<T> unmatchedEvents = new ArrayList<T>();
+
+  private Map<Object, Set<Long>> key2Buckets = new ConcurrentHashMap<Object, Set<Long>>();
+  private transient Timer bucketSlidingTimer;
+  private final transient Lock lock;
 
   protected transient Map<Long, Bucket> dirtyBuckets = new HashMap<Long, Bucket>();
 
@@ -75,8 +77,12 @@ public class TimeBasedStore<T extends TimeEvent>
     buckets = (Bucket<T>[]) Array.newInstance(Bucket.class, noOfBuckets);
   }
 
+  /**
+   * Compute the buckets and start the service
+   */
   public void setup()
   {
+    setBucketSpanInMillis((int)(spanTimeInMillis > (long)bucketSpanInMillis ? bucketSpanInMillis : spanTimeInMillis));
     if(buckets == null) {
       recomputeNumBuckets();
     }
@@ -174,7 +180,7 @@ public class TimeBasedStore<T extends TimeEvent>
     }
 
     // Insert the key into the key2Buckets map
-    Object key = bucket.getEventKey(event);
+    Object key = event.getEventKey();
     Set<Long> keyBuckets = key2Buckets.get(key);
     if(keyBuckets == null) {
       keyBuckets = new HashSet<Long>();
@@ -212,7 +218,7 @@ public class TimeBasedStore<T extends TimeEvent>
   }
 
   /**
-   * Remove the expired buckets. Check the endOfExpired BucketInMillis < expired time
+   * Remove the expired buckets.
    * @param time
    */
   void deleteExpiredBuckets(long time) {
