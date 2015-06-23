@@ -52,11 +52,11 @@ public class JsonProductGenerator implements InputOperator
 
   // Limit number of emitted tuples per window
   @Min(0)
-  private long maxTuplesPerWindow = 40000;
+  private long maxTuplesPerWindow = 40;
 
   // Maximum amount of deviation below the maximum tuples per window
   @Min(0)
-  private int tuplesPerWindowDeviation = 20000;
+  private int tuplesPerWindowDeviation = 0;
 
   // Number of windows to maintain the same deviation before selecting another
   @Min(1)
@@ -84,8 +84,8 @@ public class JsonProductGenerator implements InputOperator
   public final transient DefaultOutputPort<ProductEvent> outputPort = new DefaultOutputPort<ProductEvent>();
   private transient Timer slidingTimer;
   private long startTime = System.currentTimeMillis();
-  private long timeBucket;
-  private long timeInterval;
+  private long timeBucket = 60000;
+  private long timeInterval = 300000;
 
   @Override
   public void beginWindow(long windowId)

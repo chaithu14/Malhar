@@ -21,7 +21,7 @@ public class MapTimeBasedJoinOperator
     AbstractJoinOperator oper = new MapJoinOperator();
     oper.setLeftStore(new InMemoryStore(200, 200));
     oper.setRightStore(new InMemoryStore(200, 200));
-    oper.setIncludeFieldStr("ID,Name;OID,Amount");
+    oper.setIncludeFields("ID,Name;OID,Amount");
     oper.setKeyFields("ID,CID");
 
     oper.setup(null);

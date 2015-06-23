@@ -92,7 +92,7 @@ public class POJOTimeBasedJoinOperatorTest
     BackupStore store = new InMemoryStore(200, 200);
     oper.setLeftStore(kryo.copy(store));
     oper.setRightStore(kryo.copy(store));
-    oper.setIncludeFieldStr("ID,Name;OID,Amount");
+    oper.setIncludeFields("ID,Name;OID,Amount");
     oper.setKeyFields("ID,CID");
     oper.outputClass = CustOrder.class;
 
@@ -145,7 +145,7 @@ public class POJOTimeBasedJoinOperatorTest
     BackupStore store = new InMemoryStore(200, 200);
     oper.setLeftStore(kryo.copy(store));
     oper.setRightStore(kryo.copy(store));
-    oper.setIncludeFieldStr("ID,Name;OID,Amount");
+    oper.setIncludeFields("ID,Name;OID,Amount");
     oper.setKeyFields("ID,CID");
     oper.outputClass = CustOrder.class;
     oper.setStrategy("left_outer_join");
@@ -220,7 +220,7 @@ public class POJOTimeBasedJoinOperatorTest
     BackupStore store = new InMemoryStore(200, 200);
     oper.setLeftStore(kryo.copy(store));
     oper.setRightStore(kryo.copy(store));
-    oper.setIncludeFieldStr("ID,Name;OID,Amount");
+    oper.setIncludeFields("ID,Name;OID,Amount");
     oper.setKeyFields("ID,CID");
     oper.outputClass = CustOrder.class;
     oper.setStrategy("right_outer_join");
@@ -291,7 +291,7 @@ public class POJOTimeBasedJoinOperatorTest
     BackupStore store = new InMemoryStore(200, 200);
     oper.setLeftStore(kryo.copy(store));
     oper.setRightStore(kryo.copy(store));
-    oper.setIncludeFieldStr("ID,Name;OID,Amount");
+    oper.setIncludeFields("ID,Name;OID,Amount");
     oper.setKeyFields("ID,CID");
     oper.outputClass = CustOrder.class;
     oper.setStrategy("outer_join");

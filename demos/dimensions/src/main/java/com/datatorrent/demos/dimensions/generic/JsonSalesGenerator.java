@@ -71,8 +71,8 @@ public class JsonSalesGenerator implements InputOperator
   private double discountTiers[] = new double[] {0.0, 0.025, 0.05, 0.10, 0.15, 0.50};
   private double maxDiscountPercent = 0.75;
 
-  private long timeBucket;
-  private long timeInterval;
+  private long timeBucket = 60000;
+  private long timeInterval = 300000;
   // Should not be included by default - only used for testing when running without enrichment operator
   private boolean addProductCategory = false;
   @Min(1)
@@ -80,11 +80,11 @@ public class JsonSalesGenerator implements InputOperator
 
   // Limit number of emitted tuples per window
   @Min(0)
-  private long maxTuplesPerWindow = 40000;
+  private long maxTuplesPerWindow = 40;
 
   // Maximum amount of deviation below the maximum tuples per window
   @Min(0)
-  private int tuplesPerWindowDeviation = 20000;
+  private int tuplesPerWindowDeviation = 0;
 
   // Number of windows to maintain the same deviation before selecting another
   @Min(1)
@@ -415,8 +415,18 @@ public class JsonSalesGenerator implements InputOperator
     this.timeBucket = timeBucket;
   }
 
+  public long getTimeBucket()
+  {
+    return timeBucket;
+  }
+
   public void setTimeInterval(long timeInterval)
   {
     this.timeInterval = timeInterval;
+  }
+
+  public long getTimeInterval()
+  {
+    return timeInterval;
   }
 }

@@ -302,4 +302,14 @@ public class TimeBasedStore<T extends TimeEvent>
   {
     this.isOuter = isOuter;
   }
+
+  public long getSpanTimeInMillis()
+  {
+    return spanTimeInMillis;
+  }
+
+  public int getBucketSpanInMillis()
+  {
+    return bucketSpanInMillis;
+  }
 }

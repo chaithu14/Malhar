@@ -80,13 +80,5 @@ public class InMemoryStore extends TimeBasedStore<TimeEvent> implements BackupSt
     return super.put((TimeEvent)tuple);
   }
 
-  public void setSpanTimeInMillis(long spanTimeInMillis)
-  {
-    super.setSpanTimeInMillis(spanTimeInMillis);
-  }
 
-  public void setBucketSpanInMillis(int bucketSpanInMillis)
-  {
-    super.setBucketSpanInMillis(bucketSpanInMillis);
-  }
 }

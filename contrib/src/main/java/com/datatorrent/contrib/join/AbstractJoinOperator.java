@@ -21,7 +21,6 @@ import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.DefaultOutputPort;
 import com.datatorrent.api.Operator;
 import com.datatorrent.api.annotation.InputPortFieldAnnotation;
-import edu.umd.cs.findbugs.annotations.NonNull;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -60,6 +59,10 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
   protected String[][] includeFields;
 
   private String includeFieldStr;
+
+  private String keyFieldStr;
+
+  private String timeFieldStr;
   // Fields to compare from both the streams
   protected String[] keys;
   // Strategy of Join operation, by default the option is inner join
@@ -88,7 +91,7 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
     store[0].setup();
     store[1].setup();
 
-    populateIncludeFields();
+    populateFields();
   }
 
   @InputPortFieldAnnotation(optional = true)
@@ -126,6 +129,14 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
     if(store[idx].put(t)) {
       join(t, isLeft);
     }
+  }
+
+  private void populateFields()
+  {
+    populateIncludeFields();
+    populateKeyFields();
+    if(timeFieldStr != null)
+      populateTimeFields();
   }
   /**
    * Populate the fields from the includeFiledStr
@@ -231,14 +242,24 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
       return new TimeEvent(getKeyValue(keys[idx], tuple), Calendar.getInstance().getTimeInMillis(), tuple);
   }
 
-  public void setKeyFields(@NonNull String keyFields)
+  public void populateKeyFields()
   {
-    this.keys = keyFields.split(",");
+    this.keys = keyFieldStr.split(",");
   }
 
-  public void setIncludeFieldStr(String includeFieldStr)
+  public void setIncludeFields(String includeFieldStr)
   {
     this.includeFieldStr = includeFieldStr;
+  }
+
+  public String getIncludeFieldStr()
+  {
+    return includeFieldStr;
+  }
+
+  public JoinStrategy getStrategy()
+  {
+    return strategy;
   }
 
   public void setLeftStore(BackupStore lStore)
@@ -251,13 +272,47 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
     store[1] = rStore;
   }
 
+  public BackupStore getLeftStore()
+  {
+    return store[0];
+  }
+
+  public BackupStore getRightStore()
+  {
+    return store[1];
+  }
+
+  public String getKeyFields()
+  {
+    return keyFieldStr;
+  }
+
+  public void setKeyFields(String keyFieldStr)
+  {
+    this.keyFieldStr = keyFieldStr;
+  }
+
+  public String getTimeFields()
+  {
+    return timeFieldStr;
+  }
+
+  public void setTimeFields(String timeFieldStr)
+  {
+    this.timeFieldStr = timeFieldStr;
+  }
+
+  public String getIncludeFields()
+  {
+    return includeFieldStr;
+  }
+
   /**
    * Specify the comma separated time fields for both steams
-   * @param timeFields
    */
-  public void setTimeFields(String timeFields)
+  public void populateTimeFields()
   {
-    this.timeFields = timeFields.split(",");
+    this.timeFields = timeFieldStr.split(",");
   }
 
   public static enum JoinStrategy
