@@ -59,6 +59,7 @@ import org.apache.commons.lang3.ClassUtils;
 public class POJOJoinOperator extends AbstractJoinOperator
 {
   protected Class outputClass;
+  private String outputClassStr;
   protected transient Class leftClass;
   protected transient Class rightClass;
   private transient List<FieldObjectMap>[] fieldMap = (List<FieldObjectMap>[]) Array.newInstance((new LinkedList<FieldObjectMap>()).getClass(), 2);
@@ -130,10 +131,12 @@ public class POJOJoinOperator extends AbstractJoinOperator
       try {
         Field field = inputClass.getField(f);
         Class c ;
-        if(field.getType().isPrimitive())
-         c = ClassUtils.primitiveToWrapper(field.getType());
-        else
+        if(field.getType().isPrimitive()) {
+          c = ClassUtils.primitiveToWrapper(field.getType());
+        }
+        else {
           c = field.getType();
+        }
         FieldObjectMap fm = new FieldObjectMap();
         fm.get = PojoUtils.createGetter(inputClass, f, c);
         fm.set = PojoUtils.createSetter(outputClass, f, c);
@@ -209,17 +212,27 @@ public class POJOJoinOperator extends AbstractJoinOperator
     return Calendar.getInstance().getTimeInMillis();
   }
 
-  /**
-   * Load the output class
-   * @param outputClass
-   */
-  public void setOutputClass(String outputClass)
+  public void populateOutputClass()
   {
     try {
-      this.outputClass = this.getClass().getClassLoader().loadClass(outputClass);
+      this.outputClass = this.getClass().getClassLoader().loadClass(outputClassStr);
     } catch (ClassNotFoundException e) {
       throw new RuntimeException(e);
     }
+  }
+  /**
+   * Load the output class
+   * @param outputClassStr
+   */
+  public void setOutputClass(String outputClassStr)
+  {
+    this.outputClassStr = outputClassStr;
+    populateOutputClass();
+  }
+
+  public String getOutputClass()
+  {
+    return outputClassStr;
   }
 
   private class FieldObjectMap
