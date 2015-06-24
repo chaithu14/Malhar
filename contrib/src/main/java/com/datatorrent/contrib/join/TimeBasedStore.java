@@ -46,7 +46,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
   private static transient final Logger logger = LoggerFactory.getLogger(TimeBasedStore.class);
   @Min(1)
   protected int noOfBuckets;
-  protected Bucket<T>[] buckets;
+  protected transient Bucket<T>[] buckets;
   protected long expiryTimeInMillis;
   protected long spanTimeInMillis;
   protected int bucketSpanInMillis = 30000;
@@ -114,7 +114,7 @@ public class TimeBasedStore<T extends Event & Bucketable>
     this.writeSerde = new Kryo();
     this.writeSerde.register(ArrayList.class, new CollectionSerializer());
     //writeSerde.setClassLoader(classLoader);
-    startMergeService();
+    //startMergeService();
     startService();
 
   }
@@ -379,6 +379,21 @@ public class TimeBasedStore<T extends Event & Bucketable>
 
   public void endWindow()
   {
+    for(Long bKey : dirtyBuckets) {
+      int bckIdx = (int) (bKey % noOfBuckets);
+      Bucket bucket = buckets[bckIdx];
+      if(bucket == null) {
+        continue;
+      }
+      try {
+        bucket.wal.endWindow(currentWID);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }
+
+
+
     if(mergeBuckets != null && mergeBuckets.size() != 0) {
 
       logger.info("End Window:  {} -> {}", bucketRoot, mergeBuckets.size());
@@ -388,23 +403,6 @@ public class TimeBasedStore<T extends Event & Bucketable>
         if(bucket.bucketKey != mergeBucketId)
           continue;
         bucket.transferDataFromMemoryToStore();
-
-        /*DTFileReader bcktReader = readers.get(mergeBucketId);
-        if(bcktReader != null) {
-          try {
-            bcktReader.close();
-          } catch (IOException e) {
-            throw new RuntimeException(e);
-          }
-        }
-
-        String path = new String(bucketRoot + PATH_SEPARATOR + bucket.bucketKey + PATH_SEPARATOR + mergeWID);
-        DTFileReader tr = createDTReader(path);
-        if (tr != null) {
-          logger.info("Map Changed: {} -> {}", bucketRoot, path);
-          readers.put(bucket.bucketKey, tr);
-          bucketWid.put(bckIdx, mergeWID);
-        }*/
       }
       readers.putAll(updatedReaders);
       updatedReaders.clear();

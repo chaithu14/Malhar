@@ -31,13 +31,13 @@ public class BeanJoinApp implements StreamingApplication
     long bucketTime = 60000 * 5;
     JsonSalesGenerator input = dag.addOperator("Input", JsonSalesGenerator.class);
     input.setAddProductCategory(false);
-    input.setMaxTuplesPerWindow(500);
+    input.setMaxTuplesPerWindow(100);
     input.setTuplesPerWindowDeviation(0);
     input.setTimeInterval(timeInterval);
     input.setTimeBucket(bucketTime);
 
     JsonProductGenerator input2 = dag.addOperator("Prodcut", JsonProductGenerator.class);
-    input2.setMaxTuplesPerWindow(500);
+    input2.setMaxTuplesPerWindow(100);
     input2.setTuplesPerWindowDeviation(0);
     input2.setTimeInterval(timeInterval);
     input2.setTimeBucket(bucketTime);
