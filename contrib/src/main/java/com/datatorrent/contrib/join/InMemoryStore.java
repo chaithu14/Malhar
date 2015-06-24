@@ -43,7 +43,7 @@ public class InMemoryStore extends TimeBasedStore<TimeEvent> implements BackupSt
 
   @Override public void committed(long windowId)
   {
-
+    super.committed(windowId);
   }
 
   @Override public void checkpointed(long windowId)

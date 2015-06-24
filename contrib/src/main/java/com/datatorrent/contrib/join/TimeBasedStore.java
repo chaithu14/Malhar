@@ -26,6 +26,8 @@ import java.util.TreeMap;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -72,6 +74,9 @@ public class TimeBasedStore<T extends Event & Bucketable>
   private transient long currentWID;
   private transient long mergeWID;
   private transient String TMP_FILE = "._COPYING_";
+  private transient HDHTFileFSAccess bfs = new HDHTFileFSAccess();
+  private transient Executor writeExecutor;
+  private long flushSize = 1;
 
   public void setBucketRoot(String bucketRoot)
   {
@@ -116,7 +121,9 @@ public class TimeBasedStore<T extends Event & Bucketable>
     //writeSerde.setClassLoader(classLoader);
     //startMergeService();
     startService();
-
+    bfs.setBasePath(bucketRoot);
+    bfs.init();
+    writeExecutor = Executors.newSingleThreadScheduledExecutor(new NameableThreadFactory(this.getClass().getSimpleName() + "-Writer"));
   }
 
   private void recoveryBuckets()
@@ -385,14 +392,12 @@ public class TimeBasedStore<T extends Event & Bucketable>
       if(bucket == null) {
         continue;
       }
-      try {
+      /*try {
         bucket.wal.endWindow(currentWID);
       } catch (IOException e) {
         throw new RuntimeException(e);
-      }
+      }*/
     }
-
-
 
     if(mergeBuckets != null && mergeBuckets.size() != 0) {
 
@@ -415,10 +420,10 @@ public class TimeBasedStore<T extends Event & Bucketable>
     logger.info("Save - 0 : {} -> {} -> {}", bucketRoot, windowId, bucketKey);
     int bucketIdx = (int) (bucketKey % noOfBuckets);
     Bucket<T> bucket = buckets[bucketIdx];
-    if(bucket == null || bucket.getEvents() == null || bucket.getEvents().isEmpty()) {
+    if(bucket == null /*|| bucket.getEvents() == null || bucket.getEvents().isEmpty()*/) {
       return;
     }
-    bucket.transferEvents();
+    //bucket.transferEvents();
 
     Map<Object, List<T>> events = new HashMap<Object, List<T>>(bucket.getWrittenEvents());
     DTFileReader bcktReader = readers.get(bucketKey);
@@ -627,7 +632,9 @@ public class TimeBasedStore<T extends Event & Bucketable>
 
   protected Bucket<T> createBucket(long bucketKey)
   {
-    return new Bucket<T>(bucketKey);
+    Bucket<T> b = new Bucket<T>(bucketKey);
+    //b.wal = new HDHTWalManager(this.bfs, bucketKey);
+    return b;
   }
 
   /**
@@ -655,10 +662,44 @@ public class TimeBasedStore<T extends Event & Bucketable>
     bucketMergeTimer.cancel();
   }
 
-  public void checkpointed(long windowId)
+  public void checkpointed(final long windowId)
   {
+
   }
 
+  public void committed(long windowId)
+  {
+    logger.info("-----Committed W: {} -> {}", windowId, bucketRoot);
+    final long commitedWId = windowId;
+    for(final Long bcktKey : dirtyBuckets) {
+      int idx = (int) (bcktKey % noOfBuckets);
+      Bucket b = buckets[idx];
+      if(b == null || b.bucketKey != bcktKey) {
+        continue;
+      }
+      logger.info(" Commited Size - 1: {} -> {}", b.getEvents().size(), bucketRoot);
+      if(b.getEvents() != null && b.getEvents().size() < this.flushSize) {
+        continue;
+      }
+      b.transferEvents();
+      logger.info(" Commited Size - 2: {}", bucketRoot);
+      Runnable flushRunnable = new Runnable() {
+        @Override
+        public void run()
+        {
+          try {
+            //writeDataFiles(bucket);
+            saveData(bcktKey, commitedWId);
+          } catch (Throwable e) {
+            throw new RuntimeException("Write error: " + e.getMessage());
+          }
+        }
+      };
+      this.writeExecutor.execute(flushRunnable);
+    }
+    mergeBuckets = new HashSet<Long>(dirtyBuckets);
+    dirtyBuckets.clear();
+  }
   private class BucketWriteCallable implements Callable<Boolean>
   {
     final long bucketKey;
@@ -676,5 +717,15 @@ public class TimeBasedStore<T extends Event & Bucketable>
       saveData(bucketKey, windowId);
       return true;
     }
+  }
+
+  public long getFlushSize()
+  {
+    return flushSize;
+  }
+
+  public void setFlushSize(long flushSize)
+  {
+    this.flushSize = flushSize;
   }
 }

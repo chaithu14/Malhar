@@ -28,26 +28,30 @@ public class BeanJoinApp implements StreamingApplication
   @Override public void populateDAG(DAG dag, Configuration conf)
   {
     long timeInterval = 60000 * 10 * 2;
-    long bucketTime = 60000 * 5;
+    long bucketTime = 60000 * 1;
     JsonSalesGenerator input = dag.addOperator("Input", JsonSalesGenerator.class);
     input.setAddProductCategory(false);
-    input.setMaxTuplesPerWindow(100);
+    input.setMaxTuplesPerWindow(500);
     input.setTuplesPerWindowDeviation(0);
     input.setTimeInterval(timeInterval);
     input.setTimeBucket(bucketTime);
 
     JsonProductGenerator input2 = dag.addOperator("Prodcut", JsonProductGenerator.class);
-    input2.setMaxTuplesPerWindow(100);
+    input2.setMaxTuplesPerWindow(500);
     input2.setTuplesPerWindowDeviation(0);
     input2.setTimeInterval(timeInterval);
     input2.setTimeBucket(bucketTime);
 
     POJOJoinOperator joinOper = dag.addOperator("Join", new POJOJoinOperator());
-    joinOper.setLeftStore(new InMemoryStore(timeInterval, (int) bucketTime, "buckets/3/UP/"));
-    joinOper.setRightStore(new InMemoryStore(timeInterval, (int) bucketTime, "buckets/3/DOWN/"));
+    InMemoryStore lStore = new InMemoryStore(timeInterval, (int) bucketTime, "buckets/3/UP/");
+    lStore.setFlushSize(30000);
+    InMemoryStore rStore = new InMemoryStore(timeInterval, (int) bucketTime, "buckets/3/DOWN/");
+    rStore.setFlushSize(30000);
+    joinOper.setLeftStore(lStore);
+    joinOper.setRightStore(rStore);
     joinOper.setIncludeFieldStr("timestamp,customerId,productId,regionId,amount;productCategory");
     joinOper.setKeyFields("productId,productId");
-    joinOper.setTimeFields("timestamp,timestamp");
+    //joinOper.setTimeFields("timestamp,timestamp");
 
     joinOper.setOutputClass("com.datatorrent.demos.dimensions.generic.SalesEvent");
     CollectorModule console = dag.addOperator("Console", new CollectorModule());

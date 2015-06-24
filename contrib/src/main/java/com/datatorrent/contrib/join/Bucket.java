@@ -15,16 +15,10 @@
  */
 package com.datatorrent.contrib.join;
 
-import com.datatorrent.common.util.Slice;
-import com.datatorrent.contrib.hdht.HDHTWalManager;
 import com.datatorrent.lib.bucket.Bucketable;
-import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryo.io.Output;
 import com.google.common.collect.Lists;
 import com.google.common.hash.BloomFilter;
 import com.google.common.hash.Funnels;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,7 +37,7 @@ public class Bucket<T extends Bucketable>
   private Map<Object, List<T>> writtenEvents;
   private transient BloomFilter bloomFilter;
   private boolean isDataOnDiskLoaded;
-  protected HDHTWalManager wal;
+  //protected HDHTWalManager wal;
 
   public final long bucketKey;
 
@@ -56,13 +50,13 @@ public class Bucket<T extends Bucketable>
     isDataOnDiskLoaded = false;
     this.bucketKey = bucketKey;
     bloomFilter = BloomFilter.create(Funnels.byteArrayFunnel(), 1000000, 0.001);
-    wal = new HDHTWalManager(new HDHTFileFSAccess(), bucketKey);
+    //wal = new HDHTWalManager(new HDHTFileFSAccess(), bucketKey);
   }
 
   protected Bucket(long bucketKey, long maxSize)
   {
     this(bucketKey);
-    wal.setMaxWalFileSize(maxSize);
+    //wal.setMaxWalFileSize(maxSize);
   }
   public void transferEvents()
   {
@@ -109,7 +103,7 @@ public class Bucket<T extends Bucketable>
     } else {
       listEvents.add(event);
     }
-    Kryo kryo = new Kryo();
+    /*Kryo kryo = new Kryo();
     ByteArrayOutputStream bos = new ByteArrayOutputStream();
     Output output2 = new Output(bos);
     kryo.writeObject(output2, eventKey);
@@ -123,7 +117,7 @@ public class Bucket<T extends Bucketable>
       wal.append(keySlice, bos1.toByteArray());
     } catch (IOException e) {
       throw new RuntimeException(e);
-    }
+    }*/
   }
 
   public Map<Object, List<T>> getEvents() { return unwrittenEvents; }
