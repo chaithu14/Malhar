@@ -44,9 +44,9 @@ public class BeanJoinApp implements StreamingApplication
 
     POJOJoinOperator joinOper = dag.addOperator("Join", new POJOJoinOperator());
     InMemoryStore lStore = new InMemoryStore(timeInterval, (int) bucketTime, "buckets/3/UP/");
-    lStore.setFlushSize(30000);
+    lStore.setFlushSize(20000);
     InMemoryStore rStore = new InMemoryStore(timeInterval, (int) bucketTime, "buckets/3/DOWN/");
-    rStore.setFlushSize(30000);
+    rStore.setFlushSize(20000);
     joinOper.setLeftStore(lStore);
     joinOper.setRightStore(rStore);
     joinOper.setIncludeFieldStr("timestamp,customerId,productId,regionId,amount;productCategory");
