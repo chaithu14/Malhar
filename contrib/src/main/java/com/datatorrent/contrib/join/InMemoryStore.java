@@ -50,11 +50,6 @@ public class InMemoryStore extends TimeBasedStore<TimeEvent> implements BackupSt
 
   }
 
-  @Override public void endWindow()
-  {
-
-  }
-
   public void shutdown()
   {
     super.shutdown();

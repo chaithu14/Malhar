@@ -16,6 +16,7 @@
 package com.datatorrent.contrib.join;
 
 import com.datatorrent.lib.bucket.Event;
+import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -41,7 +42,7 @@ public class TimeBasedStore<T extends TimeEvent>
   private static transient final Logger logger = LoggerFactory.getLogger(TimeBasedStore.class);
   @Min(1)
   protected int noOfBuckets;
-  protected Bucket<T>[] buckets;
+  protected transient Bucket<T>[] buckets;
   @Min(1)
   protected long expiryTimeInMillis;
   @Min(1)
@@ -55,6 +56,9 @@ public class TimeBasedStore<T extends TimeEvent>
   private Map<Object, Set<Long>> key2Buckets = new ConcurrentHashMap<Object, Set<Long>>();
   private transient Timer bucketSlidingTimer;
   private final transient Lock lock;
+  protected transient StorageManager wal;
+  protected transient String bucketRoot;
+  protected long currentWId;
 
   protected transient Map<Long, Bucket> dirtyBuckets = new HashMap<Long, Bucket>();
 
@@ -87,6 +91,7 @@ public class TimeBasedStore<T extends TimeEvent>
       recomputeNumBuckets();
     }
     startService();
+    wal = new StorageManager(bucketRoot);
   }
 
   /**
@@ -128,6 +133,11 @@ public class TimeBasedStore<T extends TimeEvent>
     if(bucketKey < 0)
       return false;
     newEvent(bucketKey, tuple);
+    try {
+      wal.append(tuple);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
     return true;
   }
 
@@ -153,6 +163,20 @@ public class TimeBasedStore<T extends TimeEvent>
       }
     }
     return key;
+  }
+
+  public void beginWindow(long windowId)
+  {
+    currentWId = windowId;
+  }
+
+  public void endWindow()
+  {
+    try {
+      wal.endWindow(currentWId);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private static class Lock

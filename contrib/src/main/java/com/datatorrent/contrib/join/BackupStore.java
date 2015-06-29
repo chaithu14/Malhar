@@ -33,6 +33,8 @@ public interface BackupStore
 
   void endWindow();
 
+  void beginWindow(long windowId);
+
   /**
    * Get the key from the given tuple and with that key, get the tuples which satisfies the join constraint from the store.
    * @param tuple

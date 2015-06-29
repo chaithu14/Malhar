@@ -114,6 +114,12 @@ public abstract class AbstractJoinOperator<T> extends BaseOperator implements Op
     }
   };
 
+  @Override
+  public void beginWindow(long windowId)
+  {
+    store[0].beginWindow(windowId);
+    store[1].beginWindow(windowId);
+  }
   /**
    * Create the event with the given tuple. If it successfully inserted it into the store
    * then it does the join operation
