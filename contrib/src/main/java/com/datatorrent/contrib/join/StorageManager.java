@@ -18,23 +18,13 @@ package com.datatorrent.contrib.join;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Output;
 import java.io.Closeable;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.Map;
-
-import org.apache.commons.io.IOUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.datatorrent.common.util.Slice;
-import com.datatorrent.contrib.hdht.HDHT.WALReader;
-import com.datatorrent.contrib.hdht.HDHT.WALWriter;
 
 /**
  * Manages WAL for a bucket.
@@ -84,7 +74,7 @@ public class StorageManager implements Closeable
 
   /* Maximum number of bytes per WAL file,
    * default is 128M */
-  transient long maxWalFileSize = 128 * 1024 * 1024;
+  transient long maxWalFileSize = 2 * 1024 * 1024;
 
   /* The class responsible writing WAL entry to file */
   transient HDHTStorageWriter writer;
@@ -107,6 +97,7 @@ public class StorageManager implements Closeable
 
   public StorageManager(String bucketRoot) {
     this.bucketRoot = bucketRoot;
+    walFileId = 0;
   }
 
 
@@ -114,7 +105,7 @@ public class StorageManager implements Closeable
   public void append(Object value) throws IOException
   {
     if (writer == null)
-      //writer = new HDFSWalWriter(bucketKey, WAL_FILE_PREFIX + walFileId);
+      writer = new HDHTStorageWriter(bucketRoot, WAL_FILE_PREFIX + walFileId);
 
     writer.append(value);
     /*long bytes = key.length + value.length + 2 * 4;
@@ -152,6 +143,7 @@ public class StorageManager implements Closeable
     flushedWid = windowId;
     walSize = writer.logSize();
 
+    logger.info("writer.logSize: {} -> {}", bucketRoot, writer.logSize());
     /* Roll over log, if we have crossed the log size */
     if (maxWalFileSize > 0 && writer.logSize() > maxWalFileSize) {
       logger.info("Rolling over log {} windowid {}", writer, windowId);
@@ -164,7 +156,6 @@ public class StorageManager implements Closeable
 
   /**
    * Remove files older than recoveryStartWalFileId.
-   * @param recoveryStartWalFileId
    */
   /*public void cleanup(long recoveryStartWalFileId)
   {
@@ -308,7 +299,7 @@ public class StorageManager implements Closeable
     }
     public long logSize()
     {
-      return output.position();
+      return output.total();
     }
 
     public void flush()

@@ -57,7 +57,7 @@ public class TimeBasedStore<T extends TimeEvent>
   private transient Timer bucketSlidingTimer;
   private final transient Lock lock;
   protected transient StorageManager wal;
-  protected transient String bucketRoot;
+  protected String bucketRoot;
   protected long currentWId;
 
   protected transient Map<Long, Bucket> dirtyBuckets = new HashMap<Long, Bucket>();
@@ -335,5 +335,15 @@ public class TimeBasedStore<T extends TimeEvent>
   public int getBucketSpanInMillis()
   {
     return bucketSpanInMillis;
+  }
+
+  public String getBucketRoot()
+  {
+    return bucketRoot;
+  }
+
+  public void setBucketRoot(String bucketRoot)
+  {
+    this.bucketRoot = bucketRoot;
   }
 }
