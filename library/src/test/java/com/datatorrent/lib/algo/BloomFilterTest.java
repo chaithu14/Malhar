@@ -15,26 +15,14 @@
  */
 package com.datatorrent.lib.algo;
 
-import java.io.File;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-
-import com.datatorrent.common.util.Slice;
 import com.datatorrent.lib.algo.bloomFilter.BloomFilterOperator;
 import com.datatorrent.lib.util.TestUtils;
 import com.esotericsoftware.kryo.Kryo;
-import com.google.common.util.concurrent.MoreExecutors;
+import java.io.File;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
-
-import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.datatorrent.lib.testbench.CollectorTestSink;
 
 /**
  *
