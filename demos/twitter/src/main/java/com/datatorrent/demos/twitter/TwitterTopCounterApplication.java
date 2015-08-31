@@ -15,11 +15,6 @@
  */
 package com.datatorrent.demos.twitter;
 
-import java.net.URI;
-
-import org.apache.commons.lang.StringUtils;
-import org.apache.hadoop.conf.Configuration;
-
 import com.datatorrent.api.Context;
 import com.datatorrent.api.DAG;
 import com.datatorrent.api.DAG.Locality;
@@ -27,20 +22,21 @@ import com.datatorrent.api.Operator;
 import com.datatorrent.api.Operator.OutputPort;
 import com.datatorrent.api.StreamingApplication;
 import com.datatorrent.api.annotation.ApplicationAnnotation;
-
+import com.datatorrent.common.partitioner.StatelessPartitioner;
 import com.datatorrent.contrib.twitter.TwitterSampleInput;
 import com.datatorrent.lib.algo.UniqueCounter;
 import com.datatorrent.lib.appdata.schemas.SchemaUtils;
 import com.datatorrent.lib.appdata.snapshot.AppDataSnapshotServerMap;
+import com.datatorrent.lib.io.ConsoleOutputOperator;
 import com.datatorrent.lib.io.PubSubWebSocketAppDataQuery;
 import com.datatorrent.lib.io.PubSubWebSocketAppDataResult;
-import com.datatorrent.lib.io.ConsoleOutputOperator;
-import com.datatorrent.lib.io.PubSubWebSocketOutputOperator;
-
+import com.datatorrent.lib.util.KeyValPair;
 import com.google.common.collect.Maps;
-
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang.StringUtils;
+import org.apache.hadoop.conf.Configuration;
 /**
  * Twitter Demo Application: <br>
  * This demo application samples random public status from twitter, send to url
@@ -166,7 +162,7 @@ public class TwitterTopCounterApplication implements StreamingApplication
     // Setup a node to count the unique urls within a window.
     UniqueCounter<String> uniqueCounter = dag.addOperator("UniqueURLCounter", new UniqueCounter<String>());
     // Get the aggregated url counts and count them over last 5 mins.
-    dag.setAttribute(uniqueCounter, Context.OperatorContext.APPLICATION_WINDOW_COUNT, 600);
+    dag.setAttribute(uniqueCounter.count.getUnifier(), Context.OperatorContext.PARTITIONER, new StatelessPartitioner<UniqueCounter<KeyValPair<String, Object>>>(3));
     dag.setAttribute(uniqueCounter, Context.OperatorContext.SLIDE_BY_WINDOW_COUNT, 1);
 
 

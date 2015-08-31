@@ -19,12 +19,15 @@ import java.util.HashMap;
 import java.util.Map;
 
 import com.datatorrent.api.DefaultOutputPort;
+import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.Context.OperatorContext;
 import com.datatorrent.api.Operator.Unifier;
 
 import com.datatorrent.demos.machinedata.data.AverageData;
 import com.datatorrent.demos.machinedata.data.MachineKey;
 import com.datatorrent.lib.util.KeyHashValPair;
+import com.datatorrent.api.StreamCodec;
+import com.datatorrent.lib.codec.JavaSerializationStreamCodec;
 
 /**
  * This class calculates the partial sum and count for a given key
@@ -38,6 +41,43 @@ public class MachineInfoAveragingUnifier implements Unifier<KeyHashValPair<Machi
   private Map<MachineKey, AverageData> sums = new HashMap<MachineKey, AverageData>();
   public final transient DefaultOutputPort<KeyHashValPair<MachineKey, AverageData>> outputPort = new DefaultOutputPort<KeyHashValPair<MachineKey, AverageData>>();
 
+  public static class DefaultPartitionCodec<MachineKey, AverageData> extends JavaSerializationStreamCodec<KeyHashValPair<MachineKey, AverageData>> 
+  {
+    /**
+     * A codec to enable partitioning to be done by key
+     */
+    @Override
+    public int getPartition(KeyHashValPair<MachineKey, AverageData> o)
+    {
+      return o.getKey().hashCode();
+    }
+  }
+  /**
+   * A codec to enable partitioning to be done by key
+   */
+  @SuppressWarnings({ "unchecked", "rawtypes" })
+  public StreamCodec<KeyHashValPair<MachineKey, AverageData>> getKeyValPairStreamCodec()
+  {
+    return new DefaultPartitionCodec();
+    /*Class c = DefaultPartitionCodec.class;
+    return (Class<? extends StreamCodec<KeyHashValPair<MachineKey, AverageData>>>)c;*/
+  }
+  public final transient DefaultInputPort<KeyHashValPair<MachineKey, AverageData>> sinput = new DefaultInputPort<KeyHashValPair<MachineKey, AverageData>>()
+  {
+	  /**
+	   * Reference counts tuples
+	   */
+	  @Override
+		  public void process(KeyHashValPair<MachineKey, AverageData> tuple)
+		  {
+			  process(tuple);
+		  }
+	   @Override
+		  public StreamCodec<KeyHashValPair<MachineKey, AverageData>> getStreamCodec()
+		  {
+			  return getKeyValPairStreamCodec();
+		  }
+  };
   @Override
   public void beginWindow(long arg0)
   {

@@ -15,12 +15,13 @@
  */
 package com.datatorrent.demos.wordcount;
 
-import com.datatorrent.api.annotation.ApplicationAnnotation;
-import com.datatorrent.api.StreamingApplication;
+import com.datatorrent.api.Context;
 import com.datatorrent.api.DAG;
+import com.datatorrent.api.StreamingApplication;
+import com.datatorrent.api.annotation.ApplicationAnnotation;
+import com.datatorrent.common.partitioner.StatelessPartitioner;
 import com.datatorrent.lib.algo.UniqueCounter;
 import com.datatorrent.lib.io.ConsoleOutputOperator;
-
 import org.apache.hadoop.conf.Configuration;
 
 /**
@@ -101,8 +102,5 @@ public class Application implements StreamingApplication
     dag.addStream("wordinput-count", input.outputPort, wordCount.data);
     ConsoleOutputOperator consoleOperator = dag.addOperator("console", new ConsoleOutputOperator());
     dag.addStream("count-console",wordCount.count, consoleOperator.input);
-
   }
-
-
 }

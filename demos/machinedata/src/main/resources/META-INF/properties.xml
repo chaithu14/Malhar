@@ -32,6 +32,16 @@
     </name>
     <value>true</value>
   </property>
+   <property>
+      <name>dt.application.MachineDataDemo.operator.Aggregator.outputport.outputPort.unifier.attr.PARTITIONER
+      </name>
+      <value>com.datatorrent.lib.partitioner.StatelessPartitioner:2</value>
+   </property>
+   <property>
+      <name>dt.application.MachineDataDemo.operator.Aggregator.attr.PARTITIONER
+      </name>
+      <value>com.datatorrent.lib.partitioner.StatelessPartitioner:2</value>
+   </property>
   <property>
     <name>dt.application.MachineDataDemo.operator.Aggregator.attr.APPLICATION_WINDOW_COUNT
     </name>

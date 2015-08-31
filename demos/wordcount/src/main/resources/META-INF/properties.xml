@@ -9,4 +9,34 @@
 		<description>Specify container locality for the viewtuplecount stream
 		</description>
 	</property>
+	<property>
+		<name>dt.application.WordCountUnifierDemo.operator.wordinput.fileName</name>
+		<value>samplefile.txt</value>
+	</property>
+	<!--property>
+		<name>dt.application.WordCountUnifierDemo.operator.count.outputport.count.unifier.attr.PARTITIONER
+		</name>
+		<value>com.datatorrent.common.partitioner.StatelessPartitioner:2</value>
+	</property!-->
+	<property>
+		<name>dt.application.WordCountUnifierDemo.operator.count.attr.PARTITIONER
+		</name>
+		<value>com.datatorrent.common.partitioner.StatelessPartitioner:3</value>
+	</property>
+	<!--property>
+		<name>dt.application.WordCountUnifierDemo.operator.count.inputport.data.attr.PARTITION_PARALLEL
+		</name>
+		<value>true</value>
+	</property!-->
+	<!--property>
+		<name>dt.application.WordCountUnifierDemo.operator.count.outputport.count.attr.UNIFIER_PARTITION_COUNT
+		</name>
+		<value>2</value>
+	</property!-->
+	<property>
+		<name>dt.application.WordCountUnifierDemo.stream.wordinput.count.locality</name>
+		<value>CONTAINER_LOCAL</value>
+		<description>Specify container locality for the viewtuplecount stream
+		</description>
+	</property>
 </configuration>
