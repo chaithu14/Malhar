@@ -13,7 +13,7 @@ public class S3FileCopyOutputModule extends FSCopyOutputModule
   @Override
   public BlockWriter createBlockWriter()
   {
-    return new BlockWriter();
+    return new S3BlockWriter();
   }
 
   @Override

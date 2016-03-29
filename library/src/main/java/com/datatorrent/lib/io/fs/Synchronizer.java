@@ -290,7 +290,7 @@ public class Synchronizer extends BaseOperator
     public StitchBlockMetaData(FileBlockMetadata fmd, String sourceRelativePath, boolean isLastBlockSource)
     {
       super(fmd.getFilePath(), fmd.getBlockId(), fmd.getOffset(), fmd.getLength(), fmd.isLastBlock(),
-          fmd.getPreviousBlockId());
+          fmd.getPreviousBlockId(), fmd.getPartId());
       this.sourceRelativePath = sourceRelativePath;
       this.isLastBlockSource = isLastBlockSource;
     }

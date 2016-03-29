@@ -777,7 +777,7 @@ public class FileSplitter implements InputOperator, Operator.CheckpointListener
 
             FileInfo info;
             if(rootPath == null) {
-             info =parentStatus.isDirectory() ?
+             info = parentStatus.isDirectory() ?
                 new FileInfo(parentPathStr, childPath.getName(), parentStatus.getModificationTime()) :
                 new FileInfo(null, childPathStr, parentStatus.getModificationTime());
             }

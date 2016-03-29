@@ -253,7 +253,13 @@ public abstract class AbstractBlockReader<R, B extends BlockMetadata, STREAM ext
       //If the record is partial then ignore the record.
       if (record != null) {
         counters.getCounter(ReaderCounterKeys.RECORDS).increment();
-        messages.emit(new ReaderRecord<>(blockMetadata.getBlockId(), record));
+        //messages.emit(new ReaderRecord<>(blockMetadata.getBlockId(), record));
+        if (blockMetadata instanceof BlockMetadata.FileBlockMetadata) {
+          BlockMetadata.FileBlockMetadata fileBlockMetadata = (BlockMetadata.FileBlockMetadata)blockMetadata;
+          messages.emit(new ReaderRecord<>(blockMetadata.getBlockId(), record, fileBlockMetadata.getFilePath(), fileBlockMetadata.getPartId()));
+        } else {
+          messages.emit(new ReaderRecord<>(blockMetadata.getBlockId(), record));
+        }
       }
     }
   }
@@ -539,18 +545,32 @@ public abstract class AbstractBlockReader<R, B extends BlockMetadata, STREAM ext
   {
     private final long blockId;
     private final R record;
+    private final String filePath;
+    private final int partNo;
 
     @SuppressWarnings("unused")
     private ReaderRecord()
     {
       this.blockId = -1;
       this.record = null;
+      this.filePath = "";
+      this.partNo = 0;
     }
 
     public ReaderRecord(long blockId, R record)
     {
       this.blockId = blockId;
       this.record = record;
+      this.filePath = "";
+      this.partNo = 0;
+    }
+
+    public ReaderRecord(long blockId, R record, String filePath, int partNo)
+    {
+      this.blockId = blockId;
+      this.record = record;
+      this.filePath = filePath;
+      this.partNo = partNo;
     }
 
     public long getBlockId()
@@ -563,6 +583,15 @@ public abstract class AbstractBlockReader<R, B extends BlockMetadata, STREAM ext
       return record;
     }
 
+    public String getFilePath()
+    {
+      return filePath;
+    }
+
+    public int getPartNo()
+    {
+      return partNo;
+    }
   }
 
   public enum ReaderCounterKeys

@@ -173,6 +173,7 @@ public abstract class AbstractFileSplitter extends BaseOperator
     fileBlockMetadata.setOffset(pos);
     fileBlockMetadata.setLength(lengthOfFileInBlock);
     fileBlockMetadata.setLastBlock(isLast);
+    fileBlockMetadata.setPartId(blockNumber);
     fileBlockMetadata.setPreviousBlockId(blockNumber == 1 ? -1 : fileMetadata.getBlockIds()[blockNumber - 2]);
 
     return fileBlockMetadata;

@@ -56,18 +56,22 @@ public abstract class FSCopyOutputModule implements Module
 
   public abstract FileMerger createFileMerger();
 
+  public BlockWriter blockWriter;
+  public Synchronizer synchronizer;
+  public FileMerger merger;
+
   @Override
   public void populateDAG(DAG dag, Configuration conf)
   {
     //Defining DAG
-    BlockWriter blockWriter = dag.addOperator("BlockWriter", createBlockWriter());
-    Synchronizer synchronizer = dag.addOperator("BlockSynchronizer", createSynchronizer());
+    blockWriter = dag.addOperator("BlockWriter", createBlockWriter());
+    synchronizer = dag.addOperator("BlockSynchronizer", createSynchronizer());
 
     dag.setInputPortAttribute(blockWriter.input, Context.PortContext.PARTITION_PARALLEL, true);
     dag.setInputPortAttribute(blockWriter.blockMetadataInput, Context.PortContext.PARTITION_PARALLEL, true);
     dag.addStream("CompletedBlockmetadata", blockWriter.blockMetadataOutput, synchronizer.blocksMetadataInput);
 
-    FileMerger merger = dag.addOperator("FileMerger", createFileMerger());
+    merger = dag.addOperator("FileMerger", createFileMerger());
     dag.addStream("MergeTrigger", synchronizer.trigger, merger.input);
 
     //Setting operator properties

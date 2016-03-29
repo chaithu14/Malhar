@@ -68,11 +68,15 @@ public class BlockWriter extends AbstractFileOutputOperator<AbstractBlockReader.
     @Override
     public void process(BlockMetadata.FileBlockMetadata blockMetadata)
     {
-      blockMetadatas.add(blockMetadata);
+      processBlockMetadataInput(blockMetadata);
       LOG.debug("received blockId {} for file {} ", blockMetadata.getBlockId(), blockMetadata.getFilePath());
     }
   };
 
+  public void processBlockMetadataInput(BlockMetadata.FileBlockMetadata blockMetadata)
+  {
+    blockMetadatas.add(blockMetadata);
+  }
   /**
    * Output port to send Block meta data to downstream operator
    */
