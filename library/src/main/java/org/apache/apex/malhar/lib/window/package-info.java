@@ -16,25 +16,5 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+@org.apache.hadoop.classification.InterfaceStability.Evolving
 package org.apache.apex.malhar.lib.window;
-
-import org.apache.hadoop.classification.InterfaceStability;
-
-/**
- * This is the interface for accumulation when joining two streams.
- *
- * @since 3.5.0
- */
-@InterfaceStability.Evolving
-public interface JoinAccumulation<InputT1, InputT2, AccumT, OutputT> extends Accumulation<InputT1, AccumT, OutputT>
-{
-  /**
-   * Accumulate the second input type to the accumulated value
-   *
-   * @param accumulatedValue
-   * @param input
-   * @return
-   */
-  AccumT accumulate2(AccumT accumulatedValue, InputT2 input);
-
-}
