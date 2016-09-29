@@ -16,25 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.apex.malhar.lib.window;
+package org.apache.apex.malhar.lib.window.accumulation;
 
-import org.apache.hadoop.classification.InterfaceStability;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 
 /**
- * This is the interface for accumulation when joining multiple streams.
- *
- * @since 3.5.0
+ * CoGroup Join Accumulation.
  */
-@InterfaceStability.Evolving
-public interface JoinAccumulation<InputT1, InputT2, AccumT, OutputT> extends Accumulation<InputT1, AccumT, OutputT>
+public class CoGroup<T> extends Combine<T>
 {
-  /**
-   * Accumulate the second input type to the accumulated value
-   *
-   * @param accumulatedValue
-   * @param input
-   * @return
-   */
-  AccumT accumulate2(AccumT accumulatedValue, InputT2 input);
+  public CoGroup()
+  {
+    //for kryo
+  }
 
+
+  @Override
+  public List<List<T>> getOutput(List<Set<T>> accumulatedValue)
+  {
+    List<List<T>> result = new ArrayList<>();
+    for (int i = 0; i < 2; i++) {
+      result.add(new ArrayList<T>(accumulatedValue.get(i)));
+    }
+    return result;
+  }
 }

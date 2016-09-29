@@ -18,23 +18,13 @@
  */
 package org.apache.apex.malhar.lib.window;
 
-import org.apache.hadoop.classification.InterfaceStability;
-
 /**
- * This is the interface for accumulation when joining multiple streams.
- *
- * @since 3.5.0
+ * Interface for Join Windowed Operator.
  */
-@InterfaceStability.Evolving
-public interface JoinAccumulation<InputT1, InputT2, AccumT, OutputT> extends Accumulation<InputT1, AccumT, OutputT>
+public interface JoinWindowedOperator<InputT1, InputT2>
+    extends WindowedOperator<InputT1>
 {
-  /**
-   * Accumulate the second input type to the accumulated value
-   *
-   * @param accumulatedValue
-   * @param input
-   * @return
-   */
-  AccumT accumulate2(AccumT accumulatedValue, InputT2 input);
+  void accumulateTuple2(Tuple.WindowedTuple<InputT2> tuple);
 
+  void processWatermark2(ControlTuple.Watermark watermark);
 }
