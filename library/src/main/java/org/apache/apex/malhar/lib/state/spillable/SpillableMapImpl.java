@@ -26,8 +26,10 @@ import java.util.Set;
 import javax.validation.constraints.NotNull;
 
 import org.apache.apex.malhar.lib.state.BucketedState;
+import org.apache.apex.malhar.lib.state.managed.TimeExtractor;
 import org.apache.apex.malhar.lib.utils.serde.Serde;
 import org.apache.apex.malhar.lib.utils.serde.SliceUtils;
+import org.apache.commons.collections.map.HashedMap;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -53,6 +55,8 @@ public class SpillableMapImpl<K, V> implements Spillable.SpillableMap<K, V>, Spi
 {
   private transient WindowBoundedMapCache<K, V> cache = new WindowBoundedMapCache<>();
   private transient MutableInt tempOffset = new MutableInt();
+
+  private transient TimeExtractor<K> timeExtractor;
 
   @NotNull
   private SpillableStateStore store;
@@ -90,6 +94,16 @@ public class SpillableMapImpl<K, V> implements Spillable.SpillableMap<K, V>, Spi
     this.serdeValue = Preconditions.checkNotNull(serdeValue);
   }
 
+  public SpillableMapImpl(SpillableStateStore store, byte[] identifier, Serde<K, Slice> serdeKey,
+      Serde<V, Slice> serdeValue, TimeExtractor<K> timeExtractor)
+  {
+    this.store = Preconditions.checkNotNull(store);
+    this.identifier = Preconditions.checkNotNull(identifier);
+    this.serdeKey = Preconditions.checkNotNull(serdeKey);
+    this.serdeValue = Preconditions.checkNotNull(serdeValue);
+    this.timeExtractor = timeExtractor;
+  }
+
   public SpillableStateStore getStore()
   {
     return this.store;
@@ -124,6 +138,8 @@ public class SpillableMapImpl<K, V> implements Spillable.SpillableMap<K, V>, Spi
   {
     K key = (K)o;
 
+    long storeBucket = bucket;
+
     if (cache.getRemovedKeys().contains(key)) {
       return null;
     }
@@ -134,13 +150,14 @@ public class SpillableMapImpl<K, V> implements Spillable.SpillableMap<K, V>, Spi
       return val;
     }
 
-    Slice valSlice = store.getSync(bucket, SliceUtils.concatenate(identifier, serdeKey.serialize(key)));
+    Slice valSlice = store.getSync(storeBucket, SliceUtils.concatenate(identifier, serdeKey.serialize(key)));
 
     if (valSlice == null || valSlice == BucketedState.EXPIRED || valSlice.length == 0) {
       return null;
     }
 
     tempOffset.setValue(0);
+    //TODO put the get value to cache as well?
     return serdeValue.deserialize(valSlice, tempOffset);
   }
 
@@ -212,19 +229,28 @@ public class SpillableMapImpl<K, V> implements Spillable.SpillableMap<K, V>, Spi
   @Override
   public void beginWindow(long windowId)
   {
+    if (timeExtractor != null) {
+      timeExtractor.beginWindow(windowId);
+    }
   }
 
   @Override
   public void endWindow()
   {
     for (K key: cache.getChangedKeys()) {
-      store.put(this.bucket, SliceUtils.concatenate(identifier, serdeKey.serialize(key)),
+      long actualBucket = timeExtractor != null ? timeExtractor.getTime(key) : bucket;
+      store.put(actualBucket, SliceUtils.concatenate(identifier, serdeKey.serialize(key)),
           serdeValue.serialize(cache.get(key)));
     }
 
     for (K key: cache.getRemovedKeys()) {
-      store.put(this.bucket, SliceUtils.concatenate(identifier, serdeKey.serialize(key)),
+      long actualBucket = timeExtractor != null ? timeExtractor.getTime(key) : bucket;
+      store.put(actualBucket, SliceUtils.concatenate(identifier, serdeKey.serialize(key)),
           new Slice(ArrayUtils.EMPTY_BYTE_ARRAY));
+    }
+
+    if (timeExtractor != null) {
+      timeExtractor.endWindow();
     }
 
     cache.endWindow();
