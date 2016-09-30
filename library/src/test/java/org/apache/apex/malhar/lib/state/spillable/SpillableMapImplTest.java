@@ -41,28 +41,8 @@ public class SpillableMapImplTest
 {
   public static final byte[] ID1 = new byte[]{(byte)0};
   public static final byte[] ID2 = new byte[]{(byte)1};
-  public static final long basetime = System.currentTimeMillis() - 7200000;
-  public static final TimeExtractor<String> TE = new TimeExtractor<String>()
-  {
 
-    @Override
-    public long getTime(String s)
-    {
-      return (s.toCharArray()[0] - 'a') * 1000 + basetime;
-    }
-
-    @Override
-    public void beginWindow(long windowId)
-    {
-
-    }
-
-    @Override
-    public void endWindow()
-    {
-
-    }
-  };
+  public static final TestStringTimeExtractor TE = new TestStringTimeExtractor();
 
   private SpillableStateStore store;
 
@@ -418,7 +398,6 @@ public class SpillableMapImplTest
   public void recoveryWithManagedStateTest(String opt) throws Exception
   {
     setup(opt);
-    SerdeStringSlice sss = new SerdeStringSlice();
 
     SpillableMapImpl<String, String> map1 = null;
     if (te == null) {

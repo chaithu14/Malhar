@@ -29,7 +29,6 @@ import org.apache.apex.malhar.lib.state.BucketedState;
 import org.apache.apex.malhar.lib.state.managed.TimeExtractor;
 import org.apache.apex.malhar.lib.utils.serde.Serde;
 import org.apache.apex.malhar.lib.utils.serde.SliceUtils;
-import org.apache.commons.collections.map.HashedMap;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.mutable.MutableInt;
 import org.apache.hadoop.classification.InterfaceStability;
@@ -56,7 +55,7 @@ public class SpillableMapImpl<K, V> implements Spillable.SpillableMap<K, V>, Spi
   private transient WindowBoundedMapCache<K, V> cache = new WindowBoundedMapCache<>();
   private transient MutableInt tempOffset = new MutableInt();
 
-  private transient TimeExtractor<K> timeExtractor;
+  private TimeExtractor<K> timeExtractor;
 
   @NotNull
   private SpillableStateStore store;
@@ -94,6 +93,16 @@ public class SpillableMapImpl<K, V> implements Spillable.SpillableMap<K, V>, Spi
     this.serdeValue = Preconditions.checkNotNull(serdeValue);
   }
 
+  /**
+   *
+   * Creats a {@link SpillableMapImpl}.
+   * @param store The {@link SpillableStateStore} in which to spill to.
+   * @param identifier The Id of this {@link SpillableMapImpl}.
+   * {@link SpillableMapImpl} in the provided {@link SpillableStateStore}.
+   * @param serdeKey The {@link Serde} to use when serializing and deserializing keys.
+   * @param serdeKey The {@link Serde} to use when serializing and deserializing values.
+   * @param timeExtractor Extract time from the each element and use it to decide where the data goes
+   */
   public SpillableMapImpl(SpillableStateStore store, byte[] identifier, Serde<K, Slice> serdeKey,
       Serde<V, Slice> serdeValue, TimeExtractor<K> timeExtractor)
   {
@@ -148,6 +157,10 @@ public class SpillableMapImpl<K, V> implements Spillable.SpillableMap<K, V>, Spi
 
     if (val != null) {
       return val;
+    }
+
+    if (timeExtractor != null) {
+      storeBucket = timeExtractor.getTime(key);
     }
 
     Slice valSlice = store.getSync(storeBucket, SliceUtils.concatenate(identifier, serdeKey.serialize(key)));
