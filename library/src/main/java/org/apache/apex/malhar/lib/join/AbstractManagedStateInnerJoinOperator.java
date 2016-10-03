@@ -25,6 +25,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 
 import org.joda.time.Duration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import org.apache.apex.malhar.lib.state.managed.ManagedStateMultiValueImpl;
 import org.apache.apex.malhar.lib.state.managed.ManagedTimeStateMultiValue;
@@ -50,6 +52,7 @@ import com.datatorrent.lib.fileaccess.FileAccessFSImpl;
 public abstract class AbstractManagedStateInnerJoinOperator<K,T> extends AbstractInnerJoinOperator<K,T> implements
     Operator.CheckpointNotificationListener, Operator.IdleTimeHandler
 {
+  private static transient Logger LOG = LoggerFactory.getLogger(AbstractManagedStateInnerJoinOperator.class);
   public static final String stateDir = "managedState";
   public static final String stream1State = "stream1Data";
   public static final String stream2State = "stream2Data";
@@ -94,14 +97,18 @@ public abstract class AbstractManagedStateInnerJoinOperator<K,T> extends Abstrac
   @Override
   protected void processTuple(T tuple, boolean isStream1Data)
   {
+    LOG.info("processTuple - 1:  {} -> {}", tuple.toString(), isStream1Data);
     Spillable.SpillableListMultimap<K,T> store = isStream1Data ? stream1Data : stream2Data;
     K key = extractKey(tuple,isStream1Data);
     long timeBucket = extractTime(tuple,isStream1Data);
+    LOG.info("processTuple - 2:  {} -> {}", tuple.toString(), isStream1Data);
     if (!((ManagedTimeStateMultiValue)store).put(key, tuple,timeBucket)) {
       return;
     }
+    LOG.info("processTuple - 3:  {} -> {}", tuple.toString(), isStream1Data);
     Spillable.SpillableListMultimap<K, T> valuestore = isStream1Data ? stream2Data : stream1Data;
     Future<List> future = ((ManagedTimeStateMultiValue)valuestore).getAsync(key);
+    LOG.info("processTuple - 4:  {} -> {}", tuple.toString(), isStream1Data);
     if (future.isDone()) {
       try {
         joinStream(tuple,isStream1Data, future.get());
@@ -157,9 +164,11 @@ public abstract class AbstractManagedStateInnerJoinOperator<K,T> extends Abstrac
   @Override
   public void beginWindow(long windowId)
   {
+    LOG.info("BeginWindow - 0");
     stream1Store.beginWindow(windowId);
     stream2Store.beginWindow(windowId);
     super.beginWindow(windowId);
+    LOG.info("BeginWindow - 1");
   }
 
   /**

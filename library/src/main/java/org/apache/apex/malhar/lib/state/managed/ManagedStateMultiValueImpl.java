@@ -1,8 +1,10 @@
 package org.apache.apex.malhar.lib.state.managed;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -29,6 +31,7 @@ public class ManagedStateMultiValueImpl extends ManagedStateImpl implements Time
 {
   private final transient LinkedBlockingQueue<Long> purgedTimeBuckets = Queues.newLinkedBlockingQueue();
   private final transient Set<Bucket> bucketsForTeardown = Sets.newHashSet();
+  private transient Map<Slice, List<Long>> keysInBuckets = new HashMap<>();
   private int noOfKeyBuckets;
 
   @Override
@@ -81,6 +84,7 @@ public class ManagedStateMultiValueImpl extends ManagedStateImpl implements Time
     GetDataTask(int num)
     {
       this.num  = num;
+      this.completed = 0;
     }
 
     @Override
@@ -88,6 +92,7 @@ public class ManagedStateMultiValueImpl extends ManagedStateImpl implements Time
     {
       synchronized (this) {
         completed++;
+        LOG.info("Completed: {} -> {}", bucketId, key);
         if (ex == null && value != null) {
           slices.add(value);
         }
@@ -142,6 +147,7 @@ public class ManagedStateMultiValueImpl extends ManagedStateImpl implements Time
 
   public Future<List<Slice>> getAsyncValue(long bucketId, @NotNull Slice key)
   {
+    LOG.info("getAsyncValue: {} -> {} -> {}", bucketId, key, timeBucketAssigner.getNumBuckets());
     GetDataTask task = new GetDataTask(timeBucketAssigner.getNumBuckets());
     for (int i = 0; i < timeBucketAssigner.getNumBuckets(); i++)  {
       int bucketIdx = (int)(bucketId + (i * noOfKeyBuckets));
@@ -149,6 +155,7 @@ public class ManagedStateMultiValueImpl extends ManagedStateImpl implements Time
 
       getValueFromBucketAsync(bucket, key, task);
     }
+    LOG.info("End of getAsyncValue: {} -> {}", bucketId, key);
     return task;
   }
 
@@ -181,6 +188,7 @@ public class ManagedStateMultiValueImpl extends ManagedStateImpl implements Time
   @Override
   public void endWindow()
   {
+    LOG.info("End WIndow - 0");
     super.endWindow();
     Long purgedTimeBucket;
 
@@ -203,6 +211,7 @@ public class ManagedStateMultiValueImpl extends ManagedStateImpl implements Time
         bucketIterator.remove();
       }
     }
+    LOG.info("End WIndow - 1");
   }
 
   @Override

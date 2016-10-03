@@ -31,6 +31,9 @@ import java.util.concurrent.TimeoutException;
 import javax.annotation.Nullable;
 import javax.validation.constraints.NotNull;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.apache.apex.malhar.lib.state.spillable.Spillable;
 
 import com.google.common.base.Preconditions;
@@ -54,6 +57,7 @@ import com.datatorrent.netlet.util.Slice;
 @org.apache.hadoop.classification.InterfaceStability.Evolving
 public class ManagedTimeStateMultiValue<K,V> implements Spillable.SpillableListMultimap<K,V>
 {
+  private static transient Logger LOG = LoggerFactory.getLogger(ManagedTimeStateMultiValue.class);
   private transient StreamCodec streamCodec = null;
   private boolean isKeyContainsMultiValue = false;
   private long timeBucket;
@@ -103,6 +107,7 @@ public class ManagedTimeStateMultiValue<K,V> implements Spillable.SpillableListM
    */
   public CompositeFuture getAsync(@Nullable K k)
   {
+    LOG.info("GetAsync: {} ", k);
     return new CompositeFuture(store.getAsyncValue(getBucketId(k), streamCodec.toByteArray(k)));
   }
 
@@ -206,6 +211,7 @@ public class ManagedTimeStateMultiValue<K,V> implements Spillable.SpillableListM
    */
   public boolean put(@Nullable K k, @Nullable V v, long timeBucket)
   {
+    LOG.info("Put: {} -> {}", k, v);
     if (isKeyContainsMultiValue) {
       Slice keySlice = streamCodec.toByteArray(k);
       int bucketId = getBucketId(k);
@@ -236,8 +242,10 @@ public class ManagedTimeStateMultiValue<K,V> implements Spillable.SpillableListM
     long timeBucketId = store.getTimeBucketAssigner().getTimeBucketAndAdjustBoundaries(timeBucket);
     if (timeBucketId != -1) {
       store.putInBucket(bucketId, timeBucketId, keySlice, valueSlice);
+      LOG.info("Successfully Inserted into Store: {} -> {} -> {}", bucketId, timeBucket, keySlice);
       return true;
     }
+    LOG.info("Unnable to insert into Store: {} -> {} -> {}", bucketId, timeBucket, keySlice);
     return false;
   }
 
