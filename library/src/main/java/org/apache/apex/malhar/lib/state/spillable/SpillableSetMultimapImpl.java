@@ -27,6 +27,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import javax.validation.constraints.NotNull;
 
+import org.apache.apex.malhar.lib.state.managed.TimeExtractor;
 import org.apache.apex.malhar.lib.utils.serde.PassThruSliceSerde;
 import org.apache.apex.malhar.lib.utils.serde.Serde;
 import org.apache.apex.malhar.lib.utils.serde.SerdeIntSlice;
@@ -41,6 +42,7 @@ import com.esotericsoftware.kryo.serializers.FieldSerializer;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multiset;
+import com.google.common.primitives.Longs;
 
 import com.datatorrent.api.Context;
 import com.datatorrent.netlet.util.Slice;
@@ -55,6 +57,38 @@ import com.datatorrent.netlet.util.Slice;
 public class SpillableSetMultimapImpl<K, V> implements Spillable.SpillableSetMultimap<K, V>,
     Spillable.SpillableComponent
 {
+
+
+  public static class SliceTimeExtractor implements TimeExtractor<Slice>
+  {
+
+    @Override
+    public long getTime(Slice slice)
+    {
+      byte[] buffer = slice.buffer;
+      return (((long)buffer[0] << 56) +
+          ((long)(buffer[1] & 255) << 48) +
+          ((long)(buffer[2] & 255) << 40) +
+          ((long)(buffer[3] & 255) << 32) +
+          ((long)(buffer[4] & 255) << 24) +
+          ((buffer[5] & 255) << 16) +
+          ((buffer[6] & 255) <<  8) +
+          ((buffer[7] & 255) <<  0));
+    }
+
+    @Override
+    public void beginWindow(long windowId)
+    {
+      // Skip caching
+    }
+
+    @Override
+    public void endWindow()
+    {
+      // Skip caching
+    }
+  }
+
   public static final int DEFAULT_BATCH_SIZE = 1000;
   public static final byte[] META_KEY_SUFFIX = new byte[]{(byte)0, (byte)0, (byte)0};
 
@@ -68,6 +102,8 @@ public class SpillableSetMultimapImpl<K, V> implements Spillable.SpillableSetMul
   private Serde<K, Slice> serdeKey;
   private Serde<V, Slice> serdeValue;
   private transient List<SpillableSetImpl<V>> removedSets = new ArrayList<>();
+
+  private TimeExtractor<K> timeExtractor = null;
 
   private SpillableSetMultimapImpl()
   {
@@ -96,6 +132,32 @@ public class SpillableSetMultimapImpl<K, V> implements Spillable.SpillableSetMul
     map = new SpillableMapImpl(store, identifier, bucket, new PassThruSliceSerde(), new SerdePairSlice<>(new SerdeIntSlice(), serdeValue));
   }
 
+
+  /**
+   * Creates a {@link SpillableSetMultimapImpl}.
+   * @param store The {@link SpillableStateStore} in which to spill to.
+   * @param identifier The Id of this {@link SpillableSetMultimapImpl}.
+   * @param bucket The Id of the bucket used to store this
+   * {@link SpillableSetMultimapImpl} in the provided {@link SpillableStateStore}.
+   * @param serdeKey The {@link Serde} to use when serializing and deserializing keys.
+   * @param serdeKey The {@link Serde} to use when serializing and deserializing values.
+   * @param timeExtractor The {@link TimeExtractor} to be used to retrieve time from key
+   */
+  public SpillableSetMultimapImpl(SpillableStateStore store, byte[] identifier, long bucket,
+      Serde<K, Slice> serdeKey,
+      Serde<V, Slice> serdeValue,
+      TimeExtractor<K> timeExtractor)
+  {
+    this.store = Preconditions.checkNotNull(store);
+    this.identifier = Preconditions.checkNotNull(identifier);
+    this.bucket = bucket;
+    this.serdeKey = Preconditions.checkNotNull(serdeKey);
+    this.serdeValue = Preconditions.checkNotNull(serdeValue);
+    this.timeExtractor = timeExtractor;
+
+    map = new SpillableMapImpl(store, identifier, new PassThruSliceSerde(), new SerdePairSlice<>(new SerdeIntSlice(), serdeValue), new SliceTimeExtractor());
+  }
+
   public SpillableStateStore getStore()
   {
     return store;
@@ -113,6 +175,9 @@ public class SpillableSetMultimapImpl<K, V> implements Spillable.SpillableSetMul
 
     if (spillableSet == null) {
       Slice keySlice = serdeKey.serialize(key);
+      if (timeExtractor != null) {
+        keySlice = SliceUtils.concatenate(Longs.toByteArray(timeExtractor.getTime(key)), keySlice);
+      }
       Pair<Integer, V> meta = map.get(SliceUtils.concatenate(keySlice, META_KEY_SUFFIX));
 
       if (meta == null) {
@@ -166,7 +231,11 @@ public class SpillableSetMultimapImpl<K, V> implements Spillable.SpillableSetMul
     SpillableSetImpl<V> spillableSet = getHelper((K)key);
     if (spillableSet != null) {
       cache.remove((K)key);
-      Slice keySlice = SliceUtils.concatenate(serdeKey.serialize((K)key), META_KEY_SUFFIX);
+      Slice keySlice = serdeKey.serialize((K)key);
+      if (timeExtractor != null) {
+        keySlice = SliceUtils.concatenate(Longs.toByteArray(timeExtractor.getTime((K)key)), keySlice);
+      }
+      keySlice = SliceUtils.concatenate(keySlice, META_KEY_SUFFIX);
       map.put(keySlice, new ImmutablePair<>(0, spillableSet.getHead()));
       spillableSet.clear();
       removedSets.add(spillableSet);
@@ -199,7 +268,11 @@ public class SpillableSetMultimapImpl<K, V> implements Spillable.SpillableSetMul
     if (cache.contains((K)key)) {
       return true;
     }
-    Slice keySlice = SliceUtils.concatenate(serdeKey.serialize((K)key), META_KEY_SUFFIX);
+    Slice keySlice = serdeKey.serialize((K)key);
+    if (timeExtractor != null) {
+      keySlice = SliceUtils.concatenate(Longs.toByteArray(timeExtractor.getTime((K)key)), keySlice);
+    }
+    keySlice = SliceUtils.concatenate(keySlice, META_KEY_SUFFIX);
     Pair<Integer, V> meta = map.get(keySlice);
     return meta != null && meta.getLeft() > 0;
   }
@@ -301,7 +374,13 @@ public class SpillableSetMultimapImpl<K, V> implements Spillable.SpillableSetMul
       SpillableSetImpl<V> spillableSet = cache.get(key);
       spillableSet.endWindow();
 
-      map.put(SliceUtils.concatenate(serdeKey.serialize(key), META_KEY_SUFFIX),
+
+      Slice keySlice = serdeKey.serialize(key);
+      if (timeExtractor != null) {
+        keySlice = SliceUtils.concatenate(Longs.toByteArray(timeExtractor.getTime(key)), keySlice);
+      }
+      keySlice = SliceUtils.concatenate(keySlice, META_KEY_SUFFIX);
+      map.put(keySlice,
           new ImmutablePair<>(spillableSet.size(), spillableSet.getHead()));
     }
 

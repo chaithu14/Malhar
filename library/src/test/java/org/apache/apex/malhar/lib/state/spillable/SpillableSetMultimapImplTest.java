@@ -26,6 +26,7 @@ import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
 
+import org.apache.apex.malhar.lib.state.managed.TimeExtractor;
 import org.apache.apex.malhar.lib.state.spillable.inmem.InMemSpillableStateStore;
 import org.apache.apex.malhar.lib.utils.serde.SerdeStringSlice;
 
@@ -45,6 +46,8 @@ public class SpillableSetMultimapImplTest
   @Rule
   public SpillableTestUtils.TestMeta testMeta = new SpillableTestUtils.TestMeta();
 
+  public TimeExtractor<String> te = null;
+
   @Test
   public void simpleMultiKeyTest()
   {
@@ -59,11 +62,24 @@ public class SpillableSetMultimapImplTest
     simpleMultiKeyTestHelper(testMeta.store);
   }
 
+  @Test
+  public void smpleMultiKeyTimeUnifiedManagedStateTest()
+  {
+    te = new TestStringTimeExtractor();
+    simpleMultiKeyTestHelper(testMeta.timeStore);
+  }
+
+
   public void simpleMultiKeyTestHelper(SpillableStateStore store)
   {
-    SpillableSetMultimapImpl<String, String> map =
-        new SpillableSetMultimapImpl<>(store, ID1, 0L, new SerdeStringSlice(),
-        new SerdeStringSlice());
+    SpillableSetMultimapImpl<String, String> map = null;
+    if (te == null) {
+      map =
+          new SpillableSetMultimapImpl<>(store, ID1, 0L, new SerdeStringSlice(),
+              new SerdeStringSlice());
+    } else {
+      map = new SpillableSetMultimapImpl<>(store, ID1, 0L, new SerdeStringSlice(), new SerdeStringSlice(), te);
+    }
 
     store.setup(testMeta.operatorContext);
     map.setup(testMeta.operatorContext);

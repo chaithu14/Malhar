@@ -53,7 +53,8 @@ public class SpillableMapImplTest
   public SpillableTestUtils.TestMeta testMeta = new SpillableTestUtils.TestMeta();
 
 
-  private void setup(String opt) {
+  private void setup(String opt)
+  {
     if (opt.equals("InMem")) {
       store = new InMemSpillableStateStore();
       te = null;
@@ -79,8 +80,7 @@ public class SpillableMapImplTest
       map = new SpillableMapImpl<>(store, ID1, 0L,
           new SerdeStringSlice(),
           new SerdeStringSlice());
-    }
-    else {
+    } else {
       map = new SpillableMapImpl<>(store, ID1, new SerdeStringSlice(), new SerdeStringSlice(), te);
     }
 
@@ -152,7 +152,8 @@ public class SpillableMapImplTest
     store.teardown();
   }
 
-  private void multiValueCheck(String[] keys, byte[] samePrefix, String[] expectedVal) {
+  private void multiValueCheck(String[] keys, byte[] samePrefix, String[] expectedVal)
+  {
     for (int i = 0; i < keys.length; i++) {
       SpillableTestUtils.checkValue(store, _bid(keys[i], te), keys[i], samePrefix, expectedVal[i]);
     }
@@ -165,11 +166,12 @@ public class SpillableMapImplTest
     }
   }
 
-  private long _bid(String key, TimeExtractor<String> te) {
+  private long _bid(String key, TimeExtractor<String> te)
+  {
     if (te != null) {
       return te.getTime(key);
     } else {
-      return 0l;
+      return 0L;
     }
   }
 
