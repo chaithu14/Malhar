@@ -47,6 +47,13 @@ public class ManagedStateMultiValueImpl extends ManagedStateImpl implements Time
     long timeBucket = (timeBucketAssigner.getTimeBucketAndAdjustBoundaries(time));
     bucketId = (timeBucket * noOfKeyBuckets) + bucketId;
     putInBucket(bucketId, timeBucket, key, value);
+    if (timeBucket != -1) {
+      List<Long> bucketsList = keysInBuckets.get(key);
+      if (bucketsList == null) {
+        bucketsList = new ArrayList<>();
+      }
+      bucketsList.add(bucketId);
+    }
   }
 
   @Override
