@@ -38,14 +38,16 @@ public class SpillableWindowedStorageTest
   @Rule
   public SpillableTestUtils.TestMeta testMeta = new SpillableTestUtils.TestMeta();
 
+  public static long BASETIME = System.currentTimeMillis();
+
   @Test
   public void testWindowedPlainStorage()
   {
-    SpillableComplexComponentImpl sccImpl = new SpillableComplexComponentImpl(testMeta.store);
+    SpillableComplexComponentImpl sccImpl = new SpillableComplexComponentImpl(testMeta.timeStore);
     SpillableWindowedPlainStorage<Integer> storage = new SpillableWindowedPlainStorage<>();
-    Window window1 = new Window.TimeWindow<>(1000, 10);
-    Window window2 = new Window.TimeWindow<>(1010, 10);
-    Window window3 = new Window.TimeWindow<>(1020, 10);
+    Window window1 = new Window.TimeWindow<>(BASETIME + 1000, 10);
+    Window window2 = new Window.TimeWindow<>(BASETIME + 1010, 10);
+    Window window3 = new Window.TimeWindow<>(BASETIME + 1020, 10);
     storage.setSpillableComplexComponent(sccImpl);
     storage.getSpillableComplexComponent().setup(testMeta.operatorContext);
     storage.setup(testMeta.operatorContext);
@@ -97,11 +99,11 @@ public class SpillableWindowedStorageTest
   @Test
   public void testWindowedKeyedStorage()
   {
-    SpillableComplexComponentImpl sccImpl = new SpillableComplexComponentImpl(testMeta.store);
+    SpillableComplexComponentImpl sccImpl = new SpillableComplexComponentImpl(testMeta.timeStore);
     SpillableWindowedKeyedStorage<String, Integer> storage = new SpillableWindowedKeyedStorage<>();
-    Window window1 = new Window.TimeWindow<>(1000, 10);
-    Window window2 = new Window.TimeWindow<>(1010, 10);
-    Window window3 = new Window.TimeWindow<>(1020, 10);
+    Window window1 = new Window.TimeWindow<>(BASETIME + 1000, 10);
+    Window window2 = new Window.TimeWindow<>(BASETIME + 1010, 10);
+    Window window3 = new Window.TimeWindow<>(BASETIME + 1020, 10);
     storage.setSpillableComplexComponent(sccImpl);
     storage.getSpillableComplexComponent().setup(testMeta.operatorContext);
     storage.setup(testMeta.operatorContext);
