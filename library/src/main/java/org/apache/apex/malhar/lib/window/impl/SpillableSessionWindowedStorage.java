@@ -83,7 +83,9 @@ public class SpillableSessionWindowedStorage<K, V> extends SpillableWindowedKeye
     if (keys == null) {
       return;
     }
-    windowKeyToValueMap.remove(toWindow);
+    if (windowToKeysMap.containsKey(toWindow)) {
+      throw new IllegalStateException("Invalid window to be migrated to: " + toWindow);
+    }
     for (K key : keys) {
       windowToKeysMap.put(toWindow, key);
       ImmutablePair<Window, K> oldKey = new ImmutablePair<Window, K>(fromWindow, key);
