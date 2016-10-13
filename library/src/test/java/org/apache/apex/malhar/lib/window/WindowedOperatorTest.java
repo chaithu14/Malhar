@@ -538,6 +538,7 @@ public class WindowedOperatorTest
 
   private void testKeyedTrigger(TriggerOption.AccumulationMode accumulationMode)
   {
+    long BASE = System.currentTimeMillis();
     KeyedWindowedOperatorImpl<String, Long, MutableLong, Long> windowedOperator = createDefaultKeyedWindowedOperator(false);
     TriggerOption triggerOption = new TriggerOption().withEarlyFiringsAtEvery(Duration.millis(1000));
     switch (accumulationMode) {
@@ -559,10 +560,10 @@ public class WindowedOperatorTest
     windowedOperator.output.setSink((Sink<Object>)(Sink)sink);
     windowedOperator.setup(testMeta.operatorContext);
     windowedOperator.beginWindow(1);
-    windowedOperator.processTuple(new Tuple.TimestampedTuple<>(100L, new KeyValPair<>("a", 2L)));
-    windowedOperator.processTuple(new Tuple.TimestampedTuple<>(200L, new KeyValPair<>("b", 3L)));
-    windowedOperator.processTuple(new Tuple.TimestampedTuple<>(400L, new KeyValPair<>("b", 5L)));
-    windowedOperator.processTuple(new Tuple.TimestampedTuple<>(300L, new KeyValPair<>("a", 4L)));
+    windowedOperator.processTuple(new Tuple.TimestampedTuple<>(BASE + 100L, new KeyValPair<>("a", 2L)));
+    windowedOperator.processTuple(new Tuple.TimestampedTuple<>(BASE + 200L, new KeyValPair<>("b", 3L)));
+    windowedOperator.processTuple(new Tuple.TimestampedTuple<>(BASE + 400L, new KeyValPair<>("b", 5L)));
+    windowedOperator.processTuple(new Tuple.TimestampedTuple<>(BASE + 300L, new KeyValPair<>("a", 4L)));
     windowedOperator.endWindow();
     Assert.assertTrue("No trigger should be fired yet", sink.collectedTuples.isEmpty());
     windowedOperator.beginWindow(2);
@@ -581,11 +582,11 @@ public class WindowedOperatorTest
     }
     sink.collectedTuples.clear();
     windowedOperator.beginWindow(4);
-    windowedOperator.processTuple(new Tuple.TimestampedTuple<>(400L, new KeyValPair<>("a", 8L)));
+    windowedOperator.processTuple(new Tuple.TimestampedTuple<>(BASE + 400L, new KeyValPair<>("a", 8L)));
     windowedOperator.endWindow();
     Assert.assertTrue("No trigger should be fired yet", sink.collectedTuples.isEmpty());
     windowedOperator.beginWindow(5);
-    windowedOperator.processTuple(new Tuple.TimestampedTuple<>(300L, new KeyValPair<>("b", 9L)));
+    windowedOperator.processTuple(new Tuple.TimestampedTuple<>(BASE + 300L, new KeyValPair<>("b", 9L)));
     windowedOperator.endWindow();
     Map<String, Long> map = new HashMap<>();
     switch (accumulationMode) {

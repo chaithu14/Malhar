@@ -58,6 +58,39 @@ public class SpillableSetMultimapImpl<K, V> implements Spillable.SpillableSetMul
     Spillable.SpillableComponent
 {
 
+  public static class FixTimeExtractor<V> implements TimeExtractor<V>
+  {
+
+    private long fixTime;
+
+    public FixTimeExtractor(long fixTime)
+    {
+      this.fixTime = fixTime;
+    }
+
+    public FixTimeExtractor()
+    {
+      // For kryo
+    }
+
+    @Override
+    public long getTime(V v)
+    {
+      return fixTime;
+    }
+
+    @Override
+    public void beginWindow(long windowId)
+    {
+
+    }
+
+    @Override
+    public void endWindow()
+    {
+
+    }
+  }
 
   public static class SliceTimeExtractor implements TimeExtractor<Slice>
   {
@@ -175,8 +208,10 @@ public class SpillableSetMultimapImpl<K, V> implements Spillable.SpillableSetMul
 
     if (spillableSet == null) {
       Slice keySlice = serdeKey.serialize(key);
+      long keyTime = -1;
       if (timeExtractor != null) {
-        keySlice = SliceUtils.concatenate(Longs.toByteArray(timeExtractor.getTime(key)), keySlice);
+        keyTime = timeExtractor.getTime(key);
+        keySlice = SliceUtils.concatenate(Longs.toByteArray(keyTime), keySlice);
       }
       Pair<Integer, V> meta = map.get(SliceUtils.concatenate(keySlice, META_KEY_SUFFIX));
 
@@ -185,7 +220,11 @@ public class SpillableSetMultimapImpl<K, V> implements Spillable.SpillableSetMul
       }
 
       Slice keyPrefix = SliceUtils.concatenate(identifier, keySlice);
-      spillableSet = new SpillableSetImpl<>(bucket, keyPrefix.toByteArray(), store, serdeValue);
+      if (timeExtractor != null) {
+        spillableSet = new SpillableSetImpl<>(keyPrefix.toByteArray(), store, serdeValue, new FixTimeExtractor(keyTime));
+      } else {
+        spillableSet = new SpillableSetImpl<>(bucket, keyPrefix.toByteArray(), store, serdeValue);
+      }
       spillableSet.setSize(meta.getLeft());
       spillableSet.setHead(meta.getRight());
     }
@@ -299,9 +338,17 @@ public class SpillableSetMultimapImpl<K, V> implements Spillable.SpillableSetMul
   {
     SpillableSetImpl<V> spillableSet = getHelper(key);
 
+    long time = -1;
+    if (timeExtractor != null) {
+      time = timeExtractor.getTime(key);
+    }
     if (spillableSet == null) {
       Slice keyPrefix = SliceUtils.concatenate(identifier, serdeKey.serialize(key));
-      spillableSet = new SpillableSetImpl<>(bucket, keyPrefix.toByteArray(), store, serdeValue);
+      if (timeExtractor == null) {
+        spillableSet = new SpillableSetImpl<>(bucket, keyPrefix.toByteArray(), store, serdeValue);
+      } else {
+        spillableSet = new SpillableSetImpl<>(keyPrefix.toByteArray(), store, serdeValue, new FixTimeExtractor(time));
+      }
       cache.put(key, spillableSet);
     }
     return spillableSet.add(value);
