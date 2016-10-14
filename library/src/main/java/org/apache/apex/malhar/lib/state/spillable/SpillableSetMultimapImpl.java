@@ -338,12 +338,14 @@ public class SpillableSetMultimapImpl<K, V> implements Spillable.SpillableSetMul
   {
     SpillableSetImpl<V> spillableSet = getHelper(key);
 
-    long time = -1;
-    if (timeExtractor != null) {
-      time = timeExtractor.getTime(key);
-    }
     if (spillableSet == null) {
-      Slice keyPrefix = SliceUtils.concatenate(identifier, serdeKey.serialize(key));
+      long time = -1;
+      Slice keyPrefix = serdeKey.serialize(key);
+      if (timeExtractor != null) {
+        time = timeExtractor.getTime(key);
+        keyPrefix = SliceUtils.concatenate(Longs.toByteArray(time), keyPrefix);
+      }
+      keyPrefix = SliceUtils.concatenate(identifier, keyPrefix);
       if (timeExtractor == null) {
         spillableSet = new SpillableSetImpl<>(bucket, keyPrefix.toByteArray(), store, serdeValue);
       } else {

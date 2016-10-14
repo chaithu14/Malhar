@@ -58,7 +58,7 @@ import com.datatorrent.lib.util.KeyValPair;
 public class WindowedOperatorTest
 {
 
-  public final static long BASE = (System.currentTimeMillis() / 1000) * 1000;
+  public static final long BASE = (System.currentTimeMillis() / 1000) * 1000;
 
   @Parameterized.Parameters
   public static Collection<Object[]> testParameters()
