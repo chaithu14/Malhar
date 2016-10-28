@@ -24,6 +24,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -186,7 +187,7 @@ public class FSLineReaderTest
     List<Object> messages = testMeta.messageSink.collectedTuples;
     Assert.assertEquals("No of records", testMeta.messages.size(), messages.size());
 
-    testMeta.messages.sort(new Comparator<String[]>()
+    Collections.sort(testMeta.messages, new Comparator<String[]>()
     {
       @Override
       public int compare(String[] rec1, String[] rec2)
@@ -195,7 +196,7 @@ public class FSLineReaderTest
       }
     });
 
-    messages.sort(new Comparator<Object>()
+    Collections.sort(messages, new Comparator<Object>()
     {
       @Override
       public int compare(Object object1, Object object2)

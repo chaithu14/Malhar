@@ -45,8 +45,6 @@ import com.datatorrent.lib.io.block.ReaderContext;
  *
  * Typically, this operator will be connected to output of FileSplitterInput to
  * read records in parallel.
- *
- * @since 3.7.0
  */
 @Evolving
 public class S3RecordReader extends FSSliceReader
@@ -146,7 +144,7 @@ public class S3RecordReader extends FSSliceReader
    * Read the block data and emit records based on reader context
    *
    * @param blockMetadata
-   *          block
+   *          contains the metadata information of the block of the file
    * @throws IOException
    */
   protected void readBlock(BlockMetadata blockMetadata) throws IOException
@@ -183,7 +181,7 @@ public class S3RecordReader extends FSSliceReader
       extends ReaderContext.ReadAheadLineReaderContext<FSDataInputStream>
   {
     /**
-     * Amazon clinet used to read bytes from S3
+     * Amazon client used to read bytes from S3
      */
     private transient AmazonS3 s3Client;
     /**
