@@ -162,9 +162,7 @@ public class S3RecordReader extends FSSliceReader
     }
     ReaderContext.Entity entity;
     while ((entity = readerContext.next()) != null) {
-
       counters.getCounter(ReaderCounterKeys.BYTES).add(entity.getUsedBytes());
-
       byte[] record = entity.getRecord();
 
       if (record != null) {
@@ -204,7 +202,7 @@ public class S3RecordReader extends FSSliceReader
      * Get the object portion through AmazonS3 client API. (4) Get the object
      * content from the above object portion.
      *
-     * @param usedBytes
+     * @param bytesFromCurrentOffset
      *          bytes read till now from current offset
      * @param bytesToFetch
      *          the number of bytes to be fetched
@@ -213,15 +211,15 @@ public class S3RecordReader extends FSSliceReader
      */
 
     @Override
-    protected int readData(long usedBytes, int bytesToFetch) throws IOException
+    protected int readData(final long bytesFromCurrentOffset, final int bytesToFetch) throws IOException
     {
       GetObjectRequest rangeObjectRequest = new GetObjectRequest(bucketName, filePath);
-      rangeObjectRequest.setRange(offset + usedBytes, (offset + usedBytes + bytesToFetch - 1));
+      rangeObjectRequest.setRange(offset + bytesFromCurrentOffset, offset + bytesFromCurrentOffset + bytesToFetch - 1);
       S3Object objectPortion = s3Client.getObject(rangeObjectRequest);
       S3ObjectInputStream wrappedStream = objectPortion.getObjectContent();
       byte[] buffer = ByteStreams.toByteArray(wrappedStream);
       wrappedStream.close();
-      setBuffer(buffer);
+      this.setBuffer(buffer);
       int bufferLength = buffer.length;
       if (bufferLength <= 0) {
         return -1;
@@ -230,7 +228,7 @@ public class S3RecordReader extends FSSliceReader
     }
 
     @Override
-    protected boolean checkEndOfStream(long usedBytesFromOffset)
+    protected boolean checkEndOfStream(final long usedBytesFromOffset)
     {
       if ((offset + usedBytesFromOffset) >= fileLength) {
         return true;

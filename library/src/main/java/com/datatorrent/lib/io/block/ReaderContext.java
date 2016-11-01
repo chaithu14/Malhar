@@ -186,16 +186,16 @@ public interface ReaderContext<STREAM extends InputStream & PositionedReadable>
     /**
      * Reads bytes from the stream starting from the offset into the buffer
      *
-     * @param usedBytes
+     * @param bytesFromCurrentOffset
      *          bytes read till now from current block
      * @param endByte
      *          byte upto which the data is to be read
      * @return the number of bytes read, -1 if 0 bytes read
      * @throws IOException
      */
-    protected int readData(long usedBytes, int bytesToFetch) throws IOException
+    protected int readData(final long bytesFromCurrentOffset, final int bytesToFetch) throws IOException
     {
-      return stream.read(offset + usedBytes, buffer, 0, bytesToFetch);
+      return stream.read(offset + bytesFromCurrentOffset, buffer, 0, bytesToFetch);
     }
 
     /**
@@ -203,7 +203,7 @@ public interface ReaderContext<STREAM extends InputStream & PositionedReadable>
      *          number of bytes the pointer is ahead of the offset
      * @return true if end of stream reached, false otherwise
      */
-    protected boolean checkEndOfStream(long usedBytesFromOffset)
+    protected boolean checkEndOfStream(final long usedBytesFromOffset)
     {
       if (!overflowBlockRead) {
         return (offset - blockMetadata.getOffset() + usedBytesFromOffset < bufferSize);

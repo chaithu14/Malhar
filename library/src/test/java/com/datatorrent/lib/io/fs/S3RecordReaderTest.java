@@ -78,16 +78,15 @@ public class S3RecordReaderTest
 
   class TestMeta extends TestWatcher
   {
-    Context.OperatorContext readerContext;
-    AbstractFSBlockReader<Slice> blockReader;
-    CollectorTestSink<Object> blockMetadataSink;
-    CollectorTestSink<Object> messageSink;
-    List<String[]> messages = Lists.newArrayList();
-    String appId;
-
-    String dataFilePath;
-    File dataFile;
-    public String bucketKey;
+    private Context.OperatorContext readerContext;
+    private AbstractFSBlockReader<Slice> blockReader;
+    private CollectorTestSink<Object> blockMetadataSink;
+    private CollectorTestSink<Object> messageSink;
+    private List<String[]> messages = Lists.newArrayList();
+    private String appId;
+    private String dataFilePath;
+    private File dataFile;
+    private String bucketKey;
     private AmazonS3 client;
 
     @Override
