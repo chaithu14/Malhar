@@ -53,26 +53,27 @@ import com.datatorrent.api.DAG;
 import com.datatorrent.lib.helper.OperatorContextTestHelper;
 import com.datatorrent.lib.io.block.AbstractFSBlockReader;
 import com.datatorrent.lib.io.block.BlockMetadata;
+import com.datatorrent.lib.io.fs.S3RecordReader.RECORD_READER_MODE;
 import com.datatorrent.lib.testbench.CollectorTestSink;
 import com.datatorrent.netlet.util.Slice;
 
 @Ignore
-public class S3RecordReaderTest
+public class S3FixedWidthRecordReaderTest
 {
   private final String accessKey = "*************";
   private final String secretKey = "*********************";
-  private final int overflowBufferSize = 50;
+  private static final int recordLength = 123;
   private static final String FILE_1 = "file1.txt";
   private static final String s3Directory = "input/";
 
   AbstractFSBlockReader<Slice> getBlockReader(String bucketKey)
   {
-    AbstractFSBlockReader<Slice> blockReader = new S3RecordReader();
-
-    ((S3RecordReader)blockReader).setAccessKey(accessKey);
-    ((S3RecordReader)blockReader).setSecretAccessKey(secretKey);
-    ((S3RecordReader)blockReader).setBucketName(bucketKey);
-    ((S3RecordReader)blockReader).setOverflowBufferSize(overflowBufferSize);
+    S3RecordReader blockReader = new S3RecordReader();
+    blockReader.setAccessKey(accessKey);
+    blockReader.setSecretAccessKey(secretKey);
+    blockReader.setBucketName(bucketKey);
+    blockReader.setRecordLength(recordLength);
+    blockReader.setMode(RECORD_READER_MODE.FIXED_WIDTH_RECORD);
     return blockReader;
   }
 
@@ -171,7 +172,12 @@ public class S3RecordReaderTest
 
     for (int i = 0; i < actualMessages.size(); i++) {
       byte[] msg = (byte[])actualMessages.get(i);
-      Assert.assertTrue("line " + i, Arrays.equals(new String(msg).split(","), testMeta.messages.get(i)));
+      /*
+       * last character is removed below since the testMeta.messages does not contain '\n'
+       *  present in byte[] msg
+       */
+      Assert.assertTrue("line " + i,
+          Arrays.equals(new String(Arrays.copyOf(msg, msg.length - 1)).split(","), testMeta.messages.get(i)));
     }
   }
 
@@ -202,7 +208,8 @@ public class S3RecordReaderTest
     for (int i = 0; i < messages.size(); i++) {
 
       byte[] msg = (byte[])messages.get(i);
-      Assert.assertTrue("line " + i, Arrays.equals(new String(msg).split(","), testMeta.messages.get(i)));
+      Assert.assertTrue("line " + i,
+          Arrays.equals(new String(Arrays.copyOf(msg, msg.length - 1)).split(","), testMeta.messages.get(i)));
     }
   }
 
@@ -259,7 +266,8 @@ public class S3RecordReaderTest
     });
     for (int i = 0; i < messages.size(); i++) {
       byte[] msg = (byte[])messages.get(i);
-      Assert.assertTrue("line " + i, Arrays.equals(new String(msg).split(","), testMeta.messages.get(i)));
+      Assert.assertTrue("line " + i,
+          Arrays.equals(new String(Arrays.copyOf(msg, msg.length - 1)).split(","), testMeta.messages.get(i)));
     }
   }
 
@@ -281,6 +289,5 @@ public class S3RecordReaderTest
     return 0;
   }
 
-  @SuppressWarnings("unused")
-  private static final Logger LOG = LoggerFactory.getLogger(S3RecordReaderTest.class);
+  private static final Logger LOG = LoggerFactory.getLogger(S3FixedWidthRecordReaderTest.class);
 }

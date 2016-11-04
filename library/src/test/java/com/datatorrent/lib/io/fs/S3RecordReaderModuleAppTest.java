@@ -51,6 +51,7 @@ import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.LocalMode;
 import com.datatorrent.api.StreamingApplication;
 import com.datatorrent.common.util.BaseOperator;
+import com.datatorrent.lib.io.fs.S3RecordReader.RECORD_READER_MODE;
 
 @Ignore
 public class S3RecordReaderModuleAppTest
@@ -155,6 +156,86 @@ public class S3RecordReaderModuleAppTest
     {
       S3RecordReaderModule recordReader = dag.addModule("s3RecordReaderModule", S3RecordReaderModule.class);
       DelimitedValidator validator = dag.addOperator("Validator", new DelimitedValidator());
+      dag.addStream("records", recordReader.records, validator.data);
+    }
+
+  }
+
+  @Test
+  public void testS3FixedWidthRecords() throws Exception
+  {
+
+    S3FixedWidthApplication app = new S3FixedWidthApplication();
+    LocalMode lma = LocalMode.newInstance();
+    Configuration conf = new Configuration(false);
+    conf.set("dt.operator.S3RecordReaderModule.prop.files", files);
+    conf.set("dt.operator.S3RecordReaderModule.prop.recordLength", "8");
+    conf.set("dt.operator.S3RecordReaderModule.prop.blocksThreshold", "1");
+    conf.set("dt.operator.S3RecordReaderModule.prop.scanIntervalMillis", "10000");
+
+    lma.prepareDAG(app, conf);
+    LocalMode.Controller lc = lma.getController();
+    lc.setHeartbeatMonitoringEnabled(true);
+    lc.runAsync();
+    LOG.debug("Waiting for app to finish");
+    Thread.sleep(1000 * 1);
+    lc.shutdown();
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testS3MissingRecordLength() throws Exception
+  {
+    S3FixedWidthApplication app = new S3FixedWidthApplication();
+    LocalMode lma = LocalMode.newInstance();
+    Configuration conf = new Configuration(false);
+    conf.set("dt.operator.S3RecordReaderModule.prop.files", files);
+    //Should give IllegalArgumentException since recordLength is not set
+    //conf.set("dt.operator.S3RecordReaderModule.prop.recordLength", "8");
+    conf.set("dt.operator.S3RecordReaderModule.prop.blocksThreshold", "1");
+    conf.set("dt.operator.S3RecordReaderModule.prop.scanIntervalMillis", "10000");
+
+    lma.prepareDAG(app, conf);
+    LocalMode.Controller lc = lma.getController();
+    lc.setHeartbeatMonitoringEnabled(true);
+    lc.runAsync();
+    LOG.debug("Waiting for app to finish");
+    Thread.sleep(1000 * 1);
+    lc.shutdown();
+  }
+
+  public static class S3FixedWidthValidator extends BaseOperator
+  {
+    Set<String> records = new HashSet<String>();
+
+    public final transient DefaultInputPort<byte[]> data = new DefaultInputPort<byte[]>()
+    {
+
+      @Override
+      public void process(byte[] tuple)
+      {
+        String record = new String(tuple);
+        records.add(record);
+      }
+    };
+
+    public void teardown()
+    {
+      String[] expected = {"1234\n567", "890\nabcd", "e\nfgh\ni\n", "jklmop", "qr\nstuvw", "\nxyz\n" };
+
+      Set<String> expectedRecords = new HashSet<String>(Arrays.asList(expected));
+
+      Assert.assertEquals(expectedRecords, records);
+    }
+  }
+
+  private static class S3FixedWidthApplication implements StreamingApplication
+  {
+
+    public void populateDAG(DAG dag, Configuration conf)
+    {
+      S3RecordReaderModule recordReader = dag.addModule("S3RecordReaderModule", S3RecordReaderModule.class);
+      recordReader.setMode(RECORD_READER_MODE.FIXED_WIDTH_RECORD);
+      S3FixedWidthValidator validator = dag.addOperator("Validator", new S3FixedWidthValidator());
       dag.addStream("records", recordReader.records, validator.data);
     }
 

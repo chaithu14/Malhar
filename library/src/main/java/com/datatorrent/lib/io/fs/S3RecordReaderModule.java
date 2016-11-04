@@ -31,6 +31,7 @@ import com.datatorrent.api.DAG;
 import com.datatorrent.api.Module;
 import com.datatorrent.common.partitioner.StatelessPartitioner;
 import com.datatorrent.lib.io.block.FSSliceReader;
+import com.datatorrent.lib.io.fs.S3RecordReader.RECORD_READER_MODE;
 
 /**
  * This module is used for reading records/tuples from S3. Records can be read
@@ -76,6 +77,16 @@ public class S3RecordReaderModule implements Module
   public final transient ProxyOutputPort<byte[]> records = new ProxyOutputPort<byte[]>();
 
   /**
+   * Criteria for record split
+   */
+  private RECORD_READER_MODE mode = RECORD_READER_MODE.DELIMITED_RECORD;
+
+  /**
+   * Length for fixed width record
+   */
+  private int recordLength;
+
+  /**
    * Creates an instance of FileSplitter
    *
    * @return
@@ -96,6 +107,8 @@ public class S3RecordReaderModule implements Module
     s3RecordReader.setBucketName(S3RecordReader.extractBucket(getFiles()));
     s3RecordReader.setAccessKey(S3RecordReader.extractAccessKey(getFiles()));
     s3RecordReader.setSecretAccessKey(S3RecordReader.extractSecretAccessKey(getFiles()));
+    s3RecordReader.setMode(mode);
+    s3RecordReader.setRecordLength(recordLength);
     return s3RecordReader;
   }
 
@@ -129,8 +142,8 @@ public class S3RecordReaderModule implements Module
     }
 
     /**
-     * Overide the split size or input blocks of a file. If not specified,
-     * it would use default blockSize of the filesystem.
+     * Override the split size or input blocks of a file. If not specified,
+     * it would use default blockSize of the file system.
      */
     if (blockSize != 0) {
       fileSplitter.setBlockSize(blockSize);
@@ -143,7 +156,7 @@ public class S3RecordReaderModule implements Module
   /**
    * A comma separated list of directories to scan. If the path is not fully
    * qualified the default file system is used. A fully qualified path can be
-   * provided to scan directories in other filesystems.
+   * provided to scan directories in other file systems.
    *
    * @param files
    *          files
@@ -309,5 +322,46 @@ public class S3RecordReaderModule implements Module
   public void setBlockSize(long blockSize)
   {
     this.blockSize = blockSize;
+  }
+
+  /**
+   * Criteria for record split
+   *
+   * @return mode
+   */
+  public RECORD_READER_MODE getMode()
+  {
+    return mode;
+  }
+
+  /**
+   * Criteria for record split
+   *
+   * @param mode
+   *          Mode
+   */
+  public void setMode(RECORD_READER_MODE mode)
+  {
+    this.mode = mode;
+  }
+
+  /**
+   * Length for fixed width record
+   *
+   * @return record length
+   */
+  public int getRecordLength()
+  {
+    return recordLength;
+  }
+
+  /**
+   * Length for fixed width record
+   *
+   * @param recordLength
+   */
+  public void setRecordLength(int recordLength)
+  {
+    this.recordLength = recordLength;
   }
 }
