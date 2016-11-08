@@ -18,18 +18,43 @@
  */
 package org.apache.apex.malhar.lib.join;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+import javax.annotation.Nullable;
+import javax.validation.constraints.NotNull;
 
 import org.joda.time.Duration;
-import org.apache.apex.malhar.lib.state.managed.ManagedTimeStateImpl;
-import org.apache.apex.malhar.lib.state.managed.ManagedTimeStateMultiValue;
+
+import org.apache.apex.malhar.lib.state.managed.KeyBucketExtractor;
+import org.apache.apex.malhar.lib.state.managed.TimeExtractor;
+import org.apache.apex.malhar.lib.state.spillable.SequentialSpillableIdentifierGenerator;
 import org.apache.apex.malhar.lib.state.spillable.Spillable;
+import org.apache.apex.malhar.lib.state.spillable.SpillableComplexComponent;
+import org.apache.apex.malhar.lib.state.spillable.SpillableIdentifierGenerator;
+import org.apache.apex.malhar.lib.state.spillable.SpillableTimeSlicedArrayListImpl;
+import org.apache.apex.malhar.lib.state.spillable.SpillableTimeSlicedArrayListMultiMapImpl;
+import org.apache.apex.malhar.lib.state.spillable.SpillableTimeSlicedMapImpl;
+import org.apache.apex.malhar.lib.state.spillable.SpillableTimeStateStore;
+import org.apache.apex.malhar.lib.state.spillable.managed.ManagedTimeStateSpillableStore;
+import org.apache.apex.malhar.lib.utils.serde.Serde;
 import org.apache.hadoop.fs.Path;
+
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Multiset;
+import com.google.common.collect.Sets;
+
 import com.datatorrent.api.Context;
 import com.datatorrent.api.DAG;
 import com.datatorrent.api.Operator;
@@ -50,33 +75,31 @@ public abstract class AbstractManagedStateInnerJoinOperator<K,T> extends Abstrac
     Operator.CheckpointNotificationListener, Operator.IdleTimeHandler
 {
   public static final String stateDir = "managedState";
-  public static final String stream1State = "stream1Data";
-  public static final String stream2State = "stream2Data";
+  public static final String streamState = "streamData";
   private transient Map<JoinEvent<K,T>, Future<List>> waitingEvents = Maps.newLinkedHashMap();
   private int noOfBuckets = 1;
   private Long bucketSpanTime;
-  protected ManagedTimeStateImpl stream1Store;
-  protected ManagedTimeStateImpl stream2Store;
+  protected ManagedTimeStateSpillableStore streamStore;
 
   /**
    * Create Managed states and stores for both the streams.
    */
+  @SuppressWarnings("unchecked")
   @Override
   public void createStores()
   {
-    stream1Store = new ManagedTimeStateImpl();
-    stream2Store = new ManagedTimeStateImpl();
-    stream1Store.setNumBuckets(noOfBuckets);
-    stream2Store.setNumBuckets(noOfBuckets);
-    if (bucketSpanTime != null) {
-      stream1Store.getTimeBucketAssigner().setBucketSpan(Duration.millis(bucketSpanTime));
-      stream2Store.getTimeBucketAssigner().setBucketSpan(Duration.millis(bucketSpanTime));
+    component = new SpillableTimeSlicedComplexComponentImpl(streamStore);
+    if (isLeftKeyPrimary()) {
+      stream1Data = ((SpillableTimeSlicedComplexComponentImpl)component).newSpillableMap(getKeySerde(), getValueSerde());
+    } else {
+      stream1Data = ((SpillableTimeSlicedComplexComponentImpl)component).newSpillableArrayListMultimap(getKeySerde(), getValueSerde());
     }
-    stream1Store.getTimeBucketAssigner().setExpireBefore(Duration.millis(getExpiryTime()));
-    stream2Store.getTimeBucketAssigner().setExpireBefore(Duration.millis(getExpiryTime()));
 
-    stream1Data = new ManagedTimeStateMultiValue(stream1Store, !isLeftKeyPrimary());
-    stream2Data = new ManagedTimeStateMultiValue(stream2Store, !isRightKeyPrimary());
+    if (isRightKeyPrimary()) {
+      stream2Data = ((SpillableTimeSlicedComplexComponentImpl)component).newSpillableMap(getKeySerde(), getValueSerde());
+    } else {
+      stream2Data = ((SpillableTimeSlicedComplexComponentImpl)component).newSpillableArrayListMultimap(getKeySerde(), getValueSerde());
+    }
   }
 
   /**
@@ -90,17 +113,36 @@ public abstract class AbstractManagedStateInnerJoinOperator<K,T> extends Abstrac
    * @param tuple given tuple
    * @param isStream1Data Specifies whether the given tuple belongs to stream1 or not.
    */
+  @SuppressWarnings("unchecked")
   @Override
   protected void processTuple(T tuple, boolean isStream1Data)
   {
     Spillable.SpillableListMultimap<K,T> store = isStream1Data ? stream1Data : stream2Data;
     K key = extractKey(tuple,isStream1Data);
-    long timeBucket = extractTime(tuple,isStream1Data);
-    if (!((ManagedTimeStateMultiValue)store).put(key, tuple,timeBucket)) {
+    //long timeBucket = extractTime(tuple,isStream1Data);
+    if (!store.put(key, tuple)) {
       return;
     }
-    Spillable.SpillableListMultimap<K, T> valuestore = isStream1Data ? stream2Data : stream1Data;
-    Future<List> future = ((ManagedTimeStateMultiValue)valuestore).getAsync(key);
+    Future<List> future;
+
+    if (isStream1Data) {
+      if (isRightKeyPrimary()) {
+        future = ((SpillableMapAsMultiMapImpl)stream2Data).getAsync(key);
+      } else {
+        future = ((SpillableTimeSlicedArrayListMultiMapImpl)stream2Data).getAsync(key);
+      }
+    } else {
+      if (isLeftKeyPrimary()) {
+        future = ((SpillableMapAsMultiMapImpl)stream1Data).getAsync(key);
+      } else {
+        future = ((SpillableTimeSlicedArrayListMultiMapImpl)stream1Data).getAsync(key);
+      }
+    }
+
+    if (future == null) {
+      return;
+    }
+
     if (future.isDone()) {
       try {
         joinStream(tuple,isStream1Data, future.get());
@@ -123,41 +165,39 @@ public abstract class AbstractManagedStateInnerJoinOperator<K,T> extends Abstrac
   @Override
   public void beforeCheckpoint(long l)
   {
-    stream1Store.beforeCheckpoint(l);
-    stream2Store.beforeCheckpoint(l);
+    component.beforeCheckpoint(l);
   }
 
   @Override
   public void checkpointed(long l)
   {
-    stream1Store.checkpointed(l);
-    stream2Store.checkpointed(l);
+    component.checkpointed(l);
   }
 
   @Override
   public void committed(long l)
   {
-    stream1Store.committed(l);
-    stream2Store.committed(l);
+    component.committed(l);
   }
 
   @Override
   public void setup(Context.OperatorContext context)
   {
+    if (streamStore == null) {
+      streamStore = new ManagedTimeStateSpillableStore();
+      streamStore.setNumBuckets(noOfBuckets);
+      if (bucketSpanTime != null) {
+        streamStore.getTimeBucketAssigner().setBucketSpan(Duration.millis(bucketSpanTime));
+      }
+      streamStore.getTimeBucketAssigner().setExpireBefore(Duration.millis(getExpiryTime()));
+    }
+    ((FileAccessFSImpl)streamStore.getFileAccess()).setBasePath(context.getValue(DAG.APPLICATION_PATH) + Path.SEPARATOR + stateDir + Path.SEPARATOR + String.valueOf(context.getId()) + Path.SEPARATOR + streamState);
     super.setup(context);
-    ((FileAccessFSImpl)stream1Store.getFileAccess()).setBasePath(context.getValue(DAG.APPLICATION_PATH) + Path.SEPARATOR + stateDir + Path.SEPARATOR + String.valueOf(context.getId()) + Path.SEPARATOR + stream1State);
-    ((FileAccessFSImpl)stream2Store.getFileAccess()).setBasePath(context.getValue(DAG.APPLICATION_PATH) + Path.SEPARATOR + stateDir + Path.SEPARATOR + String.valueOf(context.getId()) + Path.SEPARATOR + stream2State);
-    stream1Store.getCheckpointManager().setStatePath("managed_state_" + stream1State);
-    stream1Store.getCheckpointManager().setStatePath("managed_state_" + stream2State);
-    stream1Store.setup(context);
-    stream2Store.setup(context);
   }
 
   @Override
   public void beginWindow(long windowId)
   {
-    stream1Store.beginWindow(windowId);
-    stream2Store.beginWindow(windowId);
     super.beginWindow(windowId);
   }
 
@@ -165,6 +205,7 @@ public abstract class AbstractManagedStateInnerJoinOperator<K,T> extends Abstrac
    * Process the waiting events
    * @param finalize finalize Whether or not to wait for future to return
    */
+  @SuppressWarnings("unchecked")
   private void processWaitEvents(boolean finalize)
   {
     Iterator<Map.Entry<JoinEvent<K,T>, Future<List>>> waitIterator = waitingEvents.entrySet().iterator();
@@ -190,16 +231,12 @@ public abstract class AbstractManagedStateInnerJoinOperator<K,T> extends Abstrac
   public void endWindow()
   {
     processWaitEvents(true);
-    stream1Store.endWindow();
-    stream2Store.endWindow();
     super.endWindow();
   }
 
   @Override
   public void teardown()
   {
-    stream1Store.teardown();
-    stream2Store.teardown();
     super.teardown();
   }
 
@@ -250,6 +287,490 @@ public abstract class AbstractManagedStateInnerJoinOperator<K,T> extends Abstrac
       this.key = key;
       this.value = value;
       this.isStream1Data = isStream1Data;
+    }
+  }
+
+  /**
+   * Specify the Serde for the keys
+   * @return Serde
+   */
+  public abstract Serde<K> getKeySerde();
+
+  /**
+   * Specify the Serde for the values
+   * @return Serde
+   */
+  public abstract Serde<T> getValueSerde();
+
+  /**
+   * Return type of SpillableMap as SpillableListMultimap to make as common interface for SpillableMap and SpillableArrayListMultiMap.
+   * @param <K> Key type
+   * @param <V> Value type
+   */
+  public class SpillableMapAsMultiMapImpl<K,V> implements Spillable.SpillableListMultimap<K, V>, Spillable.SpillableComponent
+  {
+    private SpillableTimeSlicedMapImpl<K,V> map;
+
+    public SpillableMapAsMultiMapImpl(SpillableTimeStateStore store, byte[] identifier, Serde<K> serdeKey, Serde<V> serdeValue)
+    {
+      map = new SpillableTimeSlicedMapImpl<>(store, identifier, serdeKey, serdeValue);
+    }
+
+    @Override
+    public void setup(Context.OperatorContext context)
+    {
+      map.setup(context);
+    }
+
+    @Override
+    public void teardown()
+    {
+      map.teardown();
+    }
+
+    @Override
+    public List<V> get(@Nullable K k)
+    {
+      V value = map.get(k);
+      if (value == null) {
+        return null;
+      }
+      List<V> valueList = new ArrayList<>();
+      valueList.add(value);
+      return valueList;
+    }
+
+    @SuppressWarnings("unchecked")
+    public Future<List<V>> getAsync(@Nullable K k)
+    {
+      return new CompositeFuture(map.getAsync(k));
+    }
+
+    @Override
+    public Set<K> keySet()
+    {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Multiset<K> keys()
+    {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Collection<V> values()
+    {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Collection<Map.Entry<K, V>> entries()
+    {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public List<V> removeAll(@Nullable Object o)
+    {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void clear()
+    {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public int size()
+    {
+      return map.size();
+    }
+
+    @Override
+    public boolean isEmpty()
+    {
+      return map.isEmpty();
+    }
+
+    @Override
+    public boolean containsKey(@Nullable Object o)
+    {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean containsValue(@Nullable Object o)
+    {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean containsEntry(@Nullable Object o, @Nullable Object o1)
+    {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean put(@Nullable K k, @Nullable V v)
+    {
+      map.put(k,v);
+      return true;
+    }
+
+    @Override
+    public boolean remove(@Nullable Object o, @Nullable Object o1)
+    {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean putAll(@Nullable K k, Iterable<? extends V> iterable)
+    {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean putAll(Multimap<? extends K, ? extends V> multimap)
+    {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public List<V> replaceValues(K k, Iterable<? extends V> iterable)
+    {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Map<K, Collection<V>> asMap()
+    {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void beginWindow(long windowId)
+    {
+      map.beginWindow(windowId);
+    }
+
+    @Override
+    public void endWindow()
+    {
+      map.endWindow();
+    }
+
+    public void setTimeExtractor(TimeExtractor timeExtractor)
+    {
+      map.setTimeExtractor(timeExtractor);
+    }
+
+    @SuppressWarnings("unchecked")
+    public void setKeyBucketExtractor(KeyBucketExtractor keyBucketExtractor)
+    {
+      map.setKeyBucketExtractor(keyBucketExtractor);
+    }
+
+  }
+
+  /**
+   * Converts the Future<V> to Future<List<V>>
+   * @param <V> Value type
+   */
+  public class CompositeFuture<V> implements Future<List<V>>
+  {
+    public Future<V> valueFuture;
+
+    public CompositeFuture(Future<V> valueFuture)
+    {
+      this.valueFuture = valueFuture;
+    }
+
+    @Override
+    public boolean cancel(boolean b)
+    {
+      return valueFuture.cancel(b);
+    }
+
+    @Override
+    public boolean isCancelled()
+    {
+      return valueFuture.isCancelled();
+    }
+
+    @Override
+    public boolean isDone()
+    {
+      return valueFuture.isDone();
+    }
+
+    /**
+     * Converts the single element into the list.
+     * @return the list of values
+     * @throws InterruptedException
+     * @throws ExecutionException
+     */
+    @Override
+    public List get() throws InterruptedException, ExecutionException
+    {
+      V value = valueFuture.get();
+      if (value == null) {
+        return null;
+      }
+      List<V> valueList = new ArrayList<>();
+      valueList.add(value);
+      return valueList;
+    }
+
+    @Override
+    public List get(long l, TimeUnit timeUnit) throws InterruptedException, ExecutionException, TimeoutException
+    {
+      throw new UnsupportedOperationException();
+    }
+  }
+
+  /**
+   * SpillableComplexComponent over SpillableTimeStateStore
+   */
+  public class SpillableTimeSlicedComplexComponentImpl implements SpillableComplexComponent
+  {
+    private List<SpillableComponent> componentList = Lists.newArrayList();
+
+    @NotNull
+    private SpillableTimeStateStore store;
+
+    @NotNull
+    private SpillableIdentifierGenerator identifierGenerator;
+
+    /**
+     * need to make sure all the buckets are created during setup.
+     */
+    protected transient Set<Long> bucketIds = Sets.newHashSet();
+
+    private SpillableTimeSlicedComplexComponentImpl()
+    {
+      // for kryo
+    }
+
+    public SpillableTimeSlicedComplexComponentImpl(SpillableTimeStateStore store)
+    {
+      this(store, new SequentialSpillableIdentifierGenerator());
+    }
+
+    public SpillableTimeSlicedComplexComponentImpl(SpillableTimeStateStore store, SpillableIdentifierGenerator identifierGenerator)
+    {
+      this.store = Preconditions.checkNotNull(store);
+      this.identifierGenerator = Preconditions.checkNotNull(identifierGenerator);
+    }
+
+    @Override
+    public <T> SpillableList<T> newSpillableArrayList(long bucket, Serde<T> serde)
+    {
+      SpillableTimeSlicedArrayListImpl<T> list = new SpillableTimeSlicedArrayListImpl<>(bucket, identifierGenerator.next(), store, serde);
+      componentList.add(list);
+      return list;
+    }
+
+    @Override
+    public <T> SpillableList<T> newSpillableArrayList(byte[] identifier, long bucket, Serde<T> serde)
+    {
+      identifierGenerator.register(identifier);
+      SpillableTimeSlicedArrayListImpl<T> list = new SpillableTimeSlicedArrayListImpl<>(bucket, identifier, store, serde);
+      bucketIds.add(bucket);
+      componentList.add(list);
+      return list;
+    }
+
+    @Override
+    public <K, V> SpillableMap<K, V> newSpillableMap(long bucket, Serde<K> serdeKey,
+        Serde<V> serdeValue)
+    {
+      SpillableTimeSlicedMapImpl<K, V> map = new SpillableTimeSlicedMapImpl<>(store, identifierGenerator.next(),
+          bucket, serdeKey, serdeValue);
+      bucketIds.add(bucket);
+      componentList.add(map);
+      return map;
+    }
+
+    @Override
+    public <K, V> SpillableMap<K, V> newSpillableMap(byte[] identifier, long bucket, Serde<K> serdeKey,
+        Serde<V> serdeValue)
+    {
+      identifierGenerator.register(identifier);
+      SpillableTimeSlicedMapImpl<K, V> map = new SpillableTimeSlicedMapImpl<>(store, identifier, bucket, serdeKey, serdeValue);
+      bucketIds.add(bucket);
+      componentList.add(map);
+      return map;
+    }
+
+    @Override
+    public <K, V> SpillableMap<K, V> newSpillableMap(Serde<K> serdeKey,
+        Serde<V> serdeValue, TimeExtractor<K> timeExtractor)
+    {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public <K, V> SpillableMap<K, V> newSpillableMap(byte[] identifier, Serde<K> serdeKey,
+        Serde<V> serdeValue, TimeExtractor<K> timeExtractor)
+    {
+      throw new UnsupportedOperationException();
+    }
+
+    public <K, V> SpillableListMultimap<K, V> newSpillableMap(byte[] identifier, Serde<K> serdeKey,
+        Serde<V> serdeValue)
+    {
+      SpillableMapAsMultiMapImpl<K,V> map = new SpillableMapAsMultiMapImpl<>(store, identifier, serdeKey, serdeValue);
+      componentList.add(map);
+      return map;
+    }
+
+    public <K, V> SpillableListMultimap<K, V> newSpillableMap(Serde<K> serdeKey, Serde<V> serdeValue)
+    {
+      SpillableMapAsMultiMapImpl<K,V> map = new SpillableMapAsMultiMapImpl<>(store, identifierGenerator.next(), serdeKey, serdeValue);
+      componentList.add(map);
+      return map;
+    }
+
+    @Override
+    public <K, V> SpillableListMultimap<K, V> newSpillableArrayListMultimap(long bucket, Serde<K> serdeKey, Serde<V> serdeValue)
+    {
+      SpillableTimeSlicedArrayListMultiMapImpl<K, V> map = new SpillableTimeSlicedArrayListMultiMapImpl<>(store,
+          identifierGenerator.next(), bucket, serdeKey, serdeValue);
+      bucketIds.add(bucket);
+      componentList.add(map);
+      return map;
+    }
+
+    @Override
+    public <K, V> SpillableListMultimap<K, V> newSpillableArrayListMultimap(byte[] identifier, long bucket,
+        Serde<K> serdeKey, Serde<V> serdeValue)
+    {
+      identifierGenerator.register(identifier);
+      SpillableTimeSlicedArrayListMultiMapImpl<K, V> map = new SpillableTimeSlicedArrayListMultiMapImpl<>(store,
+          identifier, bucket, serdeKey, serdeValue);
+      bucketIds.add(bucket);
+      componentList.add(map);
+      return map;
+    }
+
+    public <K, V> SpillableListMultimap<K, V> newSpillableArrayListMultimap(byte[] identifier,
+        Serde<K> serdeKey, Serde<V> serdeValue)
+    {
+      identifierGenerator.register(identifier);
+      SpillableTimeSlicedArrayListMultiMapImpl<K, V> map = new SpillableTimeSlicedArrayListMultiMapImpl<>(store,
+          identifier, serdeKey, serdeValue);
+      componentList.add(map);
+      return map;
+    }
+
+    public <K, V> SpillableListMultimap<K, V> newSpillableArrayListMultimap(Serde<K> serdeKey, Serde<V> serdeValue)
+    {
+      SpillableTimeSlicedArrayListMultiMapImpl<K, V> map = new SpillableTimeSlicedArrayListMultiMapImpl<>(store,
+          identifierGenerator.next(), serdeKey, serdeValue);
+      componentList.add(map);
+      return map;
+    }
+
+    @Override
+    public <K, V> SpillableSetMultimap<K, V> newSpillableSetMultimap(long bucket, Serde<K> serdeKey, Serde<V> serdeValue)
+    {
+      throw new UnsupportedOperationException("Unsupported Operation");
+    }
+
+    @Override
+    public <K, V> SpillableSetMultimap<K, V> newSpillableSetMultimap(long bucket, Serde<K> serdeKey,
+        Serde<V> serdeValue, TimeExtractor<K> timeExtractor)
+    {
+      throw new UnsupportedOperationException("Unsupported Operation");
+    }
+
+    @Override
+    public <T> SpillableMultiset<T> newSpillableMultiset(long bucket, Serde<T> serde)
+    {
+      throw new UnsupportedOperationException("Unsupported Operation");
+    }
+
+    @Override
+    public <T> SpillableMultiset<T> newSpillableMultiset(byte[] identifier, long bucket, Serde<T> serde)
+    {
+      throw new UnsupportedOperationException("Unsupported Operation");
+    }
+
+    @Override
+    public <T> SpillableQueue<T> newSpillableQueue(long bucket, Serde<T> serde)
+    {
+      throw new UnsupportedOperationException("Unsupported Operation");
+    }
+
+    @Override
+    public <T> SpillableQueue<T> newSpillableQueue(byte[] identifier, long bucket, Serde<T> serde)
+    {
+      throw new UnsupportedOperationException("Unsupported Operation");
+    }
+
+    @Override
+    public void setup(Context.OperatorContext context)
+    {
+      store.setup(context);
+
+      //ensure buckets created.
+      for (long bucketId : bucketIds) {
+        store.ensureBucket(bucketId);
+      }
+
+      //the bucket ids are only for setup. We don't need bucket ids during run time.
+      bucketIds.clear();
+
+      for (SpillableComponent spillableComponent: componentList) {
+        spillableComponent.setup(context);
+      }
+    }
+
+    @Override
+    public void beginWindow(long windowId)
+    {
+      store.beginWindow(windowId);
+      for (SpillableComponent spillableComponent: componentList) {
+        spillableComponent.beginWindow(windowId);
+      }
+    }
+
+    @Override
+    public void endWindow()
+    {
+      for (SpillableComponent spillableComponent: componentList) {
+        spillableComponent.endWindow();
+      }
+      store.endWindow();
+    }
+
+    @Override
+    public void teardown()
+    {
+      for (SpillableComponent spillableComponent: componentList) {
+        spillableComponent.teardown();
+      }
+      store.teardown();
+    }
+
+    @Override
+    public void beforeCheckpoint(long l)
+    {
+      store.beforeCheckpoint(l);
+    }
+
+    @Override
+    public void checkpointed(long l)
+    {
+      store.checkpointed(l);
+    }
+
+    @Override
+    public void committed(long l)
+    {
+      store.committed(l);
     }
   }
 }

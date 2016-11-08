@@ -22,6 +22,11 @@ import java.lang.reflect.Array;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.apex.malhar.lib.state.managed.KeyBucketExtractor;
+import org.apache.apex.malhar.lib.state.managed.TimeExtractor;
+import org.apache.apex.malhar.lib.state.spillable.SpillableTimeSlicedArrayListMultiMapImpl;
+import org.apache.apex.malhar.lib.utils.serde.GenericSerde;
+import org.apache.apex.malhar.lib.utils.serde.Serde;
 import org.apache.commons.lang3.ClassUtils;
 
 import com.datatorrent.api.Context;
@@ -109,6 +114,31 @@ public class POJOInnerJoinOperator extends AbstractManagedStateInnerJoinOperator
     timeIncrement = context.getValue(Context.OperatorContext.APPLICATION_WINDOW_COUNT) *
       context.getValue(Context.DAGContext.STREAMING_WINDOW_SIZE_MILLIS);
     super.setup(context);
+    if (isLeftKeyPrimary()) {
+      if (timeFields != null && timeFields.get(0) != null) {
+        ((SpillableMapImpl)stream1Data).setTimeExtractor(new POJOExtractTime(timeFields.get(0)));
+      }
+
+      ((SpillableMapImpl)stream1Data).setKeyBucketExtractor(new POJOKeyBucketExtractor());
+    } else {
+      if (timeFields != null && timeFields.get(0) != null) {
+        ((SpillableTimeSlicedArrayListMultiMapImpl)stream1Data).setTimeExtractor(new POJOExtractTime(timeFields.get(0)));
+      }
+
+      ((SpillableTimeSlicedArrayListMultiMapImpl)stream1Data).setKeyBucketExtractor(new POJOKeyBucketExtractor());
+    }
+    if (isRightKeyPrimary()) {
+      if (timeFields != null && timeFields.get(1) != null) {
+        ((SpillableMapImpl)stream2Data).setTimeExtractor(new POJOExtractTime(timeFields.get(1)));
+      }
+      ((SpillableMapImpl)stream2Data).setKeyBucketExtractor(new POJOKeyBucketExtractor());
+    } else {
+      if (timeFields != null && timeFields.get(1) != null) {
+        ((SpillableTimeSlicedArrayListMultiMapImpl)stream2Data).setTimeExtractor(new POJOExtractTime(timeFields.get(1)));
+      }
+      ((SpillableTimeSlicedArrayListMultiMapImpl)stream2Data).setKeyBucketExtractor(new POJOKeyBucketExtractor());
+    }
+
     for (int i = 0; i < 2; i++) {
       inputFieldObjects[i] = new FieldObjectMap();
     }
@@ -125,6 +155,32 @@ public class POJOInnerJoinOperator extends AbstractManagedStateInnerJoinOperator
   {
     return timeFields == null ? time : (long)(isStream1Data ? inputFieldObjects[0].timeFieldGet.get(tuple) :
           inputFieldObjects[1].timeFieldGet.get(tuple));
+  }
+
+  public class POJOExtractTime implements TimeExtractor<Object>
+  {
+    String timeFieldExpr;
+    PojoUtils.Getter timeFieldGet;
+
+    public POJOExtractTime(String timeField)
+    {
+      this.timeFieldExpr = timeField;
+    }
+
+    @Override
+    public long getTime(Object o)
+    {
+      if (timeFieldGet == null) {
+        Class timeField = null;
+        try {
+          timeField = ClassUtils.primitiveToWrapper(o.getClass().getDeclaredField(timeFieldExpr).getType());
+        } catch (NoSuchFieldException e) {
+          throw new RuntimeException(e);
+        }
+        timeFieldGet = PojoUtils.createGetter(o.getClass(), timeFieldExpr, timeField);
+      }
+      return (long)timeFieldGet.get(o);
+    }
   }
 
   /**
@@ -220,6 +276,18 @@ public class POJOInnerJoinOperator extends AbstractManagedStateInnerJoinOperator
     time += timeIncrement;
   }
 
+  @Override
+  public Serde<Object> getKeySerde()
+  {
+    return new GenericSerde<>();
+  }
+
+  @Override
+  public Serde<Object> getValueSerde()
+  {
+    return new GenericSerde<>();
+  }
+
   /**
    * Returns the streamcodec for the streams
    * @param isStream1data Specifies whether the codec needs for stream1 or stream2.
@@ -243,6 +311,15 @@ public class POJOInnerJoinOperator extends AbstractManagedStateInnerJoinOperator
     public FieldObjectMap()
     {
       fieldMap = new HashMap<>();
+    }
+  }
+
+  public class POJOKeyBucketExtractor implements KeyBucketExtractor<Object>
+  {
+    @Override
+    public long getBucket(Object o)
+    {
+      return o.hashCode() % getNoOfBuckets();
     }
   }
 }
