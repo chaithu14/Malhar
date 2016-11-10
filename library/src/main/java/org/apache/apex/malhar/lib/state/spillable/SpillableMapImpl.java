@@ -53,21 +53,21 @@ public class SpillableMapImpl<K, V> implements Spillable.SpillableMap<K, V>, Spi
     Serializable
 {
   private static final long serialVersionUID = 4552547110215784584L;
-  private transient WindowBoundedMapCache<K, V> cache = new WindowBoundedMapCache<>();
-  private transient Input tmpInput = new Input();
+  protected transient WindowBoundedMapCache<K, V> cache = new WindowBoundedMapCache<>();
+  protected transient Input tmpInput = new Input();
 
-  private TimeExtractor<K> timeExtractor;
+  protected TimeExtractor<K> timeExtractor;
 
   @NotNull
-  private SpillableStateStore store;
+  protected SpillableStateStore store;
 
-  private long bucket;
+  protected long bucket;
 
-  private int size = 0;
+  protected int size = 0;
 
   protected AffixKeyValueSerdeManager<K, V> keyValueSerdeManager;
 
-  private SpillableMapImpl()
+  protected SpillableMapImpl()
   {
     //for kryo
   }
@@ -253,7 +253,7 @@ public class SpillableMapImpl<K, V> implements Spillable.SpillableMap<K, V>, Spi
   {
   }
 
-  private long getBucket(K key)
+  protected long getBucket(K key)
   {
     return timeExtractor != null ? timeExtractor.getTime(key) : bucket;
   }

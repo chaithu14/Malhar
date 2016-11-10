@@ -19,6 +19,7 @@
 package org.apache.apex.malhar.lib.state.spillable;
 
 import org.apache.apex.malhar.lib.state.BucketedState;
+import org.apache.apex.malhar.lib.state.TimeSlicedBucketedState;
 import org.apache.apex.malhar.lib.state.managed.BucketProvider;
 import org.apache.hadoop.classification.InterfaceStability;
 
@@ -32,7 +33,7 @@ import com.datatorrent.api.Operator;
  * @since 3.5.0
  */
 @InterfaceStability.Evolving
-public interface SpillableStateStore extends BucketedState, Component<Context.OperatorContext>,
+public interface SpillableStateStore extends BucketedState, TimeSlicedBucketedState, Component<Context.OperatorContext>,
     Operator.CheckpointNotificationListener, WindowListener, BucketProvider
 {
 }

@@ -84,6 +84,12 @@ public class InMemSpillableStateStore implements SpillableStateStore
   }
 
   @Override
+  public void put(long bucketId, long time, @NotNull Slice key, @NotNull Slice value)
+  {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public Slice getSync(long bucketId, @NotNull Slice key)
   {
     Map<Slice, Slice> bucket = store.get(bucketId);
@@ -101,7 +107,19 @@ public class InMemSpillableStateStore implements SpillableStateStore
   }
 
   @Override
+  public Slice getSync(long bucketId, long time, @NotNull Slice key)
+  {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public Future<Slice> getAsync(long bucketId, @NotNull Slice key)
+  {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public Future<Slice> getAsync(long bucketId, long time, @NotNull Slice key)
   {
     throw new UnsupportedOperationException();
   }

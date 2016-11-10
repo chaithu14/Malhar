@@ -18,12 +18,35 @@
  */
 package org.apache.apex.malhar.lib.state.spillable.managed;
 
+import java.util.concurrent.Future;
+
+import javax.validation.constraints.NotNull;
+
 import org.apache.apex.malhar.lib.state.managed.ManagedTimeUnifiedStateImpl;
 import org.apache.apex.malhar.lib.state.spillable.SpillableStateStore;
+
+import com.datatorrent.netlet.util.Slice;
 
 /**
  *
  */
 public class ManagedTimeUnifiedStateSpillableStateStore extends ManagedTimeUnifiedStateImpl implements SpillableStateStore
 {
+  @Override
+  public void put(long bucketId, long time, @NotNull Slice key, @NotNull Slice value)
+  {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public Slice getSync(long bucketId, long time, @NotNull Slice key)
+  {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public Future<Slice> getAsync(long bucketId, long time, @NotNull Slice key)
+  {
+    throw new UnsupportedOperationException();
+  }
 }
