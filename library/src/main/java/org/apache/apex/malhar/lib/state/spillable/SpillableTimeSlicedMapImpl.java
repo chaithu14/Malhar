@@ -99,10 +99,10 @@ public class SpillableTimeSlicedMapImpl<K,V> implements Spillable.SpillableMap<K
    * Creats a {@link SpillableTimeSlicedMapImpl}.
    * @param store The {@link SpillableTimeStateStore} in which to spill to.
    * @param identifier The Id of this {@link SpillableTimeSlicedMapImpl}.
-   * {@link SpillableTimeSlicedMapImpl} in the provided {@link SpillableTimeStateStore}.
    * @param serdeKey The {@link Serde} to use when serializing and deserializing keys.
    * @param serdeValue The {@link Serde} to use when serializing and deserializing values.
    * @param timeExtractor Extract time from the each element and use it to decide where the data goes
+   * @param keyBucketExtractor Extract bucket id from the each element and use it to decide where the data goes
    */
   public SpillableTimeSlicedMapImpl(SpillableTimeStateStore store, byte[] identifier, Serde<K> serdeKey,
       Serde<V> serdeValue, @NotNull TimeExtractor<K> timeExtractor, @NotNull KeyBucketExtractor<K> keyBucketExtractor)
@@ -117,9 +117,9 @@ public class SpillableTimeSlicedMapImpl<K,V> implements Spillable.SpillableMap<K
    * Creats a {@link SpillableTimeSlicedMapImpl}.
    * @param store The {@link SpillableTimeStateStore} in which to spill to.
    * @param identifier The Id of this {@link SpillableTimeSlicedMapImpl}.
-   * {@link SpillableTimeSlicedMapImpl} in the provided {@link SpillableTimeStateStore}.
    * @param serdeKey The {@link Serde} to use when serializing and deserializing keys.
    * @param serdeValue The {@link Serde} to use when serializing and deserializing values.
+   * @param keyBucketExtractor Extract bucket id from the each element and use it to decide where the data goes
    */
   public SpillableTimeSlicedMapImpl(SpillableTimeStateStore store, byte[] identifier, Serde<K> serdeKey,
       Serde<V> serdeValue, @NotNull KeyBucketExtractor keyBucketExtractor)
@@ -133,7 +133,6 @@ public class SpillableTimeSlicedMapImpl<K,V> implements Spillable.SpillableMap<K
    * Creats a {@link SpillableTimeSlicedMapImpl}.
    * @param store The {@link SpillableTimeStateStore} in which to spill to.
    * @param identifier The Id of this {@link SpillableTimeSlicedMapImpl}.
-   * {@link SpillableTimeSlicedMapImpl} in the provided {@link SpillableTimeStateStore}.
    * @param serdeKey The {@link Serde} to use when serializing and deserializing keys.
    * @param serdeValue The {@link Serde} to use when serializing and deserializing values.
    */
@@ -198,6 +197,11 @@ public class SpillableTimeSlicedMapImpl<K,V> implements Spillable.SpillableMap<K
     return keyValueSerdeManager.deserializeValue(tmpInput);
   }
 
+  /**
+   * Returns the future using which the value is obtained. If the value is in cache then returns the immediateFuture.
+   * @param o given object
+   * @return Future<V>
+   */
   public Future<V> getAsync(Object o)
   {
     K key = (K)o;
@@ -208,7 +212,7 @@ public class SpillableTimeSlicedMapImpl<K,V> implements Spillable.SpillableMap<K
     }
 
     Future<Slice> valSlice = store.getAsync(getKeyBucket(key), keyValueSerdeManager.serializeDataKey(key, false));
-    return new DeserializeValueFuture(valSlice, tmpInput, keyValueSerdeManager);
+    return new DeserializeValueFuture(valSlice, new Input(), keyValueSerdeManager);
   }
 
   @Override
@@ -306,27 +310,6 @@ public class SpillableTimeSlicedMapImpl<K,V> implements Spillable.SpillableMap<K
   {
   }
 
-
-  public TimeExtractor getTimeExtractor()
-  {
-    return timeExtractor;
-  }
-
-  public void setTimeExtractor(TimeExtractor timeExtractor)
-  {
-    this.timeExtractor = timeExtractor;
-  }
-
-  public KeyBucketExtractor<K> getKeyBucketExtractor()
-  {
-    return keyBucketExtractor;
-  }
-
-  public void setKeyBucketExtractor(KeyBucketExtractor<K> keyBucketExtractor)
-  {
-    this.keyBucketExtractor = keyBucketExtractor;
-  }
-
   private long getTimeBucket(V value)
   {
     return timeExtractor != null ? timeExtractor.getTime(value) : time;
@@ -337,6 +320,9 @@ public class SpillableTimeSlicedMapImpl<K,V> implements Spillable.SpillableMap<K
     return keyBucketExtractor != null ? keyBucketExtractor.getBucket(key) : bucket;
   }
 
+  /**
+   * Converts the Future<Slice> to Future<V> and this is needed for getAsync
+   */
   public class DeserializeValueFuture implements Future<V>
   {
     private Future<Slice> slice;

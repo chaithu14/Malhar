@@ -95,6 +95,14 @@ public class SpillableTimeSlicedArrayListImpl<T> implements Spillable.SpillableL
       new CollectionSerde<T, List<T>>(serde, (Class)ArrayList.class));
   }
 
+  /**
+   * Creates a {@link SpillableTimeSlicedArrayListImpl}.
+   * @param prefix The Id of this {@link SpillableTimeSlicedArrayListImpl}.
+   * @param store The {@link SpillableTimeStateStore} in which to spill to.
+   * @param serde The {@link Serde} to use when serializing and deserializing data.
+   * @param timeExtractor Extract time from the each element and use it to decide where the data goes
+   * @param keyBucketExtractor Extract bucket id from the each element and use it to decide where the data goes
+   */
   public SpillableTimeSlicedArrayListImpl(@NotNull byte[] prefix,
       @NotNull SpillableTimeStateStore store,
       @NotNull Serde<T> serde, @NotNull TimeExtractor timeExtractor, @NotNull KeyBucketExtractor keyBucketExtractor)

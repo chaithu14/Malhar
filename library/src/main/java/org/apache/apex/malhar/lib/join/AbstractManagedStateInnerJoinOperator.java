@@ -40,7 +40,6 @@ import org.apache.apex.malhar.lib.state.spillable.SequentialSpillableIdentifierG
 import org.apache.apex.malhar.lib.state.spillable.Spillable;
 import org.apache.apex.malhar.lib.state.spillable.SpillableComplexComponent;
 import org.apache.apex.malhar.lib.state.spillable.SpillableIdentifierGenerator;
-import org.apache.apex.malhar.lib.state.spillable.SpillableTimeSlicedArrayListImpl;
 import org.apache.apex.malhar.lib.state.spillable.SpillableTimeSlicedArrayListMultiMapImpl;
 import org.apache.apex.malhar.lib.state.spillable.SpillableTimeSlicedMapImpl;
 import org.apache.apex.malhar.lib.state.spillable.SpillableTimeStateStore;
@@ -80,6 +79,8 @@ public abstract class AbstractManagedStateInnerJoinOperator<K,T> extends Abstrac
   private int noOfBuckets = 1;
   private Long bucketSpanTime;
   protected ManagedTimeStateSpillableStore streamStore;
+  protected transient TimeExtractor stream1TimeExtractor;
+  protected transient TimeExtractor stream2TimeExtractor;
 
   /**
    * Create Managed states and stores for both the streams.
@@ -91,15 +92,15 @@ public abstract class AbstractManagedStateInnerJoinOperator<K,T> extends Abstrac
     component = new SpillableTimeSlicedComplexComponentImpl(streamStore);
     SpillableTimeSlicedComplexComponentImpl timeSlicedComponent = (SpillableTimeSlicedComplexComponentImpl)component;
     if (isLeftKeyPrimary()) {
-      stream1Data = timeSlicedComponent.newSpillableMap(getKeySerde(), getValueSerde(), getTimeExtractor(true), getKeyBucketExtractor(true));
+      stream1Data = timeSlicedComponent.newSpillableMap(getKeySerde(), getValueSerde(), stream1TimeExtractor, getKeyBucketExtractor(true));
     } else {
-      stream1Data = timeSlicedComponent.newSpillableArrayListMultimap(getKeySerde(), getValueSerde(), getTimeExtractor(true), getKeyBucketExtractor(true));
+      stream1Data = timeSlicedComponent.newSpillableArrayListMultimap(getKeySerde(), getValueSerde(),stream1TimeExtractor, getKeyBucketExtractor(true));
     }
 
     if (isRightKeyPrimary()) {
-      stream2Data = timeSlicedComponent.newSpillableMap(getKeySerde(), getValueSerde(), getTimeExtractor(true), getKeyBucketExtractor(true));
+      stream2Data = timeSlicedComponent.newSpillableMap(getKeySerde(), getValueSerde(), stream1TimeExtractor, getKeyBucketExtractor(false));
     } else {
-      stream2Data = timeSlicedComponent.newSpillableArrayListMultimap(getKeySerde(), getValueSerde(), getTimeExtractor(true), getKeyBucketExtractor(true));
+      stream2Data = timeSlicedComponent.newSpillableArrayListMultimap(getKeySerde(), getValueSerde(), stream1TimeExtractor, getKeyBucketExtractor(false));
     }
   }
 
@@ -120,24 +121,19 @@ public abstract class AbstractManagedStateInnerJoinOperator<K,T> extends Abstrac
   {
     Spillable.SpillableListMultimap<K,T> store = isStream1Data ? stream1Data : stream2Data;
     K key = extractKey(tuple,isStream1Data);
-    //long timeBucket = extractTime(tuple,isStream1Data);
-    if (!store.put(key, tuple)) {
+
+    // Checks whether the tuple is expired or not.
+    // If it is expired, don't insert into the map.
+    if (isExpiredTuple(tuple,isStream1Data)) {
       return;
     }
+    store.put(key, tuple);
     Future<List> future;
 
     if (isStream1Data) {
-      if (isRightKeyPrimary()) {
-        future = ((SpillableMapAsMultiMapImpl)stream2Data).getAsync(key);
-      } else {
-        future = ((SpillableTimeSlicedArrayListMultiMapImpl)stream2Data).getAsync(key);
-      }
+      future = getAsync(stream2Data, isRightKeyPrimary(), key);
     } else {
-      if (isLeftKeyPrimary()) {
-        future = ((SpillableMapAsMultiMapImpl)stream1Data).getAsync(key);
-      } else {
-        future = ((SpillableTimeSlicedArrayListMultiMapImpl)stream1Data).getAsync(key);
-      }
+      future = getAsync(stream1Data, isLeftKeyPrimary(), key);
     }
 
     if (future == null) {
@@ -153,6 +149,39 @@ public abstract class AbstractManagedStateInnerJoinOperator<K,T> extends Abstrac
     } else {
       waitingEvents.put(new JoinEvent<>(key,tuple,isStream1Data),future);
     }
+  }
+
+  /**
+   * Check whether the given tuple is expired tuple or not
+   * @param tuple given tuple
+   * @param isStream1Data Specifies whether the given tuple belongs to stream1 or not.
+   * @return true if the given tuple is expired.
+   */
+  @SuppressWarnings("unchecked")
+  boolean isExpiredTuple(T tuple, boolean isStream1Data)
+  {
+    TimeExtractor timeExtractor = isStream1Data ? stream1TimeExtractor : stream2TimeExtractor;
+    if (timeExtractor == null) {
+      return false;
+    }
+    long time = timeExtractor.getTime(tuple);
+    return (streamStore.getTimeBucketAssigner().getTimeBucketAndAdjustBoundaries(time) == -1);
+  }
+
+  /**
+   * Called the getAsync() from the given map
+   * @param map given map
+   * @param isPrimary Specifies whether the map is multimap or not.
+   * @param key given key
+   * @return Future<List>
+   */
+  @SuppressWarnings("unchecked")
+  Future<List> getAsync(Spillable.SpillableListMultimap<K,T> map, boolean isPrimary, K key)
+  {
+    if (isPrimary) {
+      return ((SpillableMapAsMultiMapImpl)map).getAsync(key);
+    }
+    return ((SpillableTimeSlicedArrayListMultiMapImpl)map).getAsync(key);
   }
 
   @Override
@@ -193,6 +222,8 @@ public abstract class AbstractManagedStateInnerJoinOperator<K,T> extends Abstrac
       streamStore.getTimeBucketAssigner().setExpireBefore(Duration.millis(getExpiryTime()));
     }
     ((FileAccessFSImpl)streamStore.getFileAccess()).setBasePath(context.getValue(DAG.APPLICATION_PATH) + Path.SEPARATOR + stateDir + Path.SEPARATOR + String.valueOf(context.getId()) + Path.SEPARATOR + streamState);
+    stream1TimeExtractor = getTimeExtractor(true);
+    stream2TimeExtractor = getTimeExtractor(false);
     super.setup(context);
   }
 
@@ -308,7 +339,7 @@ public abstract class AbstractManagedStateInnerJoinOperator<K,T> extends Abstrac
   public abstract KeyBucketExtractor getKeyBucketExtractor(boolean isStream1);
 
   /**
-   * Return type of SpillableMap as SpillableListMultimap to make as common interface for SpillableMap and SpillableArrayListMultiMap.
+   * Return type of SpillableListMultimap to make as common interface for SpillableMap and SpillableArrayListMultiMap.
    * @param <K> Key type
    * @param <V> Value type
    */
@@ -316,17 +347,41 @@ public abstract class AbstractManagedStateInnerJoinOperator<K,T> extends Abstrac
   {
     private SpillableTimeSlicedMapImpl<K,V> map;
 
+    /**
+     * Creates a {@link SpillableMapAsMultiMapImpl}
+     * @param store The {@link SpillableTimeStateStore} in which to spill to.
+     * @param identifier The Id of this {@link SpillableMapAsMultiMapImpl}.
+     * @param serdeKey The {@link Serde} to use when serializing and deserializing keys.
+     * @param serdeValue The {@link Serde} to use when serializing and deserializing values.
+     */
     public SpillableMapAsMultiMapImpl(SpillableTimeStateStore store, byte[] identifier, Serde<K> serdeKey, Serde<V> serdeValue)
     {
       map = new SpillableTimeSlicedMapImpl<>(store, identifier, serdeKey, serdeValue);
     }
 
+    /**
+     * Creates a {@link SpillableMapAsMultiMapImpl}
+     * @param store The {@link SpillableTimeStateStore} in which to spill to.
+     * @param identifier The Id of this {@link SpillableMapAsMultiMapImpl}.
+     * @param serdeKey The {@link Serde} to use when serializing and deserializing keys.
+     * @param serdeValue The {@link Serde} to use when serializing and deserializing values.
+     * @param timeExtractor Extract time from the each element and use it to decide where the data goes
+     * @param keyBucketExtractor Extract key bucket id from each element and use it to descide where the data goes
+     */
     public SpillableMapAsMultiMapImpl(SpillableTimeStateStore store, byte[] identifier, Serde<K> serdeKey, Serde<V> serdeValue,
         @NotNull TimeExtractor timeExtractor, @NotNull KeyBucketExtractor keyBucketExtractor)
     {
       map = new SpillableTimeSlicedMapImpl<>(store, identifier, serdeKey, serdeValue, timeExtractor, keyBucketExtractor);
     }
 
+    /**
+     * Creates a {@link SpillableMapAsMultiMapImpl}
+     * @param store The {@link SpillableTimeStateStore} in which to spill to.
+     * @param identifier The Id of this {@link SpillableMapAsMultiMapImpl}.
+     * @param serdeKey The {@link Serde} to use when serializing and deserializing keys.
+     * @param serdeValue The {@link Serde} to use when serializing and deserializing values.
+     * @param keyBucketExtractor Extract key bucket id from each element and use it to descide where the data goes
+     */
     public SpillableMapAsMultiMapImpl(SpillableTimeStateStore store, byte[] identifier, Serde<K> serdeKey, Serde<V> serdeValue,
         @NotNull KeyBucketExtractor keyBucketExtractor)
     {
@@ -477,22 +532,10 @@ public abstract class AbstractManagedStateInnerJoinOperator<K,T> extends Abstrac
     {
       map.endWindow();
     }
-
-    public void setTimeExtractor(TimeExtractor timeExtractor)
-    {
-      map.setTimeExtractor(timeExtractor);
-    }
-
-    @SuppressWarnings("unchecked")
-    public void setKeyBucketExtractor(KeyBucketExtractor keyBucketExtractor)
-    {
-      map.setKeyBucketExtractor(keyBucketExtractor);
-    }
-
   }
 
   /**
-   * Converts the Future<V> to Future<List<V>>
+   * Converts the Future<V> to Future<List<V>>. This is used in map.getAsync()
    * @param <V> Value type
    */
   public class CompositeFuture<V> implements Future<List<V>>
@@ -584,41 +627,27 @@ public abstract class AbstractManagedStateInnerJoinOperator<K,T> extends Abstrac
     @Override
     public <T> SpillableList<T> newSpillableArrayList(long bucket, Serde<T> serde)
     {
-      SpillableTimeSlicedArrayListImpl<T> list = new SpillableTimeSlicedArrayListImpl<>(bucket, identifierGenerator.next(), store, serde);
-      componentList.add(list);
-      return list;
+      throw new UnsupportedOperationException();
     }
 
     @Override
     public <T> SpillableList<T> newSpillableArrayList(byte[] identifier, long bucket, Serde<T> serde)
     {
-      identifierGenerator.register(identifier);
-      SpillableTimeSlicedArrayListImpl<T> list = new SpillableTimeSlicedArrayListImpl<>(bucket, identifier, store, serde);
-      bucketIds.add(bucket);
-      componentList.add(list);
-      return list;
+      throw new UnsupportedOperationException();
     }
 
     @Override
     public <K, V> SpillableMap<K, V> newSpillableMap(long bucket, Serde<K> serdeKey,
         Serde<V> serdeValue)
     {
-      SpillableTimeSlicedMapImpl<K, V> map = new SpillableTimeSlicedMapImpl<>(store, identifierGenerator.next(),
-          bucket, serdeKey, serdeValue);
-      bucketIds.add(bucket);
-      componentList.add(map);
-      return map;
+      throw new UnsupportedOperationException();
     }
 
     @Override
     public <K, V> SpillableMap<K, V> newSpillableMap(byte[] identifier, long bucket, Serde<K> serdeKey,
         Serde<V> serdeValue)
     {
-      identifierGenerator.register(identifier);
-      SpillableTimeSlicedMapImpl<K, V> map = new SpillableTimeSlicedMapImpl<>(store, identifier, bucket, serdeKey, serdeValue);
-      bucketIds.add(bucket);
-      componentList.add(map);
-      return map;
+      throw new UnsupportedOperationException();
     }
 
     @Override
@@ -662,23 +691,14 @@ public abstract class AbstractManagedStateInnerJoinOperator<K,T> extends Abstrac
     @Override
     public <K, V> SpillableListMultimap<K, V> newSpillableArrayListMultimap(long bucket, Serde<K> serdeKey, Serde<V> serdeValue)
     {
-      SpillableTimeSlicedArrayListMultiMapImpl<K, V> map = new SpillableTimeSlicedArrayListMultiMapImpl<>(store,
-          identifierGenerator.next(), bucket, serdeKey, serdeValue);
-      bucketIds.add(bucket);
-      componentList.add(map);
-      return map;
+      throw new UnsupportedOperationException();
     }
 
     @Override
     public <K, V> SpillableListMultimap<K, V> newSpillableArrayListMultimap(byte[] identifier, long bucket,
         Serde<K> serdeKey, Serde<V> serdeValue)
     {
-      identifierGenerator.register(identifier);
-      SpillableTimeSlicedArrayListMultiMapImpl<K, V> map = new SpillableTimeSlicedArrayListMultiMapImpl<>(store,
-          identifier, bucket, serdeKey, serdeValue);
-      bucketIds.add(bucket);
-      componentList.add(map);
-      return map;
+      throw new UnsupportedOperationException();
     }
 
     public <K, V> SpillableListMultimap<K, V> newSpillableArrayListMultimap(byte[] identifier,

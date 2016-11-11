@@ -221,6 +221,11 @@ public class POJOInnerJoinOperator extends AbstractManagedStateInnerJoinOperator
     return new GenericSerde<>();
   }
 
+  /**
+   * Create an instance of POJOTimeExtractor
+   * @param isStream1 Specifies whether the timeExtractor is for stream1 or not.
+   * @return the POJOTimeExtractor
+   */
   @Override
   public TimeExtractor getTimeExtractor(boolean isStream1)
   {
@@ -237,6 +242,11 @@ public class POJOInnerJoinOperator extends AbstractManagedStateInnerJoinOperator
     }
   }
 
+  /**
+   * Create an instance of POJOKeyBucketExtractor
+   * @param isStream1 Specifies whether the KeyBucketExtractor is for stream1 or not.
+   * @return POJOKeyBucketExtractor
+   */
   @Override
   public KeyBucketExtractor getKeyBucketExtractor(boolean isStream1)
   {
@@ -299,25 +309,9 @@ public class POJOInnerJoinOperator extends AbstractManagedStateInnerJoinOperator
     public long getTime(Object o)
     {
       if (timeFieldGet == null) {
-        Class timeField = null;
-        try {
-          timeField = ClassUtils.primitiveToWrapper(o.getClass().getDeclaredField(timeFieldExpr).getType());
-        } catch (NoSuchFieldException e) {
-          throw new RuntimeException(e);
-        }
         timeFieldGet = PojoUtils.createGetter(o.getClass(), timeFieldExpr, Date.class);
       }
       return timeFieldGet.get(o).getTime();
-    }
-
-    public String getTimeFieldExpr()
-    {
-      return timeFieldExpr;
-    }
-
-    public void setTimeFieldExpr(String timeFieldExpr)
-    {
-      this.timeFieldExpr = timeFieldExpr;
     }
   }
 }

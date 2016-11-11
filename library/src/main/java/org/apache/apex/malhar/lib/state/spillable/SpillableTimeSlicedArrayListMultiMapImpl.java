@@ -99,6 +99,15 @@ public class SpillableTimeSlicedArrayListMultiMapImpl<K,V> implements Spillable.
     map = new SpillableTimeSlicedMapImpl<>(store, identifier, bucket, new PassThruSliceSerde(), new IntSerde());
   }
 
+  /**
+   * Creates a {@link SpillableTimeSlicedArrayListMultiMapImpl}.
+   * @param store The {@link SpillableTimeStateStore} in which to spill to.
+   * @param identifier The Id of this {@link SpillableTimeSlicedArrayListMultiMapImpl}.
+   * @param keySerde The {@link Serde} to use when serializing and deserializing keys.
+   * @param valueSerde The {@link Serde} to use when serializing and deserializing values.
+   * @param timeExtractor Extract time from the each element and use it to decide where the data goes
+   * @param keyBucketExtractor Extract bucket id from the each element and use it to decide where the data goes
+   */
   public SpillableTimeSlicedArrayListMultiMapImpl(SpillableTimeStateStore store, byte[] identifier,
       Serde<K> keySerde, Serde<V> valueSerde, @NotNull TimeExtractor timeExtractor, @NotNull KeyBucketExtractor keyBucketExtractor)
   {
@@ -112,6 +121,14 @@ public class SpillableTimeSlicedArrayListMultiMapImpl<K,V> implements Spillable.
     map = new SpillableTimeSlicedMapImpl<>(store, identifier, new PassThruSliceSerde(), new IntSerde());
   }
 
+  /**
+   * Creates a {@link SpillableTimeSlicedArrayListMultiMapImpl}.
+   * @param store The {@link SpillableTimeStateStore} in which to spill to.
+   * @param identifier The Id of this {@link SpillableTimeSlicedArrayListMultiMapImpl}.
+   * @param keySerde The {@link Serde} to use when serializing and deserializing keys.
+   * @param valueSerde The {@link Serde} to use when serializing and deserializing values.
+   * @param keyBucketExtractor Extract bucket id from the each element and use it to decide where the data goes
+   */
   public SpillableTimeSlicedArrayListMultiMapImpl(SpillableTimeStateStore store, byte[] identifier,
       Serde<K> keySerde, Serde<V> valueSerde, @NotNull KeyBucketExtractor keyBucketExtractor)
   {
@@ -124,6 +141,13 @@ public class SpillableTimeSlicedArrayListMultiMapImpl<K,V> implements Spillable.
     map = new SpillableTimeSlicedMapImpl<>(store, identifier, new PassThruSliceSerde(), new IntSerde());
   }
 
+  /**
+   * Creates a {@link SpillableTimeSlicedArrayListMultiMapImpl}.
+   * @param store The {@link SpillableTimeStateStore} in which to spill to.
+   * @param identifier The Id of this {@link SpillableTimeSlicedArrayListMultiMapImpl}.
+   * @param keySerde The {@link Serde} to use when serializing and deserializing keys.
+   * @param valueSerde The {@link Serde} to use when serializing and deserializing values.
+   */
   public SpillableTimeSlicedArrayListMultiMapImpl(SpillableTimeStateStore store, byte[] identifier,
       Serde<K> keySerde, Serde<V> valueSerde)
   {
@@ -144,7 +168,6 @@ public class SpillableTimeSlicedArrayListMultiMapImpl<K,V> implements Spillable.
   {
     return getHelper(key);
   }
-
 
   private SpillableTimeSlicedArrayListImpl<V> getHelper(@Nullable K key)
   {
@@ -368,26 +391,6 @@ public class SpillableTimeSlicedArrayListMultiMapImpl<K,V> implements Spillable.
   {
     isRunning = false;
     map.teardown();
-  }
-
-  public TimeExtractor getTimeExtractor()
-  {
-    return timeExtractor;
-  }
-
-  public void setTimeExtractor(TimeExtractor timeExtractor)
-  {
-    this.timeExtractor = timeExtractor;
-  }
-
-  public KeyBucketExtractor getKeyBucketExtractor()
-  {
-    return keyBucketExtractor;
-  }
-
-  public void setKeyBucketExtractor(KeyBucketExtractor keyBucketExtractor)
-  {
-    this.keyBucketExtractor = keyBucketExtractor;
   }
 
   @SuppressWarnings("unchecked")
