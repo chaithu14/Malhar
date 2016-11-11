@@ -99,6 +99,25 @@ public class SpillableTimeSlicedMapImpl<K,V> implements Spillable.SpillableMap<K
    * Creats a {@link SpillableTimeSlicedMapImpl}.
    * @param store The {@link SpillableTimeStateStore} in which to spill to.
    * @param identifier The Id of this {@link SpillableTimeSlicedMapImpl}.
+   * @param bucket The Id of the bucket used to store this
+   * {@link SpillableTimeSlicedMapImpl} in the provided {@link SpillableTimeStateStore}.
+   * @param serdeKey The {@link Serde} to use when serializing and deserializing keys.
+   * @param serdeValue The {@link Serde} to use when serializing and deserializing values.
+   * @param timeExtractor Extract time from the each element and use it to decide where the data goes
+   */
+  public SpillableTimeSlicedMapImpl(SpillableTimeStateStore store, byte[] identifier, long bucket, Serde<K> serdeKey,
+      Serde<V> serdeValue, TimeExtractor timeExtractor)
+  {
+    this.store = Preconditions.checkNotNull(store);
+    this.bucket = bucket;
+    this.timeExtractor = timeExtractor;
+    keyValueSerdeManager = new AffixKeyValueSerdeManager<>(null, identifier, Preconditions.checkNotNull(serdeKey), Preconditions.checkNotNull(serdeValue));
+  }
+
+  /**
+   * Creats a {@link SpillableTimeSlicedMapImpl}.
+   * @param store The {@link SpillableTimeStateStore} in which to spill to.
+   * @param identifier The Id of this {@link SpillableTimeSlicedMapImpl}.
    * @param serdeKey The {@link Serde} to use when serializing and deserializing keys.
    * @param serdeValue The {@link Serde} to use when serializing and deserializing values.
    * @param timeExtractor Extract time from the each element and use it to decide where the data goes
@@ -298,7 +317,7 @@ public class SpillableTimeSlicedMapImpl<K,V> implements Spillable.SpillableMap<K
     }
 
     for (K key: cache.getRemovedKeys()) {
-      store.put(getKeyBucket(key), getTimeBucket(cache.get(key)), keyValueSerdeManager.serializeDataKey(key, true), BufferSlice.EMPTY_SLICE);
+      store.put(getKeyBucket(key), time, keyValueSerdeManager.serializeDataKey(key, true), BufferSlice.EMPTY_SLICE);
     }
     cache.endWindow();
     keyValueSerdeManager.resetReadBuffer();

@@ -179,7 +179,7 @@ public class SpillableTimeSlicedArrayListMultiMapImpl<K,V> implements Spillable.
         return null;
       }
 
-      spillableArrayList = new SpillableTimeSlicedArrayListImpl<V>(getKeyBucket(key), keyValueSerdeManager.serializeDataKey(key, false).toByteArray(), store, valueSerde);
+      spillableArrayList = new SpillableTimeSlicedArrayListImpl<V>(getKeyBucket(key), keyValueSerdeManager.serializeDataKey(key, false).toByteArray(), store, valueSerde, timeExtractor);
       spillableArrayList.setSize(size);
     }
 
@@ -198,7 +198,7 @@ public class SpillableTimeSlicedArrayListMultiMapImpl<K,V> implements Spillable.
         return null;
       }
 
-      spillableArrayList = new SpillableTimeSlicedArrayListImpl<V>(getKeyBucket(key), keyValueSerdeManager.serializeDataKey(key, false).toByteArray(), store, valueSerde);
+      spillableArrayList = new SpillableTimeSlicedArrayListImpl<V>(getKeyBucket(key), keyValueSerdeManager.serializeDataKey(key, false).toByteArray(), store, valueSerde, timeExtractor);
       spillableArrayList.setSize(size);
     }
 
@@ -297,7 +297,7 @@ public class SpillableTimeSlicedArrayListMultiMapImpl<K,V> implements Spillable.
 
     if (spillableArrayList == null) {
       Slice keyPrefix = keyValueSerdeManager.serializeDataKey(key, true);
-      spillableArrayList = new SpillableTimeSlicedArrayListImpl<V>(getKeyBucket(key), keyPrefix.toByteArray(), store, valueSerde);
+      spillableArrayList = new SpillableTimeSlicedArrayListImpl<V>(getKeyBucket(key), keyPrefix.toByteArray(), store, valueSerde, timeExtractor);
       spillableArrayList.setup(context);
       cache.put(key, spillableArrayList);
     }

@@ -27,7 +27,6 @@ import java.util.concurrent.Future;
 
 import javax.validation.constraints.NotNull;
 
-import org.apache.apex.malhar.lib.state.managed.KeyBucketExtractor;
 import org.apache.apex.malhar.lib.state.managed.TimeExtractor;
 import org.apache.apex.malhar.lib.utils.serde.CollectionSerde;
 import org.apache.apex.malhar.lib.utils.serde.IntSerde;
@@ -97,22 +96,29 @@ public class SpillableTimeSlicedArrayListImpl<T> implements Spillable.SpillableL
 
   /**
    * Creates a {@link SpillableTimeSlicedArrayListImpl}.
+   * @param bucketId The Id of the bucket used to store this
+   * {@link SpillableTimeSlicedArrayListImpl} in the provided {@link SpillableTimeStateStore}.
    * @param prefix The Id of this {@link SpillableTimeSlicedArrayListImpl}.
    * @param store The {@link SpillableTimeStateStore} in which to spill to.
-   * @param serde The {@link Serde} to use when serializing and deserializing data.
+   * @param serde The {@link SpillableTimeStateStore} in which to spill to.
    * @param timeExtractor Extract time from the each element and use it to decide where the data goes
-   * @param keyBucketExtractor Extract bucket id from the each element and use it to decide where the data goes
    */
-  public SpillableTimeSlicedArrayListImpl(@NotNull byte[] prefix,
-      @NotNull SpillableTimeStateStore store,
-      @NotNull Serde<T> serde, @NotNull TimeExtractor timeExtractor, @NotNull KeyBucketExtractor keyBucketExtractor)
+  public SpillableTimeSlicedArrayListImpl(long bucketId, @NotNull byte[] prefix,
+      @NotNull SpillableTimeStateStore store, @NotNull Serde<T> serde, TimeExtractor timeExtractor)
   {
+    this.bucketId = bucketId;
     this.prefix = Preconditions.checkNotNull(prefix);
     this.store = Preconditions.checkNotNull(store);
     this.serde = Preconditions.checkNotNull(serde);
 
-    map = new SpillableTimeSlicedMapImpl<>(store, prefix, new IntSerde(),
-      new CollectionSerde<T, List<T>>(serde, (Class)ArrayList.class), timeExtractor, keyBucketExtractor);
+    if (timeExtractor != null) {
+      map = new SpillableTimeSlicedMapImpl<>(store, prefix, bucketId, new IntSerde(),
+        new CollectionSerde<T, List<T>>(serde, (Class)ArrayList.class), new ArrayListTimeExtractor(timeExtractor));
+    } else {
+      map = new SpillableTimeSlicedMapImpl<>(store, prefix, bucketId, new IntSerde(),
+        new CollectionSerde<T, List<T>>(serde, (Class)ArrayList.class));
+    }
+
   }
 
   /**
@@ -391,5 +397,21 @@ public class SpillableTimeSlicedArrayListImpl<T> implements Spillable.SpillableL
   public void teardown()
   {
     map.teardown();
+  }
+
+  public class ArrayListTimeExtractor implements TimeExtractor<List>
+  {
+    private TimeExtractor timeExtractor;
+
+    public ArrayListTimeExtractor(TimeExtractor timeExtractor)
+    {
+      this.timeExtractor = timeExtractor;
+    }
+
+    @Override
+    public long getTime(List list)
+    {
+      return timeExtractor.getTime(list.get(list.size() - 1));
+    }
   }
 }
