@@ -73,13 +73,14 @@ public class S3BlockUpload implements Operator, Operator.CheckpointNotificationL
   @NotNull
   private String secretAccessKey;
   private String endPoint;
-  private Map<Long, S3BlockMetaData> blockInfo = new HashMap<>();
+  private Map<String, S3BlockMetaData> blockInfo = new HashMap<>();
+  private Map<Long, String> blockId2FilePath = new HashMap<>();
   private WindowDataManager windowDataManager = new FSWindowDataManager();
   protected transient AmazonS3 s3Client;
   private transient Set<Long> processedBlocks;
   private transient long currentWindowId;
-  private transient List<AbstractBlockReader.ReaderRecord<Slice>> recordData;
-  private transient Map<Long, UploadBlockMetadata> currentWindowRecoveryState;
+  private transient List<AbstractBlockReader.ReaderRecord<Slice>> waitingTuples;
+  private transient Map<String, UploadBlockMetadata> currentWindowRecoveryState;
   public final transient DefaultOutputPort<UploadBlockMetadata> output = new DefaultOutputPort<>();
 
   /**
@@ -102,6 +103,10 @@ public class S3BlockUpload implements Operator, Operator.CheckpointNotificationL
     @Override
     public void process(BlockMetadata.FileBlockMetadata blockMetadata)
     {
+      if (currentWindowId <= windowDataManager.getLargestCompletedWindow()) {
+        return;
+      }
+      blockId2FilePath.put(blockMetadata.getBlockId(), blockMetadata.getFilePath());
       LOG.debug("received blockId {} for file {} ", blockMetadata.getBlockId(), blockMetadata.getFilePath());
     }
   };
@@ -128,20 +133,34 @@ public class S3BlockUpload implements Operator, Operator.CheckpointNotificationL
       return;
     }
     long[] blocks = tuple.getFileMetadata().getBlockIds();
+    String filePath = tuple.getFileMetadata().getFilePath();
     for (int i = 0; i < blocks.length; i++) {
-      blockInfo.put(blocks[i], new S3BlockMetaData(tuple.getKeyName(), tuple.getUploadId(), i + 1));
+      blockInfo.put(getUniqueBlockIdFromFile(blocks[i], filePath), new S3BlockMetaData(tuple.getKeyName(), tuple.getUploadId(), i + 1));
     }
-    if (blocks.length < 1) {
-      return;
+    if (blocks.length > 0) {
+      blockInfo.get(getUniqueBlockIdFromFile(blocks[blocks.length - 1], filePath)).setLastBlock(true);
     }
-    blockInfo.get(blocks[blocks.length - 1]).setLastBlock(true);
+    if (waitingTuples.size() > 0) {
+      processWaitBlocks();
+    }
+  }
+
+  /**
+   * Construct the unique block id from the given block id and file path.
+   * @param blockId Id of the block
+   * @param filepath given filepath
+   * @return unique block id
+   */
+  public static String getUniqueBlockIdFromFile(long blockId, String filepath)
+  {
+    return Long.toString(blockId) + "|" + filepath;
   }
 
   @Override
   public void setup(Context.OperatorContext context)
   {
     processedBlocks = new HashSet<>();
-    recordData = new ArrayList<>();
+    waitingTuples = new ArrayList<>();
     currentWindowRecoveryState = new HashMap<>();
     windowDataManager.setup(context);
     s3Client = createClient();
@@ -177,11 +196,11 @@ public class S3BlockUpload implements Operator, Operator.CheckpointNotificationL
   {
     try {
       @SuppressWarnings("unchecked")
-      Map<Long, UploadBlockMetadata> recoveredData = (Map<Long, UploadBlockMetadata>)windowDataManager.retrieve(windowId);
+      Map<String, UploadBlockMetadata> recoveredData = (Map<String, UploadBlockMetadata>)windowDataManager.retrieve(windowId);
       if (recoveredData == null) {
         return;
       }
-      for (Map.Entry<Long, UploadBlockMetadata> ubm: recoveredData.entrySet()) {
+      for (Map.Entry<String, UploadBlockMetadata> ubm: recoveredData.entrySet()) {
         output.emit(ubm.getValue());
         blockInfo.remove(ubm.getKey());
       }
@@ -193,7 +212,7 @@ public class S3BlockUpload implements Operator, Operator.CheckpointNotificationL
   @Override
   public void endWindow()
   {
-    if (recordData.size() > 0) {
+    if (waitingTuples.size() > 0) {
       processWaitBlocks();
     }
 
@@ -222,7 +241,7 @@ public class S3BlockUpload implements Operator, Operator.CheckpointNotificationL
    */
   private void processWaitBlocks()
   {
-    Iterator<AbstractBlockReader.ReaderRecord<Slice>> ite = recordData.iterator();
+    Iterator<AbstractBlockReader.ReaderRecord<Slice>> ite = waitingTuples.iterator();
 
     while (ite.hasNext()) {
       AbstractBlockReader.ReaderRecord<Slice> blockData = ite.next();
@@ -242,9 +261,14 @@ public class S3BlockUpload implements Operator, Operator.CheckpointNotificationL
     if (currentWindowId <= windowDataManager.getLargestCompletedWindow()) {
       return;
     }
-    S3BlockMetaData metaData = blockInfo.get(tuple.getBlockId());
+    if (blockId2FilePath.get(tuple.getBlockId()) == null) {
+      waitingTuples.add(tuple);
+      return;
+    }
+    String uniqueBlockId = getUniqueBlockIdFromFile(tuple.getBlockId(), blockId2FilePath.get(tuple.getBlockId()));
+    S3BlockMetaData metaData = blockInfo.get(uniqueBlockId);
     if (metaData == null) {
-      recordData.add(tuple);
+      waitingTuples.add(tuple);
       return;
     }
     if (processedBlocks.contains(tuple.getBlockId())) {
@@ -252,29 +276,30 @@ public class S3BlockUpload implements Operator, Operator.CheckpointNotificationL
     }
     processedBlocks.add(tuple.getBlockId());
     long partSize = tuple.getRecord().length;
-    PartETag pt = null;
+    PartETag partETag = null;
     ByteArrayInputStream bis = new ByteArrayInputStream(tuple.getRecord().buffer);
     // Check if it is a Single block of a file
     if (metaData.isLastBlock && metaData.partNo == 1) {
       ObjectMetadata omd = new ObjectMetadata();
       omd.setContentLength(partSize);
       PutObjectResult result = s3Client.putObject(new PutObjectRequest(bucketName, metaData.getKeyName(), bis, omd));
-      pt = new PartETag(1, result.getETag());
+      partETag = new PartETag(1, result.getETag());
     } else {
       // Else upload use multi-part feature
       try {
         // Create request to upload a part.
         UploadPartRequest uploadRequest = new UploadPartRequest().withBucketName(bucketName).withKey(metaData.getKeyName())
             .withUploadId(metaData.getUploadId()).withPartNumber(metaData.getPartNo()).withInputStream(bis).withPartSize(partSize);
-        pt =  s3Client.uploadPart(uploadRequest).getPartETag();
+        partETag =  s3Client.uploadPart(uploadRequest).getPartETag();
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     }
 
-    UploadBlockMetadata uploadmetadata = new UploadBlockMetadata(pt, metaData.getKeyName());
+    UploadBlockMetadata uploadmetadata = new UploadBlockMetadata(partETag, metaData.getKeyName());
     output.emit(uploadmetadata);
-    currentWindowRecoveryState.put(tuple.getBlockId(), uploadmetadata);
+    currentWindowRecoveryState.put(uniqueBlockId, uploadmetadata);
+    blockId2FilePath.remove(uniqueBlockId);
     try {
       bis.close();
     } catch (IOException e) {

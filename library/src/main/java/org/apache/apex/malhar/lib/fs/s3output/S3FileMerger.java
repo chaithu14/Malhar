@@ -46,7 +46,6 @@ import com.google.common.base.Preconditions;
 import com.datatorrent.api.Context;
 import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.Operator;
-
 /**
  * This operator can be used to merge the S3 blocks into a file. This operator will request for
  * S3 CompleteMultipartUploadRequest once all the blocks are uploaded using multi-part feature.
@@ -70,6 +69,7 @@ public class S3FileMerger implements Operator, Operator.CheckpointNotificationLi
   private Map<String, S3InitiateFileUpload.UploadFileMetadata> fileMetadatas = new HashMap<>();
   protected transient long currentWindowId;
   protected transient AmazonS3 s3Client;
+  private transient List<String> currentWindowRecoveryState;
 
   /**
    * Input port to receive UploadBlockMetadata
@@ -96,7 +96,7 @@ public class S3FileMerger implements Operator, Operator.CheckpointNotificationLi
     }
     listOfUploads.add(tuple.getPartETag());
     if (fileMetadatas.get(tuple.getKeyName()) != null) {
-      emitFileMerge(tuple.getKeyName());
+      verifyAndEmitFileMerge(tuple.getKeyName());
     }
   }
 
@@ -121,13 +121,14 @@ public class S3FileMerger implements Operator, Operator.CheckpointNotificationLi
     String keyName = tuple.getKeyName();
     fileMetadatas.put(keyName, tuple);
     if (uploadParts.get(keyName) != null) {
-      emitFileMerge(keyName);
+      verifyAndEmitFileMerge(keyName);
     }
   }
 
   @Override
   public void setup(Context.OperatorContext context)
   {
+    currentWindowRecoveryState = new ArrayList<>();
     windowDataManager.setup(context);
     s3Client = createClient();
   }
@@ -150,6 +151,29 @@ public class S3FileMerger implements Operator, Operator.CheckpointNotificationLi
   public void beginWindow(long windowId)
   {
     currentWindowId = windowId;
+    if (windowId <= windowDataManager.getLargestCompletedWindow()) {
+      replay(windowId);
+    }
+  }
+
+  /**
+   * Replay the state.
+   * @param windowId replay window Id
+   */
+  protected void replay(long windowId)
+  {
+    try {
+      @SuppressWarnings("unchecked")
+      List<String> recoveredData = (List<String>)windowDataManager.retrieve(windowId);
+      if (recoveredData == null || recoveredData.size() == 0) {
+        return;
+      }
+      for (String keyName: recoveredData) {
+        uploadedFiles.add(keyName);
+      }
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Override
@@ -157,7 +181,7 @@ public class S3FileMerger implements Operator, Operator.CheckpointNotificationLi
   {
     if (currentWindowId > windowDataManager.getLargestCompletedWindow()) {
       try {
-        windowDataManager.save("UploadedFiles", currentWindowId);
+        windowDataManager.save(currentWindowRecoveryState, currentWindowId);
       } catch (IOException e) {
         throw new RuntimeException("Unable to save recovery", e);
       }
@@ -174,21 +198,21 @@ public class S3FileMerger implements Operator, Operator.CheckpointNotificationLi
    * Send the CompleteMultipartUploadRequest to S3 if all the blocks of a file are uploaded into S3.
    * @param keyName file to upload into S3
    */
-  private void emitFileMerge(String keyName)
+  private void verifyAndEmitFileMerge(String keyName)
   {
+    if (currentWindowId <= windowDataManager.getLargestCompletedWindow()) {
+      return;
+    }
     S3InitiateFileUpload.UploadFileMetadata uploadFileMetadata = fileMetadatas.get(keyName);
     List<PartETag> partETags = uploadParts.get(keyName);
     if (partETags == null || uploadFileMetadata == null ||
         uploadFileMetadata.getFileMetadata().getNumberOfBlocks() != partETags.size()) {
       return;
     }
-    if (currentWindowId <= windowDataManager.getLargestCompletedWindow()) {
-      uploadedFiles.add(keyName);
-      return;
-    }
 
     if (partETags.size() <= 1) {
       uploadedFiles.add(keyName);
+      currentWindowRecoveryState.add(keyName);
       return;
     }
 
@@ -197,6 +221,7 @@ public class S3FileMerger implements Operator, Operator.CheckpointNotificationLi
     CompleteMultipartUploadResult result = s3Client.completeMultipartUpload(compRequest);
     if (result.getETag() != null) {
       uploadedFiles.add(keyName);
+      currentWindowRecoveryState.add(keyName);
       LOG.debug("Uploaded file {} successfully", keyName);
     }
   }
