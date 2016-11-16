@@ -156,7 +156,7 @@ public interface ReaderContext<STREAM extends InputStream & PositionedReadable>
     private final transient ByteArrayOutputStream emptyBuilder;
     private final transient ByteArrayOutputStream tmpBuilder;
 
-    private transient byte[] buffer;
+    protected transient byte[] buffer;
     private transient String bufferStr;
     private transient int posInStr;
     private transient boolean overflowBlockRead;
@@ -174,9 +174,6 @@ public interface ReaderContext<STREAM extends InputStream & PositionedReadable>
     @Override
     public void initialize(STREAM stream, BlockMetadata blockMetadata, boolean consecutiveBlock)
     {
-      if (buffer == null) {
-        buffer = new byte[bufferSize];
-      }
       overflowBlockRead = false;
       posInStr = 0;
       offset = blockMetadata.getOffset();
@@ -188,13 +185,16 @@ public interface ReaderContext<STREAM extends InputStream & PositionedReadable>
      *
      * @param bytesFromCurrentOffset
      *          bytes read till now from current block
-     * @param endByte
-     *          byte upto which the data is to be read
-     * @return the number of bytes read, -1 if 0 bytes read
+     * @param bytesToFetch
+     *          the number of bytes to be read from stream
+     * @return the number of bytes actually read, -1 if 0 bytes read
      * @throws IOException
      */
     protected int readData(final long bytesFromCurrentOffset, final int bytesToFetch) throws IOException
     {
+      if (buffer == null) {
+        buffer = new byte[bufferSize];
+      }
       return stream.read(offset + bytesFromCurrentOffset, buffer, 0, bytesToFetch);
     }
 

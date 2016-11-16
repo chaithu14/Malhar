@@ -241,21 +241,30 @@ public interface BlockMetadata
       return filePath;
     }
 
+    /**
+     * Returns the length of the file to which this block belongs
+     *
+     * @return length of the file to which this block belongs
+     */
     public long getFileLength()
     {
       return fileLength;
+    }
+
+    /**
+     * Set the length of the file to which this block belongs
+     *
+     * @param fileLength
+     */
+    public void setFileLength(long fileLength)
+    {
+      this.fileLength = fileLength;
     }
 
     public FileBlockMetadata newInstance(@NotNull String filePath)
     {
       Preconditions.checkNotNull(filePath);
       return new FileBlockMetadata(filePath);
-    }
-
-    public FileBlockMetadata newInstance(@NotNull String filePath, long fileLength)
-    {
-      Preconditions.checkNotNull(filePath);
-      return new FileBlockMetadata(filePath, fileLength);
     }
   }
 }

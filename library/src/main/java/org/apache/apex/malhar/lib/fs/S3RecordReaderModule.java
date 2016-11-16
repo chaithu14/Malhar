@@ -17,21 +17,23 @@
  * under the License.
  */
 
-package com.datatorrent.lib.io.fs;
+package org.apache.apex.malhar.lib.fs;
 
 import javax.validation.constraints.Min;
 import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Pattern;
 import javax.validation.constraints.Size;
 
-import org.apache.apex.malhar.lib.fs.FSRecordReaderModule.SequentialFileBlockMetadataCodec;
+import org.apache.apex.malhar.lib.fs.S3RecordReader.RECORD_READER_MODE;
 import org.apache.hadoop.conf.Configuration;
 
 import com.datatorrent.api.Context;
 import com.datatorrent.api.DAG;
 import com.datatorrent.api.Module;
-import com.datatorrent.common.partitioner.StatelessPartitioner;
-import com.datatorrent.lib.io.block.FSSliceReader;
-import com.datatorrent.lib.io.fs.S3RecordReader.RECORD_READER_MODE;
+import com.datatorrent.lib.codec.KryoSerializableStreamCodec;
+import com.datatorrent.lib.io.block.BlockMetadata;
+import com.datatorrent.lib.io.fs.FileSplitterInput;
+import com.datatorrent.lib.io.fs.S3BlockReader;
 
 /**
  * This module is used for reading records/tuples from S3. Records can be read
@@ -68,18 +70,20 @@ public class S3RecordReaderModule implements Module
   private boolean recursive = true;
   private boolean sequentialFileRead = false;
   @Min(1)
-  private int readersCount = 1;
-  @Min(1)
   protected int blocksThreshold = 1;
   @Min(0)
   private long blockSize;
+  protected int minReaders;
+  protected int maxReaders;
+  protected long repartitionCheckInterval;
 
   public final transient ProxyOutputPort<byte[]> records = new ProxyOutputPort<byte[]>();
 
+  private String s3EndPoint;
   /**
    * Criteria for record split
    */
-  private RECORD_READER_MODE mode = RECORD_READER_MODE.DELIMITED_RECORD;
+  private String mode = RECORD_READER_MODE.DELIMITED_RECORD.toString();
 
   /**
    * Length for fixed width record
@@ -104,9 +108,10 @@ public class S3RecordReaderModule implements Module
   public S3RecordReader createRecordReader()
   {
     S3RecordReader s3RecordReader = new S3RecordReader();
-    s3RecordReader.setBucketName(S3RecordReader.extractBucket(getFiles()));
-    s3RecordReader.setAccessKey(S3RecordReader.extractAccessKey(getFiles()));
-    s3RecordReader.setSecretAccessKey(S3RecordReader.extractSecretAccessKey(getFiles()));
+    s3RecordReader.setBucketName(S3BlockReader.extractBucket(getFiles()));
+    s3RecordReader.setAccessKey(S3BlockReader.extractAccessKey(getFiles()));
+    s3RecordReader.setSecretAccessKey(S3BlockReader.extractSecretAccessKey(getFiles()));
+    s3RecordReader.setEndPoint(s3EndPoint);
     s3RecordReader.setMode(mode);
     s3RecordReader.setRecordLength(recordLength);
     return s3RecordReader;
@@ -136,14 +141,10 @@ public class S3RecordReaderModule implements Module
     }
 
     recordReader.setBasePath(files);
-    if (readersCount != 0) {
-      dag.setAttribute(recordReader, Context.OperatorContext.PARTITIONER,
-          new StatelessPartitioner<FSSliceReader>(readersCount));
-    }
 
     /**
-     * Override the split size or input blocks of a file. If not specified,
-     * it would use default blockSize of the file system.
+     * Override the split size or input blocks of a file. If not specified, it
+     * would use default blockSize of the file system.
      */
     if (blockSize != 0) {
       fileSplitter.setBlockSize(blockSize);
@@ -151,6 +152,16 @@ public class S3RecordReaderModule implements Module
 
     fileSplitter.setBlocksThreshold(blocksThreshold);
     records.set(recordReader.records);
+
+    if (minReaders != 0) {
+      recordReader.setMinReaders(minReaders);
+    }
+    if (maxReaders != 0) {
+      recordReader.setMaxReaders(maxReaders);
+    }
+    if (repartitionCheckInterval != 0) {
+      recordReader.setIntervalMillis(repartitionCheckInterval);
+    }
   }
 
   /**
@@ -240,23 +251,66 @@ public class S3RecordReaderModule implements Module
   }
 
   /**
-   * Gets readers count
+   * Gets minimum number of block readers for dynamic partitioning.
    *
-   * @return readersCount
+   * @return minimum instances of block reader.
    */
-  public int getReadersCount()
+  public int getMinReaders()
   {
-    return readersCount;
+    return minReaders;
   }
 
   /**
-   * Static count of readers to read input file
+   * Sets minimum number of block readers for dynamic partitioning.
    *
-   * @param readersCount
+   * @param minReaders
+   *          minimum number of readers.
    */
-  public void setReadersCount(int readersCount)
+  public void setMinReaders(int minReaders)
   {
-    this.readersCount = readersCount;
+    this.minReaders = minReaders;
+  }
+
+  /**
+   * Gets maximum number of block readers for dynamic partitioning.
+   *
+   * @return maximum instances of block reader.
+   */
+  public int getMaxReaders()
+  {
+    return maxReaders;
+  }
+
+  /**
+   * Sets maximum number of block readers for dynamic partitioning.
+   *
+   * @param maxReaders
+   *          maximum number of readers.
+   */
+  public void setMaxReaders(int maxReaders)
+  {
+    this.maxReaders = maxReaders;
+  }
+
+  /**
+   * Gets Interval for re-evaluating dynamic partitioning.
+   *
+   * @return interval for re-evaluating dynamic partitioning
+   */
+  public long getRepartitionCheckInterval()
+  {
+    return repartitionCheckInterval;
+  }
+
+  /**
+   * Sets Interval for re-evaluating dynamic partitioning.
+   *
+   * @param repartitionCheckInterval
+   *          interval for re-evaluating dynamic partitioning
+   */
+  public void setRepartitionCheckInterval(long repartitionCheckInterval)
+  {
+    this.repartitionCheckInterval = repartitionCheckInterval;
   }
 
   /**
@@ -283,7 +337,7 @@ public class S3RecordReaderModule implements Module
   /**
    * Sets number of blocks to be emitted per window.<br/>
    * A lot of blocks emitted per window can overwhelm the downstream operators.
-   * Set this value considering blockSize and readersCount.
+   * Set this value considering blockSize, minReaders and maxReaders.
    *
    * @param threshold
    */
@@ -295,9 +349,9 @@ public class S3RecordReaderModule implements Module
   /**
    * Gets number of blocks to be emitted per window.<br/>
    * A lot of blocks emitted per window can overwhelm the downstream operators.
-   * Set this value considering blockSize and readersCount.
+   * Set this value considering blockSize, minReaders and maxReaders.
    *
-   * @return
+   * @return blocksThreshold
    */
   public int getBlocksThreshold()
   {
@@ -329,18 +383,20 @@ public class S3RecordReaderModule implements Module
    *
    * @return mode
    */
-  public RECORD_READER_MODE getMode()
+  public String getMode()
   {
     return mode;
   }
 
   /**
-   * Criteria for record split
+   * Criteria for record split : FIXED_WIDTH_RECORD or DELIMITED_RECORD By
+   * default, it is delimited
    *
    * @param mode
    *          Mode
    */
-  public void setMode(RECORD_READER_MODE mode)
+  public void setMode(
+      @Pattern(regexp = "FIXED_WIDTH_RECORD|DELIMITED_RECORD", flags = Pattern.Flag.CASE_INSENSITIVE) String mode)
   {
     this.mode = mode;
   }
@@ -363,5 +419,20 @@ public class S3RecordReaderModule implements Module
   public void setRecordLength(int recordLength)
   {
     this.recordLength = recordLength;
+  }
+
+  /**
+   * Partitions the file/directory such that all blocks of a file go to single
+   * operator
+   */
+  @SuppressWarnings("serial")
+  public static class SequentialFileBlockMetadataCodec
+      extends KryoSerializableStreamCodec<BlockMetadata.FileBlockMetadata>
+  {
+    @Override
+    public int getPartition(BlockMetadata.FileBlockMetadata fileBlockMetadata)
+    {
+      return fileBlockMetadata.getFilePath().hashCode();
+    }
   }
 }

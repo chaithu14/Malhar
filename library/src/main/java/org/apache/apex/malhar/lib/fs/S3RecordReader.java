@@ -17,10 +17,12 @@
  * under the License.
  */
 
-package com.datatorrent.lib.io.fs;
+package org.apache.apex.malhar.lib.fs;
 
 import java.io.IOException;
 import java.util.Arrays;
+
+import javax.validation.constraints.Pattern;
 
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -31,6 +33,8 @@ import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.S3Object;
 import com.amazonaws.services.s3.model.S3ObjectInputStream;
+import com.esotericsoftware.kryo.NotNull;
+import com.google.common.base.Preconditions;
 import com.google.common.io.ByteStreams;
 
 import com.datatorrent.api.Context.OperatorContext;
@@ -51,8 +55,12 @@ import com.datatorrent.lib.io.block.ReaderContext;
 public class S3RecordReader extends FSSliceReader
 {
   private transient AmazonS3 s3Client;
+  private String endPoint;
+  @NotNull
   private String bucketName;
+  @NotNull
   private String accessKey;
+  @NotNull
   private String secretAccessKey;
   private int overflowBufferSize;
 
@@ -85,42 +93,6 @@ public class S3RecordReader extends FSSliceReader
      * Set default overflowBufferSize to 1MB
      */
     overflowBufferSize = 1024 * 1024;
-  }
-
-  /**
-   * Extracts the bucket name from the given uri
-   *
-   * @param s3uri
-   *          s3 uri
-   * @return name of the bucket
-   */
-  protected static String extractBucket(String s3uri)
-  {
-    return s3uri.substring(s3uri.indexOf('@') + 1, s3uri.indexOf("/", s3uri.indexOf('@')));
-  }
-
-  /**
-   * Extracts the accessKey from the given uri
-   *
-   * @param s3uri
-   *          given s3 uri
-   * @return the accessKey
-   */
-  protected static String extractAccessKey(String s3uri)
-  {
-    return s3uri.substring(s3uri.indexOf("://") + 3, s3uri.indexOf(':', s3uri.indexOf("://") + 3));
-  }
-
-  /**
-   * Extracts the secretAccessKey from the given uri
-   *
-   * @param s3uri
-   *          given s3uri
-   * @return the secretAccessKey
-   */
-  protected static String extractSecretAccessKey(String s3uri)
-  {
-    return s3uri.substring(s3uri.indexOf(':', s3uri.indexOf("://") + 1) + 1, s3uri.indexOf('@'));
   }
 
   /**
@@ -159,6 +131,9 @@ public class S3RecordReader extends FSSliceReader
   {
     super.setup(context);
     s3Client = new AmazonS3Client(new BasicAWSCredentials(accessKey, secretAccessKey));
+    if (endPoint != null) {
+      s3Client.setEndpoint(endPoint);
+    }
     if (mode == RECORD_READER_MODE.FIXED_WIDTH_RECORD) {
       S3FixedWidthRecordReaderContext fixedBytesReaderContext = new S3FixedWidthRecordReaderContext();
       fixedBytesReaderContext.setLength(recordLength);
@@ -259,9 +234,8 @@ public class S3RecordReader extends FSSliceReader
       rangeObjectRequest.setRange(offset + bytesFromCurrentOffset, offset + bytesFromCurrentOffset + bytesToFetch - 1);
       S3Object objectPortion = s3Client.getObject(rangeObjectRequest);
       S3ObjectInputStream wrappedStream = objectPortion.getObjectContent();
-      byte[] buffer = ByteStreams.toByteArray(wrappedStream);
+      buffer = ByteStreams.toByteArray(wrappedStream);
       wrappedStream.close();
-      this.setBuffer(buffer);
       int bufferLength = buffer.length;
       if (bufferLength <= 0) {
         return -1;
@@ -284,8 +258,9 @@ public class S3RecordReader extends FSSliceReader
      * @param s3Client
      *          given s3Client
      */
-    public void setS3Client(AmazonS3 s3Client)
+    public void setS3Client(@javax.validation.constraints.NotNull AmazonS3 s3Client)
     {
+      Preconditions.checkNotNull(s3Client);
       this.s3Client = s3Client;
     }
 
@@ -295,8 +270,9 @@ public class S3RecordReader extends FSSliceReader
      * @param bucketName
      *          given bucketName
      */
-    public void setBucketName(String bucketName)
+    public void setBucketName(@javax.validation.constraints.NotNull String bucketName)
     {
+      Preconditions.checkNotNull(bucketName);
       this.bucketName = bucketName;
     }
 
@@ -464,6 +440,16 @@ public class S3RecordReader extends FSSliceReader
   /**
    * Size of bytes to be retrieved when a record overflows
    *
+   * return overflowBufferSize
+   */
+  public int getOverflowBufferSize()
+  {
+    return overflowBufferSize;
+  }
+
+  /**
+   * Size of bytes to be retrieved when a record overflows
+   *
    * @param overflowBufferSize
    */
   public void setOverflowBufferSize(int overflowBufferSize)
@@ -535,14 +521,15 @@ public class S3RecordReader extends FSSliceReader
   }
 
   /**
-   * Criteria for record split
+   * Criteria for record split : FIXED_WIDTH_RECORD or DELIMITED_RECORD
    *
    * @param mode
    *          Mode
    */
-  public void setMode(RECORD_READER_MODE mode)
+  public void setMode(
+      @Pattern(regexp = "FIXED_WIDTH_RECORD|DELIMITED_RECORD", flags = Pattern.Flag.CASE_INSENSITIVE) String mode)
   {
-    this.mode = mode;
+    this.mode = RECORD_READER_MODE.valueOf(mode.toUpperCase());
   }
 
   /**
@@ -550,9 +537,9 @@ public class S3RecordReader extends FSSliceReader
    *
    * @return mode
    */
-  public RECORD_READER_MODE getMode()
+  public String getMode()
   {
-    return mode;
+    return mode.toString();
   }
 
   /**
@@ -576,5 +563,26 @@ public class S3RecordReader extends FSSliceReader
   public int getRecordLength()
   {
     return recordLength;
+  }
+
+  /**
+   * S3 endpoint
+   *
+   * @param s3
+   *          endpoint
+   */
+  public void setEndPoint(String endPoint)
+  {
+    this.endPoint = endPoint;
+  }
+
+  /**
+   * S3 endpoint
+   *
+   * @return s3 endpoint
+   */
+  public String getEndPoint()
+  {
+    return endPoint;
   }
 }

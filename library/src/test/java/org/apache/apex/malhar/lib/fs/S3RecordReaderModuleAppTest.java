@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package com.datatorrent.lib.io.fs;
+package org.apache.apex.malhar.lib.fs;
 
 import java.io.File;
 import java.io.IOException;
@@ -51,7 +51,6 @@ import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.LocalMode;
 import com.datatorrent.api.StreamingApplication;
 import com.datatorrent.common.util.BaseOperator;
-import com.datatorrent.lib.io.fs.S3RecordReader.RECORD_READER_MODE;
 
 @Ignore
 public class S3RecordReaderModuleAppTest
@@ -234,7 +233,7 @@ public class S3RecordReaderModuleAppTest
     public void populateDAG(DAG dag, Configuration conf)
     {
       S3RecordReaderModule recordReader = dag.addModule("S3RecordReaderModule", S3RecordReaderModule.class);
-      recordReader.setMode(RECORD_READER_MODE.FIXED_WIDTH_RECORD);
+      recordReader.setMode("fixed_width_record");
       S3FixedWidthValidator validator = dag.addOperator("Validator", new S3FixedWidthValidator());
       dag.addStream("records", recordReader.records, validator.data);
     }
