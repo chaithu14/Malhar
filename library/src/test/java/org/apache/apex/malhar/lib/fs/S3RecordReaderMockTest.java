@@ -20,6 +20,7 @@
 package org.apache.apex.malhar.lib.fs;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
@@ -32,16 +33,26 @@ import org.junit.rules.TestWatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.apex.malhar.lib.fs.FSRecordReaderTest.DelimitedValidator;
+import org.apache.apex.malhar.lib.fs.FSRecordReaderTest.FixedWidthValidator;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.Path;
 
+import com.amazonaws.services.s3.AmazonS3;
+
+import com.datatorrent.api.Context.OperatorContext;
 import com.datatorrent.api.DAG;
-import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.LocalMode;
 import com.datatorrent.api.StreamingApplication;
-import com.datatorrent.common.util.BaseOperator;
+import com.datatorrent.lib.io.block.BlockMetadata.FileBlockMetadata;
+import com.datatorrent.lib.io.block.ReaderContext;
+import com.datatorrent.lib.io.fs.S3BlockReader;
 
-public class FSRecordReaderTest
+import static org.mockito.Mockito.mock;
+
+public class S3RecordReaderMockTest
 {
   private String inputDir;
   static String outputDir;
@@ -81,9 +92,9 @@ public class FSRecordReaderTest
     DelimitedApplication app = new DelimitedApplication();
     LocalMode lma = LocalMode.newInstance();
     Configuration conf = new Configuration(false);
-    conf.set("dt.operator.HDFSRecordReaderModule.prop.files", inputDir);
-    conf.set("dt.operator.HDFSRecordReaderModule.prop.blocksThreshold", "1");
-    conf.set("dt.operator.HDFSRecordReaderModule.prop.scanIntervalMillis", "10000");
+    conf.set("dt.operator.S3RecordReaderModuleMock.prop.files", inputDir);
+    conf.set("dt.operator.S3RecordReaderModuleMock.prop.blocksThreshold", "1");
+    conf.set("dt.operator.S3RecordReaderModuleMock.prop.scanIntervalMillis", "10000");
 
     lma.prepareDAG(app, conf);
     LocalMode.Controller lc = lma.getController();
@@ -102,21 +113,88 @@ public class FSRecordReaderTest
 
   }
 
-  public static class DelimitedValidator extends BaseOperator
+  private static class S3RecordReaderMock extends S3RecordReader
   {
-    static Set<String> records = new HashSet<String>();
+    AmazonS3 s3ClientObject;
 
-    public final transient DefaultInputPort<byte[]> data = new DefaultInputPort<byte[]>()
+    @Override
+    protected FSDataInputStream setupStream(FileBlockMetadata block) throws IOException
     {
-
-      @Override
-      public void process(byte[] tuple)
-      {
-        String record = new String(tuple);
-        records.add(record);
+      if (mode == RECORD_READER_MODE.DELIMITED_RECORD) {
+        ((S3DelimitedRecordReaderContextMock)readerContext).setFilePath(block.getFilePath());
+        ((S3DelimitedRecordReaderContextMock)readerContext).setFileLength(block.getFileLength());
+      } else {
+        ((S3FixedWidthRecordReaderContextMock)readerContext).setFilePath(block.getFilePath());
+        ((S3FixedWidthRecordReaderContextMock)readerContext).setFileLength(block.getFileLength());
       }
-    };
+      return fs.open(new Path(block.getFilePath()));
+    }
 
+    @Override
+    public void setup(OperatorContext context)
+    {
+      s3ClientObject = mock(AmazonS3.class);
+      super.setup(context);
+    }
+
+    @Override
+    protected ReaderContext<FSDataInputStream> createDelimitedReaderContext()
+    {
+      S3DelimitedRecordReaderContextMock s3DelimitedRecordReaderContextMock = new S3DelimitedRecordReaderContextMock();
+      s3DelimitedRecordReaderContextMock.setBucketName("S3RecordReaderMock");
+      s3DelimitedRecordReaderContextMock.setS3Client(s3ClientObject);
+      return s3DelimitedRecordReaderContextMock;
+    }
+
+    @Override
+    protected ReaderContext<FSDataInputStream> createFixedWidthReaderContext()
+    {
+      S3FixedWidthRecordReaderContextMock s3FixedWidthRecordReaderContextMock = new S3FixedWidthRecordReaderContextMock();
+      s3FixedWidthRecordReaderContextMock.setBucketName("S3RecordReaderMock");
+      s3FixedWidthRecordReaderContextMock.setS3Client(s3ClientObject);
+      s3FixedWidthRecordReaderContextMock.setLength(recordLength);
+      return s3FixedWidthRecordReaderContextMock;
+    }
+
+    private class S3DelimitedRecordReaderContextMock extends S3DelimitedRecordReaderContext
+    {
+      @Override
+      protected int readData(long bytesFromCurrentOffset, int bytesToFetch) throws IOException
+      {
+        if (buffer == null) {
+          buffer = new byte[bufferSize];
+        }
+        return stream.read(offset + bytesFromCurrentOffset, buffer, 0, bytesToFetch);
+      }
+    }
+
+    private static class S3FixedWidthRecordReaderContextMock extends S3FixedWidthRecordReaderContext
+    {
+      @Override
+      protected int readData(long startOffset, long endOffset) throws IOException
+      {
+        int bufferSize = Long.valueOf(endOffset - startOffset + 1).intValue();
+        if (buffer == null) {
+          buffer = new byte[bufferSize];
+        }
+        return stream.read(startOffset, buffer, 0, bufferSize);
+      }
+    }
+  }
+
+  private static class S3RecordReaderModuleMock extends S3RecordReaderModule
+  {
+    @Override
+    public S3RecordReader createRecordReader()
+    {
+      S3RecordReader s3RecordReader = new S3RecordReaderMock();
+      s3RecordReader.setBucketName(S3BlockReader.extractBucket(getFiles()));
+      s3RecordReader.setAccessKey("****");
+      s3RecordReader.setSecretAccessKey("*****");
+      s3RecordReader.setMode(this.getMode().toString());
+      s3RecordReader.setRecordLength(this.getRecordLength());
+      return s3RecordReader;
+    }
   }
 
   private static class DelimitedApplication implements StreamingApplication
@@ -124,7 +202,8 @@ public class FSRecordReaderTest
 
     public void populateDAG(DAG dag, Configuration conf)
     {
-      FSRecordReaderModule recordReader = dag.addModule("HDFSRecordReaderModule", FSRecordReaderModule.class);
+
+      S3RecordReaderModuleMock recordReader = dag.addModule("S3RecordReaderModuleMock", new S3RecordReaderModuleMock());
       recordReader.setMode("delimited_record");
       DelimitedValidator validator = dag.addOperator("Validator", new DelimitedValidator());
       dag.addStream("records", recordReader.records, validator.data);
@@ -139,10 +218,10 @@ public class FSRecordReaderTest
     FixedWidthApplication app = new FixedWidthApplication();
     LocalMode lma = LocalMode.newInstance();
     Configuration conf = new Configuration(false);
-    conf.set("dt.operator.HDFSRecordReaderModule.prop.files", inputDir);
-    conf.set("dt.operator.HDFSRecordReaderModule.prop.recordLength", "8");
-    conf.set("dt.operator.HDFSRecordReaderModule.prop.blocksThreshold", "1");
-    conf.set("dt.operator.HDFSRecordReaderModule.prop.scanIntervalMillis", "10000");
+    conf.set("dt.operator.S3RecordReaderModuleMock.prop.files", inputDir);
+    conf.set("dt.operator.S3RecordReaderModuleMock.prop.recordLength", "8");
+    conf.set("dt.operator.S3RecordReaderModuleMock.prop.blocksThreshold", "1");
+    conf.set("dt.operator.S3RecordReaderModuleMock.prop.scanIntervalMillis", "10000");
 
     lma.prepareDAG(app, conf);
     LocalMode.Controller lc = lma.getController();
@@ -159,11 +238,11 @@ public class FSRecordReaderTest
     FixedWidthApplication app = new FixedWidthApplication();
     LocalMode lma = LocalMode.newInstance();
     Configuration conf = new Configuration(false);
-    conf.set("dt.operator.HDFSRecordReaderModule.prop.files", inputDir);
+    conf.set("dt.operator.S3RecordReaderModuleMock.prop.files", inputDir);
     //Should give IllegalArgumentException since recordLength is not set
     //conf.set("dt.operator.HDFSRecordReaderModule.prop.recordLength", "8");
-    conf.set("dt.operator.HDFSRecordReaderModule.prop.blocksThreshold", "1");
-    conf.set("dt.operator.HDFSRecordReaderModule.prop.scanIntervalMillis", "10000");
+    conf.set("dt.operator.S3RecordReaderModuleMock.prop.blocksThreshold", "1");
+    conf.set("dt.operator.S3RecordReaderModuleMock.prop.scanIntervalMillis", "10000");
 
     lma.prepareDAG(app, conf);
     LocalMode.Controller lc = lma.getController();
@@ -174,37 +253,12 @@ public class FSRecordReaderTest
     lc.shutdown();
   }
 
-  public static class FixedWidthValidator extends BaseOperator
-  {
-    Set<String> records = new HashSet<String>();
-
-    public final transient DefaultInputPort<byte[]> data = new DefaultInputPort<byte[]>()
-    {
-
-      @Override
-      public void process(byte[] tuple)
-      {
-        String record = new String(tuple);
-        records.add(record);
-      }
-    };
-
-    public void teardown()
-    {
-      String[] expected = {"1234\n567", "890\nabcd", "e\nfgh\ni\n", "jklmop", "qr\nstuvw", "\nxyz\n" };
-
-      Set<String> expectedRecords = new HashSet<String>(Arrays.asList(expected));
-
-      Assert.assertEquals(expectedRecords, records);
-    }
-  }
-
   private static class FixedWidthApplication implements StreamingApplication
   {
 
     public void populateDAG(DAG dag, Configuration conf)
     {
-      FSRecordReaderModule recordReader = dag.addModule("HDFSRecordReaderModule", FSRecordReaderModule.class);
+      FSRecordReaderModule recordReader = dag.addModule("S3RecordReaderModuleMock", FSRecordReaderModule.class);
       recordReader.setMode("FIXED_WIDTH_RECORD");
       FixedWidthValidator validator = dag.addOperator("Validator", new FixedWidthValidator());
       dag.addStream("records", recordReader.records, validator.data);
@@ -212,6 +266,6 @@ public class FSRecordReaderTest
 
   }
 
-  private static Logger LOG = LoggerFactory.getLogger(FSRecordReaderTest.class);
+  private static Logger LOG = LoggerFactory.getLogger(S3RecordReaderMockTest.class);
 
 }

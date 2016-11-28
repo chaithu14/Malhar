@@ -36,6 +36,8 @@ import org.junit.rules.TestWatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.apex.malhar.lib.fs.FSRecordReaderTest.DelimitedValidator;
+import org.apache.apex.malhar.lib.fs.FSRecordReaderTest.FixedWidthValidator;
 import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.conf.Configuration;
 
@@ -47,10 +49,8 @@ import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
 
 import com.datatorrent.api.DAG;
-import com.datatorrent.api.DefaultInputPort;
 import com.datatorrent.api.LocalMode;
 import com.datatorrent.api.StreamingApplication;
-import com.datatorrent.common.util.BaseOperator;
 
 @Ignore
 public class S3RecordReaderModuleAppTest
@@ -130,24 +130,6 @@ public class S3RecordReaderModuleAppTest
 
   }
 
-  public static class DelimitedValidator extends BaseOperator
-  {
-    static Set<String> records = new HashSet<String>();
-
-    public final transient DefaultInputPort<byte[]> data = new DefaultInputPort<byte[]>()
-    {
-
-      @Override
-      public void process(byte[] tuple)
-      {
-        String record = new String(tuple);
-        LOG.info("Record:" + record);
-        records.add(record);
-      }
-    };
-
-  }
-
   private static class S3DelimitedApplication implements StreamingApplication
   {
 
@@ -202,31 +184,6 @@ public class S3RecordReaderModuleAppTest
     lc.shutdown();
   }
 
-  public static class S3FixedWidthValidator extends BaseOperator
-  {
-    Set<String> records = new HashSet<String>();
-
-    public final transient DefaultInputPort<byte[]> data = new DefaultInputPort<byte[]>()
-    {
-
-      @Override
-      public void process(byte[] tuple)
-      {
-        String record = new String(tuple);
-        records.add(record);
-      }
-    };
-
-    public void teardown()
-    {
-      String[] expected = {"1234\n567", "890\nabcd", "e\nfgh\ni\n", "jklmop", "qr\nstuvw", "\nxyz\n" };
-
-      Set<String> expectedRecords = new HashSet<String>(Arrays.asList(expected));
-
-      Assert.assertEquals(expectedRecords, records);
-    }
-  }
-
   private static class S3FixedWidthApplication implements StreamingApplication
   {
 
@@ -234,7 +191,7 @@ public class S3RecordReaderModuleAppTest
     {
       S3RecordReaderModule recordReader = dag.addModule("S3RecordReaderModule", S3RecordReaderModule.class);
       recordReader.setMode("fixed_width_record");
-      S3FixedWidthValidator validator = dag.addOperator("Validator", new S3FixedWidthValidator());
+      FixedWidthValidator validator = dag.addOperator("Validator", new FixedWidthValidator());
       dag.addStream("records", recordReader.records, validator.data);
     }
 

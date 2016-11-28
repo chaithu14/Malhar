@@ -22,8 +22,6 @@ package org.apache.apex.malhar.lib.fs;
 import java.io.IOException;
 import java.util.Arrays;
 
-import javax.validation.constraints.Pattern;
-
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.fs.FSDataInputStream;
 
@@ -38,9 +36,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.io.ByteStreams;
 
 import com.datatorrent.api.Context.OperatorContext;
-import com.datatorrent.api.DefaultOutputPort;
 import com.datatorrent.lib.io.block.BlockMetadata;
-import com.datatorrent.lib.io.block.FSSliceReader;
 import com.datatorrent.lib.io.block.ReaderContext;
 
 /**
@@ -52,7 +48,7 @@ import com.datatorrent.lib.io.block.ReaderContext;
  * read records in parallel.
  */
 @Evolving
-public class S3RecordReader extends FSSliceReader
+public class S3RecordReader extends FSRecordReader
 {
   private transient AmazonS3 s3Client;
   private String endPoint;
@@ -63,29 +59,6 @@ public class S3RecordReader extends FSSliceReader
   @NotNull
   private String secretAccessKey;
   private int overflowBufferSize;
-
-  /**
-   * Record reader mode decides how to split the records.
-   */
-  public static enum RECORD_READER_MODE
-  {
-    DELIMITED_RECORD, FIXED_WIDTH_RECORD;
-  }
-
-  /**
-   * Criteria for record split
-   */
-  private RECORD_READER_MODE mode = RECORD_READER_MODE.DELIMITED_RECORD;
-
-  /**
-   * Length for fixed width record
-   */
-  private int recordLength;
-
-  /**
-   * Port to emit individual records/tuples as byte[]
-   */
-  public final transient DefaultOutputPort<byte[]> records = new DefaultOutputPort<byte[]>();
 
   public S3RecordReader()
   {
@@ -129,70 +102,48 @@ public class S3RecordReader extends FSSliceReader
   @Override
   public void setup(OperatorContext context)
   {
-    super.setup(context);
     s3Client = new AmazonS3Client(new BasicAWSCredentials(accessKey, secretAccessKey));
     if (endPoint != null) {
       s3Client.setEndpoint(endPoint);
     }
-    if (mode == RECORD_READER_MODE.FIXED_WIDTH_RECORD) {
-      S3FixedWidthRecordReaderContext fixedBytesReaderContext = new S3FixedWidthRecordReaderContext();
-      fixedBytesReaderContext.setLength(recordLength);
-      fixedBytesReaderContext.setBucketName(bucketName);
-      fixedBytesReaderContext.setS3Client(s3Client);
-      readerContext = fixedBytesReaderContext;
-    } else {
-      S3DelimitedRecordReaderContext delimitedRecordReaderContext = new S3DelimitedRecordReaderContext();
-      delimitedRecordReaderContext.setBucketName(bucketName);
-      delimitedRecordReaderContext.setS3Client(s3Client);
-      readerContext = delimitedRecordReaderContext;
-    }
+    super.setup(context);
   }
 
   /**
-   * Read the block data and emit records based on reader context
+   * Returns an instance of S3FixedWidthRecordReaderContext after setting
+   * recordLength, bucketName and s3Client
    *
-   * @param blockMetadata
-   *          contains the metadata information of the block of the file
-   * @throws IOException
+   * @return S3DelimitedRecordReaderContext
    */
-  protected void readBlock(BlockMetadata blockMetadata) throws IOException
+  @Override
+  protected ReaderContext<FSDataInputStream> createFixedWidthReaderContext()
   {
-    readerContext.initialize(stream, blockMetadata, consecutiveBlock);
-    if (mode == RECORD_READER_MODE.FIXED_WIDTH_RECORD) {
-      int bytesRead = ((S3FixedWidthRecordReaderContext)readerContext).getBlockFromS3();
-      if (bytesRead == -1) {
-        return;
-      }
-      ((S3FixedWidthRecordReaderContext)readerContext).setBufferOffset(0);
-    } else {
-      /*
-       * Initialize the bufferSize and overflowBufferSize
-       */
-      int bufferSize = Long.valueOf(blockMetadata.getLength() - blockMetadata.getOffset()).intValue();
-      ((S3DelimitedRecordReaderContext)readerContext).setBufferSize(bufferSize);
-      if (overflowBufferSize > bufferSize) {
-        ((S3DelimitedRecordReaderContext)readerContext).setOverflowBufferSize(bufferSize);
-      } else {
-        ((S3DelimitedRecordReaderContext)readerContext).setOverflowBufferSize(overflowBufferSize);
-      }
-    }
+    S3FixedWidthRecordReaderContext fixedBytesReaderContext = new S3FixedWidthRecordReaderContext();
+    fixedBytesReaderContext.setLength(recordLength);
+    fixedBytesReaderContext.setBucketName(bucketName);
+    fixedBytesReaderContext.setS3Client(s3Client);
+    return fixedBytesReaderContext;
+  }
 
-    ReaderContext.Entity entity;
-    while ((entity = readerContext.next()) != null) {
-      counters.getCounter(ReaderCounterKeys.BYTES).add(entity.getUsedBytes());
-      byte[] record = entity.getRecord();
-
-      if (record != null) {
-        counters.getCounter(ReaderCounterKeys.RECORDS).increment();
-        records.emit(record);
-      }
-    }
+  /**
+   * Returns an instance of S3DelimitedRecordReaderContext after setting
+   * bucketName and s3Client
+   *
+   * @return S3DelimitedRecordReaderContext
+   */
+  @Override
+  protected ReaderContext<FSDataInputStream> createDelimitedReaderContext()
+  {
+    S3DelimitedRecordReaderContext delimitedRecordReaderContext = new S3DelimitedRecordReaderContext();
+    delimitedRecordReaderContext.setBucketName(bucketName);
+    delimitedRecordReaderContext.setS3Client(s3Client);
+    return delimitedRecordReaderContext;
   }
 
   /**
    * RecordReaderContext for reading delimited S3 Records.
    */
-  private static class S3DelimitedRecordReaderContext
+  protected static class S3DelimitedRecordReaderContext
       extends ReaderContext.ReadAheadLineReaderContext<FSDataInputStream>
   {
     /**
@@ -211,6 +162,22 @@ public class S3RecordReader extends FSSliceReader
      * length of the file being processed
      */
     private transient long fileLength;
+
+    @Override
+    public void initialize(FSDataInputStream stream, BlockMetadata blockMetadata, boolean consecutiveBlock)
+    {
+      super.initialize(stream, blockMetadata, consecutiveBlock);
+      /*
+       * Initialize the bufferSize and overflowBufferSize
+       */
+      int bufferSize = Long.valueOf(blockMetadata.getLength() - blockMetadata.getOffset()).intValue();
+      this.setBufferSize(bufferSize);
+      if (overflowBufferSize > bufferSize) {
+        this.setOverflowBufferSize(bufferSize);
+      } else {
+        this.setOverflowBufferSize(overflowBufferSize);
+      }
+    }
 
     /**
      * S3 block read would be achieved through the AmazonS3 client. Following
@@ -301,7 +268,7 @@ public class S3RecordReader extends FSSliceReader
   /**
    * RecordReaderContext for reading fixed width S3 Records.
    */
-  private static class S3FixedWidthRecordReaderContext extends ReaderContext.FixedBytesReaderContext<FSDataInputStream>
+  protected static class S3FixedWidthRecordReaderContext extends ReaderContext.FixedBytesReaderContext<FSDataInputStream>
   {
     /**
      * Amazon client used to read bytes from S3
@@ -323,12 +290,27 @@ public class S3RecordReader extends FSSliceReader
     /**
      * used to hold data retrieved from S3
      */
-    private transient byte[] buffer;
+    protected transient byte[] buffer;
 
     /**
      * current offset within the byte[] buffer
      */
     private transient int bufferOffset;
+
+    @Override
+    public void initialize(FSDataInputStream stream, BlockMetadata blockMetadata, boolean consecutiveBlock)
+    {
+      super.initialize(stream, blockMetadata, consecutiveBlock);
+      try {
+        int bytesRead = this.getBlockFromS3();
+        if (bytesRead == -1) {
+          return;
+        }
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+      this.setBufferOffset(0);
+    }
 
     /**
      * S3 block read would be achieved through the AmazonS3 client. Following
@@ -354,6 +336,22 @@ public class S3RecordReader extends FSSliceReader
         endOffset = this.fileLength - 1;
       }
       offset = startOffset;
+      return readData(startOffset, endOffset);
+    }
+
+    /**
+     * Reads data from S3 starting from startOffset till the endOffset and
+     * returns the number of bytes read
+     *
+     * @param startOffset
+     *          offset from where to read
+     * @param endOffset
+     *          offset till where to read
+     * @return number of bytes read
+     * @throws IOException
+     */
+    protected int readData(long startOffset, long endOffset) throws IOException
+    {
       GetObjectRequest rangeObjectRequest = new GetObjectRequest(bucketName, filePath);
       rangeObjectRequest.setRange(startOffset, endOffset);
       S3Object objectPortion = s3Client.getObject(rangeObjectRequest);
@@ -518,51 +516,6 @@ public class S3RecordReader extends FSSliceReader
   public void setSecretAccessKey(String secretAccessKey)
   {
     this.secretAccessKey = secretAccessKey;
-  }
-
-  /**
-   * Criteria for record split : FIXED_WIDTH_RECORD or DELIMITED_RECORD
-   *
-   * @param mode
-   *          Mode
-   */
-  public void setMode(
-      @Pattern(regexp = "FIXED_WIDTH_RECORD|DELIMITED_RECORD", flags = Pattern.Flag.CASE_INSENSITIVE) String mode)
-  {
-    this.mode = RECORD_READER_MODE.valueOf(mode.toUpperCase());
-  }
-
-  /**
-   * Criteria for record split
-   *
-   * @return mode
-   */
-  public String getMode()
-  {
-    return mode.toString();
-  }
-
-  /**
-   * Length for fixed width record
-   *
-   * @param recordLength
-   */
-  public void setRecordLength(int recordLength)
-  {
-    if (mode == RECORD_READER_MODE.FIXED_WIDTH_RECORD && recordLength <= 0) {
-      throw new IllegalArgumentException("recordLength should be greater than 0.");
-    }
-    this.recordLength = recordLength;
-  }
-
-  /**
-   * Length for fixed width record
-   *
-   * @return record length
-   */
-  public int getRecordLength()
-  {
-    return recordLength;
   }
 
   /**
