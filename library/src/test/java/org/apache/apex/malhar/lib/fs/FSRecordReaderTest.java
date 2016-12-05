@@ -117,6 +117,10 @@ public class FSRecordReaderTest
       }
     };
 
+    public static Set<String> getRecords()
+    {
+      return records;
+    }
   }
 
   private static class DelimitedApplication implements StreamingApplication

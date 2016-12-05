@@ -17,11 +17,12 @@
  * under the License.
  */
 
-package org.apache.apex.malhar.lib.fs;
+package org.apache.apex.malhar.lib.fs.s3;
 
 import java.io.IOException;
 import java.util.Arrays;
 
+import org.apache.apex.malhar.lib.fs.FSRecordReader;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 import org.apache.hadoop.fs.FSDataInputStream;
 
@@ -86,10 +87,11 @@ public class S3RecordReader extends FSRecordReader
       filePath = filePath.substring(1);
     }
 
-    if (mode == RECORD_READER_MODE.FIXED_WIDTH_RECORD) {
+    RECORD_READER_MODE recordReaderMode = RECORD_READER_MODE.valueOf(this.getMode());
+    if (recordReaderMode == RECORD_READER_MODE.FIXED_WIDTH_RECORD) {
       ((S3FixedWidthRecordReaderContext)readerContext).setFilePath(filePath);
       ((S3FixedWidthRecordReaderContext)readerContext).setFileLength(block.getFileLength());
-    } else {
+    } else if (recordReaderMode == RECORD_READER_MODE.DELIMITED_RECORD) {
       ((S3DelimitedRecordReaderContext)readerContext).setFilePath(filePath);
       ((S3DelimitedRecordReaderContext)readerContext).setFileLength(block.getFileLength());
     }
@@ -119,7 +121,7 @@ public class S3RecordReader extends FSRecordReader
   protected ReaderContext<FSDataInputStream> createFixedWidthReaderContext()
   {
     S3FixedWidthRecordReaderContext fixedBytesReaderContext = new S3FixedWidthRecordReaderContext();
-    fixedBytesReaderContext.setLength(recordLength);
+    fixedBytesReaderContext.setLength(this.getRecordLength());
     fixedBytesReaderContext.setBucketName(bucketName);
     fixedBytesReaderContext.setS3Client(s3Client);
     return fixedBytesReaderContext;
@@ -268,7 +270,8 @@ public class S3RecordReader extends FSRecordReader
   /**
    * RecordReaderContext for reading fixed width S3 Records.
    */
-  protected static class S3FixedWidthRecordReaderContext extends ReaderContext.FixedBytesReaderContext<FSDataInputStream>
+  protected static class S3FixedWidthRecordReaderContext
+      extends ReaderContext.FixedBytesReaderContext<FSDataInputStream>
   {
     /**
      * Amazon client used to read bytes from S3
@@ -521,8 +524,8 @@ public class S3RecordReader extends FSRecordReader
   /**
    * S3 endpoint
    *
-   * @param s3
-   *          endpoint
+   * @param endPoint
+   *          endpoint to be used for S3
    */
   public void setEndPoint(String endPoint)
   {

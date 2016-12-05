@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.apex.malhar.lib.fs;
+package org.apache.apex.malhar.lib.fs.s3;
 
 import java.io.File;
 import java.io.IOException;
@@ -33,6 +33,7 @@ import org.junit.rules.TestWatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.apex.malhar.lib.fs.FSRecordReaderModule;
 import org.apache.apex.malhar.lib.fs.FSRecordReaderTest.DelimitedValidator;
 import org.apache.apex.malhar.lib.fs.FSRecordReaderTest.FixedWidthValidator;
 import org.apache.commons.io.FileUtils;
@@ -93,6 +94,7 @@ public class S3RecordReaderMockTest
     LocalMode lma = LocalMode.newInstance();
     Configuration conf = new Configuration(false);
     conf.set("dt.operator.S3RecordReaderModuleMock.prop.files", inputDir);
+    conf.set("dt.operator.S3RecordReaderModuleMock.prop.blockSize", "3");
     conf.set("dt.operator.S3RecordReaderModuleMock.prop.blocksThreshold", "1");
     conf.set("dt.operator.S3RecordReaderModuleMock.prop.scanIntervalMillis", "10000");
 
@@ -104,12 +106,12 @@ public class S3RecordReaderMockTest
     Set<String> expectedRecords = new HashSet<String>(Arrays.asList(FILE_1_DATA.split("\n")));
     expectedRecords.addAll(Arrays.asList(FILE_2_DATA.split("\n")));
 
-    while (DelimitedValidator.records.size() != expectedRecords.size()) {
+    while (DelimitedValidator.getRecords().size() != expectedRecords.size()) {
       LOG.debug("Waiting for app to finish");
       Thread.sleep(1000);
     }
     lc.shutdown();
-    Assert.assertEquals(expectedRecords, DelimitedValidator.records);
+    Assert.assertEquals(expectedRecords, DelimitedValidator.getRecords());
 
   }
 
@@ -120,13 +122,7 @@ public class S3RecordReaderMockTest
     @Override
     protected FSDataInputStream setupStream(FileBlockMetadata block) throws IOException
     {
-      if (mode == RECORD_READER_MODE.DELIMITED_RECORD) {
-        ((S3DelimitedRecordReaderContextMock)readerContext).setFilePath(block.getFilePath());
-        ((S3DelimitedRecordReaderContextMock)readerContext).setFileLength(block.getFileLength());
-      } else {
-        ((S3FixedWidthRecordReaderContextMock)readerContext).setFilePath(block.getFilePath());
-        ((S3FixedWidthRecordReaderContextMock)readerContext).setFileLength(block.getFileLength());
-      }
+      super.setupStream(block);
       return fs.open(new Path(block.getFilePath()));
     }
 
@@ -152,7 +148,7 @@ public class S3RecordReaderMockTest
       S3FixedWidthRecordReaderContextMock s3FixedWidthRecordReaderContextMock = new S3FixedWidthRecordReaderContextMock();
       s3FixedWidthRecordReaderContextMock.setBucketName("S3RecordReaderMock");
       s3FixedWidthRecordReaderContextMock.setS3Client(s3ClientObject);
-      s3FixedWidthRecordReaderContextMock.setLength(recordLength);
+      s3FixedWidthRecordReaderContextMock.setLength(this.getRecordLength());
       return s3FixedWidthRecordReaderContextMock;
     }
 
@@ -220,6 +216,7 @@ public class S3RecordReaderMockTest
     Configuration conf = new Configuration(false);
     conf.set("dt.operator.S3RecordReaderModuleMock.prop.files", inputDir);
     conf.set("dt.operator.S3RecordReaderModuleMock.prop.recordLength", "8");
+    conf.set("dt.operator.S3RecordReaderModuleMock.prop.blockSize", "3");
     conf.set("dt.operator.S3RecordReaderModuleMock.prop.blocksThreshold", "1");
     conf.set("dt.operator.S3RecordReaderModuleMock.prop.scanIntervalMillis", "10000");
 
@@ -242,6 +239,7 @@ public class S3RecordReaderMockTest
     //Should give IllegalArgumentException since recordLength is not set
     //conf.set("dt.operator.HDFSRecordReaderModule.prop.recordLength", "8");
     conf.set("dt.operator.S3RecordReaderModuleMock.prop.blocksThreshold", "1");
+    conf.set("dt.operator.S3RecordReaderModuleMock.prop.blockSize", "3");
     conf.set("dt.operator.S3RecordReaderModuleMock.prop.scanIntervalMillis", "10000");
 
     lma.prepareDAG(app, conf);

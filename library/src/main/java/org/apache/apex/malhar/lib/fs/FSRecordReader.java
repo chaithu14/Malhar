@@ -55,12 +55,12 @@ public class FSRecordReader extends FSSliceReader
   /**
    * Criteria for record split
    */
-  protected RECORD_READER_MODE mode = RECORD_READER_MODE.DELIMITED_RECORD;
+  private RECORD_READER_MODE mode = RECORD_READER_MODE.DELIMITED_RECORD;
 
   /**
    * Length for fixed width record
    */
-  protected int recordLength;
+  private int recordLength;
 
   /**
    * Port to emit individual records/tuples as byte[]

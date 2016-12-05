@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.apex.malhar.lib.fs;
+package org.apache.apex.malhar.lib.fs.s3;
 
 import java.io.File;
 import java.io.IOException;
@@ -121,12 +121,12 @@ public class S3RecordReaderModuleAppTest
     Set<String> expectedRecords = new HashSet<String>(Arrays.asList(FILE_1_DATA.split("\n")));
     expectedRecords.addAll(Arrays.asList(FILE_2_DATA.split("\n")));
 
-    while (DelimitedValidator.records.size() != expectedRecords.size()) {
+    while (DelimitedValidator.getRecords().size() != expectedRecords.size()) {
       LOG.debug("Waiting for app to finish");
       Thread.sleep(1000);
     }
     lc.shutdown();
-    Assert.assertEquals(expectedRecords, DelimitedValidator.records);
+    Assert.assertEquals(expectedRecords, DelimitedValidator.getRecords());
 
   }
 

@@ -108,7 +108,7 @@ public class FSRecordReaderModule implements Module
   public FSRecordReader createRecordReader()
   {
     FSRecordReader recordReader = new FSRecordReader();
-    recordReader.setMode(mode.toString());
+    recordReader.setMode(mode);
     recordReader.setRecordLength(recordLength);
 
     return recordReader;
@@ -389,7 +389,7 @@ public class FSRecordReaderModule implements Module
    */
   public String getMode()
   {
-    return mode.toString();
+    return mode;
   }
 
   /**
