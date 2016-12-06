@@ -158,7 +158,7 @@ public class S3RecordReaderMockTest
       protected int readData(long bytesFromCurrentOffset, int bytesToFetch) throws IOException
       {
         if (buffer == null) {
-          buffer = new byte[bufferSize];
+          buffer = new byte[bytesToFetch];
         }
         return stream.read(offset + bytesFromCurrentOffset, buffer, 0, bytesToFetch);
       }

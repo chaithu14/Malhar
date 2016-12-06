@@ -193,7 +193,7 @@ public interface ReaderContext<STREAM extends InputStream & PositionedReadable>
     protected int readData(final long bytesFromCurrentOffset, final int bytesToFetch) throws IOException
     {
       if (buffer == null) {
-        buffer = new byte[bufferSize];
+        buffer = new byte[bytesToFetch];
       }
       return stream.read(offset + bytesFromCurrentOffset, buffer, 0, bytesToFetch);
     }
@@ -212,6 +212,18 @@ public interface ReaderContext<STREAM extends InputStream & PositionedReadable>
       }
     }
 
+    /**
+     * Gives the number of bytes to be fetched from the stream
+     *
+     * @param readOverflowBlock
+     *          indicates whether we are reading main block or overflow block
+     * @return bytes to be fetched from stream
+     */
+    protected int calculateBytesToFetch(boolean readOverflowBlock)
+    {
+      return (readOverflowBlock ? overflowBufferSize : (bufferSize));
+    }
+
     @Override
     protected Entity readEntity() throws IOException
     {
@@ -225,7 +237,7 @@ public interface ReaderContext<STREAM extends InputStream & PositionedReadable>
       while (!foundEOL) {
         tmpBuilder.reset();
         if (posInStr == 0) {
-          int bytesToFetch = (overflowBlockRead ? overflowBufferSize : bufferSize);
+          int bytesToFetch = calculateBytesToFetch(overflowBlockRead);
           overflowBlockRead = true;
           bytesRead = readData(usedBytes, bytesToFetch);
           if (bytesRead == -1) {
@@ -359,6 +371,15 @@ public interface ReaderContext<STREAM extends InputStream & PositionedReadable>
         return entity;
       }
       return null;
+    }
+
+    @Override
+    protected int calculateBytesToFetch(boolean readOverflowBlock)
+    {
+      /*
+       * With readAheadLineReaderContext, we always read at least one overflowBlock. Hence, fetch it in advance
+       */
+      return (readOverflowBlock ? overflowBufferSize : (bufferSize + overflowBufferSize));
     }
   }
 

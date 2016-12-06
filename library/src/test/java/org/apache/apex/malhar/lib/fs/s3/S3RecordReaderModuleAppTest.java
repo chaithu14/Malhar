@@ -111,6 +111,7 @@ public class S3RecordReaderModuleAppTest
     Configuration conf = new Configuration(false);
     conf.set("dt.operator.s3RecordReaderModule.prop.files", files);
     conf.set("dt.operator.s3RecordReaderModule.prop.blockSize", "10");
+    conf.set("dt.operator.s3RecordReaderModule.prop.overflowBlockSize", "4");
     conf.set("dt.operator.s3RecordReaderModule.prop.scanIntervalMillis", "10000");
 
     lma.prepareDAG(app, conf);

@@ -61,7 +61,7 @@ public class S3DelimitedRecordReaderTest
 {
   private final String accessKey = "*************";
   private final String secretKey = "*********************";
-  private static final int overflowBufferSize = 50;
+  private static final int overflowBufferSize = 123;
   private static final String FILE_1 = "file1.txt";
   private static final String s3Directory = "input/";
 

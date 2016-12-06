@@ -139,6 +139,7 @@ public class S3RecordReader extends FSRecordReader
     S3DelimitedRecordReaderContext delimitedRecordReaderContext = new S3DelimitedRecordReaderContext();
     delimitedRecordReaderContext.setBucketName(bucketName);
     delimitedRecordReaderContext.setS3Client(s3Client);
+    delimitedRecordReaderContext.setOverflowBufferSize(overflowBufferSize);
     return delimitedRecordReaderContext;
   }
 
