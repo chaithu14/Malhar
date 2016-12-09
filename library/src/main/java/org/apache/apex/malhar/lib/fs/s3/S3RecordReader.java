@@ -80,26 +80,11 @@ public class S3RecordReader extends FSRecordReader
   @Override
   protected FSDataInputStream setupStream(BlockMetadata.FileBlockMetadata block) throws IOException
   {
-    String filePath = block.getFilePath();
-    // File path would be the path after bucket name.
-    // Check if the file path starts with "/"
-    if (filePath.startsWith("/")) {
-      filePath = filePath.substring(1);
-    }
-
-    RECORD_READER_MODE recordReaderMode = RECORD_READER_MODE.valueOf(this.getMode());
-    if (recordReaderMode == RECORD_READER_MODE.FIXED_WIDTH_RECORD) {
-      ((S3FixedWidthRecordReaderContext)readerContext).setFilePath(filePath);
-      ((S3FixedWidthRecordReaderContext)readerContext).setFileLength(block.getFileLength());
-    } else if (recordReaderMode == RECORD_READER_MODE.DELIMITED_RECORD) {
-      ((S3DelimitedRecordReaderContext)readerContext).setFilePath(filePath);
-      ((S3DelimitedRecordReaderContext)readerContext).setFileLength(block.getFileLength());
-    }
     return null;
   }
 
   /**
-   * Initialize the reader context
+   * Initialize the s3 client and reader context
    */
   @Override
   public void setup(OperatorContext context)
@@ -170,6 +155,16 @@ public class S3RecordReader extends FSRecordReader
     public void initialize(FSDataInputStream stream, BlockMetadata blockMetadata, boolean consecutiveBlock)
     {
       super.initialize(stream, blockMetadata, consecutiveBlock);
+      if (blockMetadata instanceof BlockMetadata.FileBlockMetadata) {
+        BlockMetadata.FileBlockMetadata fileBlockMetadata = (BlockMetadata.FileBlockMetadata)blockMetadata;
+        fileLength = fileBlockMetadata.getFileLength();
+        filePath = fileBlockMetadata.getFilePath();
+        // File path would be the path after bucket name.
+        // Check if the file path starts with "/"
+        if (filePath.startsWith("/")) {
+          filePath = filePath.substring(1);
+        }
+      }
       /*
        * Initialize the bufferSize and overflowBufferSize
        */
@@ -305,6 +300,16 @@ public class S3RecordReader extends FSRecordReader
     public void initialize(FSDataInputStream stream, BlockMetadata blockMetadata, boolean consecutiveBlock)
     {
       super.initialize(stream, blockMetadata, consecutiveBlock);
+      if (blockMetadata instanceof BlockMetadata.FileBlockMetadata) {
+        BlockMetadata.FileBlockMetadata fileBlockMetadata = (BlockMetadata.FileBlockMetadata)blockMetadata;
+        fileLength = fileBlockMetadata.getFileLength();
+        filePath = fileBlockMetadata.getFilePath();
+        // File path would be the path after bucket name.
+        // Check if the file path starts with "/"
+        if (filePath.startsWith("/")) {
+          filePath = filePath.substring(1);
+        }
+      }
       try {
         int bytesRead = this.getBlockFromS3();
         if (bytesRead == -1) {

@@ -215,13 +215,13 @@ public interface ReaderContext<STREAM extends InputStream & PositionedReadable>
     /**
      * Gives the number of bytes to be fetched from the stream
      *
-     * @param readOverflowBlock
+     * @param overflowBlockRead
      *          indicates whether we are reading main block or overflow block
      * @return bytes to be fetched from stream
      */
-    protected int calculateBytesToFetch(boolean readOverflowBlock)
+    protected int calculateBytesToFetch(boolean overflowBlockRead)
     {
-      return (readOverflowBlock ? overflowBufferSize : (bufferSize));
+      return (overflowBlockRead ? overflowBufferSize : (bufferSize));
     }
 
     @Override
@@ -374,12 +374,12 @@ public interface ReaderContext<STREAM extends InputStream & PositionedReadable>
     }
 
     @Override
-    protected int calculateBytesToFetch(boolean readOverflowBlock)
+    protected int calculateBytesToFetch(boolean overflowBlockRead)
     {
       /*
        * With readAheadLineReaderContext, we always read at least one overflowBlock. Hence, fetch it in advance
        */
-      return (readOverflowBlock ? overflowBufferSize : (bufferSize + overflowBufferSize));
+      return (overflowBlockRead ? overflowBufferSize : (bufferSize + overflowBufferSize));
     }
   }
 
