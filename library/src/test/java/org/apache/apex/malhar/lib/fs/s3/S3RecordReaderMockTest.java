@@ -137,8 +137,8 @@ public class S3RecordReaderMockTest
     protected ReaderContext<FSDataInputStream> createDelimitedReaderContext()
     {
       S3DelimitedRecordReaderContextMock s3DelimitedRecordReaderContextMock = new S3DelimitedRecordReaderContextMock();
-      s3DelimitedRecordReaderContextMock.setBucketName("S3RecordReaderMock");
-      s3DelimitedRecordReaderContextMock.setS3Client(s3ClientObject);
+      s3DelimitedRecordReaderContextMock.getS3Params().setBucketName("S3RecordReaderMock");
+      s3DelimitedRecordReaderContextMock.getS3Params().setS3Client(s3ClientObject);
       return s3DelimitedRecordReaderContextMock;
     }
 
@@ -146,8 +146,8 @@ public class S3RecordReaderMockTest
     protected ReaderContext<FSDataInputStream> createFixedWidthReaderContext()
     {
       S3FixedWidthRecordReaderContextMock s3FixedWidthRecordReaderContextMock = new S3FixedWidthRecordReaderContextMock();
-      s3FixedWidthRecordReaderContextMock.setBucketName("S3RecordReaderMock");
-      s3FixedWidthRecordReaderContextMock.setS3Client(s3ClientObject);
+      s3FixedWidthRecordReaderContextMock.getS3Params().setBucketName("S3RecordReaderMock");
+      s3FixedWidthRecordReaderContextMock.getS3Params().setS3Client(s3ClientObject);
       s3FixedWidthRecordReaderContextMock.setLength(this.getRecordLength());
       return s3FixedWidthRecordReaderContextMock;
     }

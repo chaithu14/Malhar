@@ -219,7 +219,7 @@ public interface ReaderContext<STREAM extends InputStream & PositionedReadable>
      *          indicates whether we are reading main block or overflow block
      * @return bytes to be fetched from stream
      */
-    protected int calculateBytesToFetch(boolean overflowBlockRead)
+    protected int calculateBytesToFetch()
     {
       return (overflowBlockRead ? overflowBufferSize : (bufferSize));
     }
@@ -237,7 +237,7 @@ public interface ReaderContext<STREAM extends InputStream & PositionedReadable>
       while (!foundEOL) {
         tmpBuilder.reset();
         if (posInStr == 0) {
-          int bytesToFetch = calculateBytesToFetch(overflowBlockRead);
+          int bytesToFetch = calculateBytesToFetch();
           overflowBlockRead = true;
           bytesRead = readData(usedBytes, bytesToFetch);
           if (bytesRead == -1) {
@@ -332,6 +332,27 @@ public interface ReaderContext<STREAM extends InputStream & PositionedReadable>
     {
       this.buffer = buffer;
     }
+
+    /**
+     * Sets whether to read overflow block during next fetch.
+     *
+     * @param overflowBlockRead
+     *          boolean indicating whether to read overflow block during next read
+     */
+    public void setOverflowBlockRead(boolean overflowBlockRead)
+    {
+      this.overflowBlockRead = overflowBlockRead;
+    }
+
+    /**
+     * Returns a boolean indicating whether to read overflow block during next read
+     *
+     * @returnoverflowBlockRead
+     */
+    protected boolean isOverflowBlockRead()
+    {
+      return overflowBlockRead;
+    }
   }
 
   /**
@@ -374,12 +395,12 @@ public interface ReaderContext<STREAM extends InputStream & PositionedReadable>
     }
 
     @Override
-    protected int calculateBytesToFetch(boolean overflowBlockRead)
+    protected int calculateBytesToFetch()
     {
       /*
        * With readAheadLineReaderContext, we always read at least one overflowBlock. Hence, fetch it in advance
        */
-      return (overflowBlockRead ? overflowBufferSize : (bufferSize + overflowBufferSize));
+      return (this.isOverflowBlockRead() ? overflowBufferSize : (bufferSize + overflowBufferSize));
     }
   }
 

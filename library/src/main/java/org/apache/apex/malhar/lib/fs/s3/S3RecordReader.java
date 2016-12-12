@@ -36,7 +36,6 @@ import com.esotericsoftware.kryo.NotNull;
 import com.google.common.base.Preconditions;
 import com.google.common.io.ByteStreams;
 
-import com.datatorrent.api.Context.OperatorContext;
 import com.datatorrent.lib.io.block.BlockMetadata;
 import com.datatorrent.lib.io.block.ReaderContext;
 
@@ -51,7 +50,6 @@ import com.datatorrent.lib.io.block.ReaderContext;
 @Evolving
 public class S3RecordReader extends FSRecordReader
 {
-  private transient AmazonS3 s3Client;
   private String endPoint;
   @NotNull
   private String bucketName;
@@ -70,11 +68,11 @@ public class S3RecordReader extends FSRecordReader
   }
 
   /**
-   * Extract the file path from given block and set it to the readerContext
+   * S3 reader doesn't make use of any stream, hence returns a null value
    *
    * @param block
    *          block metadata
-   * @return stream
+   * @return stream (null object)
    * @throws IOException
    */
   @Override
@@ -84,21 +82,8 @@ public class S3RecordReader extends FSRecordReader
   }
 
   /**
-   * Initialize the s3 client and reader context
-   */
-  @Override
-  public void setup(OperatorContext context)
-  {
-    s3Client = new AmazonS3Client(new BasicAWSCredentials(accessKey, secretAccessKey));
-    if (endPoint != null) {
-      s3Client.setEndpoint(endPoint);
-    }
-    super.setup(context);
-  }
-
-  /**
    * Returns an instance of S3FixedWidthRecordReaderContext after setting
-   * recordLength, bucketName and s3Client
+   * recordLength and bucketName and initializing s3Client
    *
    * @return S3DelimitedRecordReaderContext
    */
@@ -107,14 +92,14 @@ public class S3RecordReader extends FSRecordReader
   {
     S3FixedWidthRecordReaderContext fixedBytesReaderContext = new S3FixedWidthRecordReaderContext();
     fixedBytesReaderContext.setLength(this.getRecordLength());
-    fixedBytesReaderContext.setBucketName(bucketName);
-    fixedBytesReaderContext.setS3Client(s3Client);
+    fixedBytesReaderContext.getS3Params().initializeS3Client(accessKey, secretAccessKey, endPoint);
+    fixedBytesReaderContext.getS3Params().setBucketName(bucketName);
     return fixedBytesReaderContext;
   }
 
   /**
    * Returns an instance of S3DelimitedRecordReaderContext after setting
-   * bucketName and s3Client
+   * bucketName and overflowBuffersize and initializing the s3Client
    *
    * @return S3DelimitedRecordReaderContext
    */
@@ -122,39 +107,143 @@ public class S3RecordReader extends FSRecordReader
   protected ReaderContext<FSDataInputStream> createDelimitedReaderContext()
   {
     S3DelimitedRecordReaderContext delimitedRecordReaderContext = new S3DelimitedRecordReaderContext();
-    delimitedRecordReaderContext.setBucketName(bucketName);
-    delimitedRecordReaderContext.setS3Client(s3Client);
+    delimitedRecordReaderContext.getS3Params().initializeS3Client(accessKey, secretAccessKey, endPoint);
+    delimitedRecordReaderContext.getS3Params().setBucketName(bucketName);
     delimitedRecordReaderContext.setOverflowBufferSize(overflowBufferSize);
     return delimitedRecordReaderContext;
   }
 
   /**
-   * RecordReaderContext for reading delimited S3 Records.
+   * S3RecordReaderParams is used to hold the common parameters used by the
+   * DelimitedRecordReaderContext and FixedWidthReacordReaderContext for S3
    */
-  protected static class S3DelimitedRecordReaderContext
-      extends ReaderContext.ReadAheadLineReaderContext<FSDataInputStream>
+  protected static class S3RecordReaderParams
   {
     /**
      * Amazon client used to read bytes from S3
      */
-    private transient AmazonS3 s3Client;
+    private AmazonS3 s3Client;
     /**
      * S3 bucket name
      */
-    private transient String bucketName;
+    private String bucketName;
     /**
      * path of file being processed in bucket
      */
-    private transient String filePath;
+    private String filePath;
     /**
      * length of the file being processed
      */
-    private transient long fileLength;
+    private long fileLength;
 
-    @Override
-    public void initialize(FSDataInputStream stream, BlockMetadata blockMetadata, boolean consecutiveBlock)
+    /**
+     * Set the AmazonS3 service
+     *
+     * @param s3Client
+     *          given s3Client
+     */
+    public void initializeS3Client(String accessKey, String secretAccessKey, String endPoint)
     {
-      super.initialize(stream, blockMetadata, consecutiveBlock);
+      s3Client = new AmazonS3Client(new BasicAWSCredentials(accessKey, secretAccessKey));
+      if (endPoint != null) {
+        s3Client.setEndpoint(endPoint);
+      }
+    }
+
+    /**
+     * Set the AmazonS3 service
+     *
+     * @param s3Client
+     *          given s3Client
+     */
+    public void setS3Client(@javax.validation.constraints.NotNull AmazonS3 s3Client)
+    {
+      Preconditions.checkNotNull(s3Client);
+      this.s3Client = s3Client;
+    }
+
+    /**
+     * Returns the AmazonS3 service
+     *
+     * @return s3Client
+     */
+    public AmazonS3 getS3Client()
+    {
+      return s3Client;
+    }
+
+    /**
+     * Set the bucket name
+     *
+     * @param bucketName
+     *          given bucketName
+     */
+    public void setBucketName(@javax.validation.constraints.NotNull String bucketName)
+    {
+      Preconditions.checkNotNull(bucketName);
+      this.bucketName = bucketName;
+    }
+
+    /**
+     * Returns the bucket name
+     *
+     * @return bucketName
+     */
+    public String getBucketName()
+    {
+      return bucketName;
+    }
+
+    /**
+     * Sets the file path
+     *
+     * @param filePath
+     *          given filePath
+     */
+    public void setFilePath(String filePath)
+    {
+      this.filePath = filePath;
+    }
+
+    /**
+     * Returns the file path
+     *
+     * @return filePath
+     */
+    public String getFilePath()
+    {
+      return filePath;
+    }
+
+    /**
+     * Sets the length of the file to which the block belongs
+     *
+     * @param fileLength
+     *          length of the file to which the block belongs
+     */
+    public void setFileLength(long fileLength)
+    {
+      this.fileLength = fileLength;
+    }
+
+    /**
+     * Returns the length of the file to which the block belongs
+     *
+     * @return fileLength
+     */
+    public long getFileLength()
+    {
+      return fileLength;
+    }
+
+    /**
+     * This method reads the blockMetadata input parameter and initializes the
+     * fileBlock and fileLength
+     *
+     * @param blockMetadata
+     */
+    public void initialzeFilepathAndFileLength(BlockMetadata blockMetadata)
+    {
       if (blockMetadata instanceof BlockMetadata.FileBlockMetadata) {
         BlockMetadata.FileBlockMetadata fileBlockMetadata = (BlockMetadata.FileBlockMetadata)blockMetadata;
         fileLength = fileBlockMetadata.getFileLength();
@@ -165,6 +254,30 @@ public class S3RecordReader extends FSRecordReader
           filePath = filePath.substring(1);
         }
       }
+    }
+  }
+
+  /**
+   * RecordReaderContext for reading delimited S3 Records.
+   */
+  protected static class S3DelimitedRecordReaderContext
+      extends ReaderContext.ReadAheadLineReaderContext<FSDataInputStream>
+  {
+    /**
+     * S3 parameters
+     */
+    private transient S3RecordReaderParams s3Params;
+
+    public S3DelimitedRecordReaderContext()
+    {
+      s3Params = new S3RecordReaderParams();
+    }
+
+    @Override
+    public void initialize(FSDataInputStream stream, BlockMetadata blockMetadata, boolean consecutiveBlock)
+    {
+      super.initialize(stream, blockMetadata, consecutiveBlock);
+      s3Params.initialzeFilepathAndFileLength(blockMetadata);
       /*
        * Initialize the bufferSize and overflowBufferSize
        */
@@ -195,9 +308,9 @@ public class S3RecordReader extends FSRecordReader
     @Override
     protected int readData(final long bytesFromCurrentOffset, final int bytesToFetch) throws IOException
     {
-      GetObjectRequest rangeObjectRequest = new GetObjectRequest(bucketName, filePath);
+      GetObjectRequest rangeObjectRequest = new GetObjectRequest(s3Params.bucketName, s3Params.filePath);
       rangeObjectRequest.setRange(offset + bytesFromCurrentOffset, offset + bytesFromCurrentOffset + bytesToFetch - 1);
-      S3Object objectPortion = s3Client.getObject(rangeObjectRequest);
+      S3Object objectPortion = s3Params.s3Client.getObject(rangeObjectRequest);
       S3ObjectInputStream wrappedStream = objectPortion.getObjectContent();
       buffer = ByteStreams.toByteArray(wrappedStream);
       wrappedStream.close();
@@ -211,56 +324,32 @@ public class S3RecordReader extends FSRecordReader
     @Override
     protected boolean checkEndOfStream(final long usedBytesFromOffset)
     {
-      if ((offset + usedBytesFromOffset) >= fileLength) {
+      if ((offset + usedBytesFromOffset) >= s3Params.fileLength) {
         return true;
       }
       return false;
     }
 
     /**
-     * Set the AmazonS3 service
+     * Sets the S3RecordReaderParams object
      *
-     * @param s3Client
-     *          given s3Client
+     * @param s3Params
+     *          S3RecordReaderParams object
      */
-    public void setS3Client(@javax.validation.constraints.NotNull AmazonS3 s3Client)
+    protected void setS3Params(S3RecordReaderParams s3Params)
     {
-      Preconditions.checkNotNull(s3Client);
-      this.s3Client = s3Client;
+      this.s3Params = s3Params;
     }
 
     /**
-     * Set the bucket name
+     * Returns the S3RecordReaderParams object
      *
-     * @param bucketName
-     *          given bucketName
+     * @return s3Params
      */
-    public void setBucketName(@javax.validation.constraints.NotNull String bucketName)
+    protected S3RecordReaderParams getS3Params()
     {
-      Preconditions.checkNotNull(bucketName);
-      this.bucketName = bucketName;
+      return s3Params;
     }
-
-    /**
-     * Sets the file path
-     *
-     * @param filePath
-     *          given filePath
-     */
-    public void setFilePath(String filePath)
-    {
-      this.filePath = filePath;
-    }
-
-    /**
-     * @param fileLength
-     *          length of the file to which the block belongs
-     */
-    public void setFileLength(long fileLength)
-    {
-      this.fileLength = fileLength;
-    }
-
   }
 
   /**
@@ -270,21 +359,9 @@ public class S3RecordReader extends FSRecordReader
       extends ReaderContext.FixedBytesReaderContext<FSDataInputStream>
   {
     /**
-     * Amazon client used to read bytes from S3
+     * S3 parameters
      */
-    private transient AmazonS3 s3Client;
-    /**
-     * S3 bucket name
-     */
-    private transient String bucketName;
-    /**
-     * path of file being processed in bucket
-     */
-    private transient String filePath;
-    /**
-     * length of the file being processed
-     */
-    private transient long fileLength;
+    private transient S3RecordReaderParams s3Params;
 
     /**
      * used to hold data retrieved from S3
@@ -296,20 +373,16 @@ public class S3RecordReader extends FSRecordReader
      */
     private transient int bufferOffset;
 
+    public S3FixedWidthRecordReaderContext()
+    {
+      s3Params = new S3RecordReaderParams();
+    }
+
     @Override
     public void initialize(FSDataInputStream stream, BlockMetadata blockMetadata, boolean consecutiveBlock)
     {
       super.initialize(stream, blockMetadata, consecutiveBlock);
-      if (blockMetadata instanceof BlockMetadata.FileBlockMetadata) {
-        BlockMetadata.FileBlockMetadata fileBlockMetadata = (BlockMetadata.FileBlockMetadata)blockMetadata;
-        fileLength = fileBlockMetadata.getFileLength();
-        filePath = fileBlockMetadata.getFilePath();
-        // File path would be the path after bucket name.
-        // Check if the file path starts with "/"
-        if (filePath.startsWith("/")) {
-          filePath = filePath.substring(1);
-        }
-      }
+      s3Params.initialzeFilepathAndFileLength(blockMetadata);
       try {
         int bytesRead = this.getBlockFromS3();
         if (bytesRead == -1) {
@@ -335,14 +408,14 @@ public class S3RecordReader extends FSRecordReader
           + (this.length - (blockMetadata.getOffset() % this.length)) % this.length;
       long endOffset = blockMetadata.getLength()
           + ((this.length - (blockMetadata.getLength() % this.length)) % this.length) - 1;
-      if (endOffset == (startOffset - 1) || startOffset > this.fileLength) {
+      if (endOffset == (startOffset - 1) || startOffset > s3Params.fileLength) {
         /*
          * If start and end offset is same, it means no record starts in this block
          */
         return -1;
       }
-      if (endOffset >= this.fileLength) {
-        endOffset = this.fileLength - 1;
+      if (endOffset >= s3Params.fileLength) {
+        endOffset = s3Params.fileLength - 1;
       }
       offset = startOffset;
       return readData(startOffset, endOffset);
@@ -361,9 +434,9 @@ public class S3RecordReader extends FSRecordReader
      */
     protected int readData(long startOffset, long endOffset) throws IOException
     {
-      GetObjectRequest rangeObjectRequest = new GetObjectRequest(bucketName, filePath);
+      GetObjectRequest rangeObjectRequest = new GetObjectRequest(s3Params.bucketName, s3Params.filePath);
       rangeObjectRequest.setRange(startOffset, endOffset);
-      S3Object objectPortion = s3Client.getObject(rangeObjectRequest);
+      S3Object objectPortion = s3Params.s3Client.getObject(rangeObjectRequest);
       S3ObjectInputStream wrappedStream = objectPortion.getObjectContent();
       buffer = ByteStreams.toByteArray(wrappedStream);
       wrappedStream.close();
@@ -379,8 +452,8 @@ public class S3RecordReader extends FSRecordReader
        * The data to be read from buffer array should be less in this case.
        */
       long bufferLength = length;
-      if (offset + length > fileLength) {
-        bufferLength = fileLength - offset;
+      if (offset + length > s3Params.fileLength) {
+        bufferLength = s3Params.fileLength - offset;
       }
       byte[] record = Arrays.copyOfRange(buffer, Long.valueOf(bufferOffset).intValue(),
           Long.valueOf(bufferOffset + bufferLength).intValue());
@@ -388,48 +461,6 @@ public class S3RecordReader extends FSRecordReader
       entity.setRecord(record);
       entity.setUsedBytes(record.length);
       return entity;
-    }
-
-    /**
-     * Set the AmazonS3 service
-     *
-     * @param s3Client
-     *          given s3Client
-     */
-    public void setS3Client(AmazonS3 s3Client)
-    {
-      this.s3Client = s3Client;
-    }
-
-    /**
-     * Set the bucket name
-     *
-     * @param bucketName
-     *          given bucketName
-     */
-    public void setBucketName(String bucketName)
-    {
-      this.bucketName = bucketName;
-    }
-
-    /**
-     * Sets the file path
-     *
-     * @param filePath
-     *          given filePath
-     */
-    public void setFilePath(String filePath)
-    {
-      this.filePath = filePath;
-    }
-
-    /**
-     * @param fileLength
-     *          length of the file to which the block belongs
-     */
-    public void setFileLength(long fileLength)
-    {
-      this.fileLength = fileLength;
     }
 
     /**
@@ -441,6 +472,27 @@ public class S3RecordReader extends FSRecordReader
     protected void setBufferOffset(int bufferOffset)
     {
       this.bufferOffset = bufferOffset;
+    }
+
+    /**
+     * Sets the S3RecordReaderParams object
+     *
+     * @param s3Params
+     *          S3RecordReaderParams object
+     */
+    protected void setS3Params(S3RecordReaderParams s3Params)
+    {
+      this.s3Params = s3Params;
+    }
+
+    /**
+     * Returns the S3RecordReaderParams object
+     *
+     * @return s3Params
+     */
+    protected S3RecordReaderParams getS3Params()
+    {
+      return s3Params;
     }
   }
 
