@@ -137,10 +137,12 @@ public class S3RecordReader extends FSRecordReader
     private long fileLength;
 
     /**
-     * Set the AmazonS3 service
+     * Initialize the AmazonS3 client using the accessKey, secretAccessKey, sets
+     * endpoint for the s3Client if provided
      *
-     * @param s3Client
-     *          given s3Client
+     * @param accessKey
+     * @param secretAccessKey
+     * @param endPoint
      */
     public void initializeS3Client(String accessKey, String secretAccessKey, String endPoint)
     {
