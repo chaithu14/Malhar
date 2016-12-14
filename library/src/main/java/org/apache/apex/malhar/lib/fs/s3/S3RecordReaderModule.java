@@ -89,7 +89,6 @@ public class S3RecordReaderModule extends FSRecordReaderModule
     s3RecordReader.setRecordLength(this.getRecordLength());
     if (overflowBlockSize != 0) {
       s3RecordReader.setOverflowBufferSize(overflowBlockSize);
-      ;
     }
     return s3RecordReader;
   }

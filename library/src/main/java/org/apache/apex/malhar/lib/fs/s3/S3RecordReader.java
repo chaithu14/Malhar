@@ -144,8 +144,11 @@ public class S3RecordReader extends FSRecordReader
      * @param secretAccessKey
      * @param endPoint
      */
-    public void initializeS3Client(String accessKey, String secretAccessKey, String endPoint)
+    public void initializeS3Client(@javax.validation.constraints.NotNull String accessKey,
+        @javax.validation.constraints.NotNull String secretAccessKey, String endPoint)
     {
+      Preconditions.checkNotNull(accessKey);
+      Preconditions.checkNotNull(secretAccessKey);
       s3Client = new AmazonS3Client(new BasicAWSCredentials(accessKey, secretAccessKey));
       if (endPoint != null) {
         s3Client.setEndpoint(endPoint);
@@ -197,17 +200,6 @@ public class S3RecordReader extends FSRecordReader
     }
 
     /**
-     * Sets the file path
-     *
-     * @param filePath
-     *          given filePath
-     */
-    public void setFilePath(String filePath)
-    {
-      this.filePath = filePath;
-    }
-
-    /**
      * Returns the file path
      *
      * @return filePath
@@ -215,17 +207,6 @@ public class S3RecordReader extends FSRecordReader
     public String getFilePath()
     {
       return filePath;
-    }
-
-    /**
-     * Sets the length of the file to which the block belongs
-     *
-     * @param fileLength
-     *          length of the file to which the block belongs
-     */
-    public void setFileLength(long fileLength)
-    {
-      this.fileLength = fileLength;
     }
 
     /**
@@ -330,17 +311,6 @@ public class S3RecordReader extends FSRecordReader
         return true;
       }
       return false;
-    }
-
-    /**
-     * Sets the S3RecordReaderParams object
-     *
-     * @param s3Params
-     *          S3RecordReaderParams object
-     */
-    protected void setS3Params(S3RecordReaderParams s3Params)
-    {
-      this.s3Params = s3Params;
     }
 
     /**
@@ -534,8 +504,9 @@ public class S3RecordReader extends FSRecordReader
    * @param bucketName
    *          bucket name
    */
-  public void setBucketName(String bucketName)
+  public void setBucketName(@javax.validation.constraints.NotNull String bucketName)
   {
+    Preconditions.checkNotNull(bucketName);
     this.bucketName = bucketName;
   }
 
@@ -555,8 +526,9 @@ public class S3RecordReader extends FSRecordReader
    * @param accessKey
    *          given accessKey
    */
-  public void setAccessKey(String accessKey)
+  public void setAccessKey(@javax.validation.constraints.NotNull String accessKey)
   {
+    Preconditions.checkNotNull(accessKey);
     this.accessKey = accessKey;
   }
 
@@ -576,8 +548,9 @@ public class S3RecordReader extends FSRecordReader
    * @param secretAccessKey
    *          secretAccessKey
    */
-  public void setSecretAccessKey(String secretAccessKey)
+  public void setSecretAccessKey(@javax.validation.constraints.NotNull String secretAccessKey)
   {
+    Preconditions.checkNotNull(secretAccessKey);
     this.secretAccessKey = secretAccessKey;
   }
 
