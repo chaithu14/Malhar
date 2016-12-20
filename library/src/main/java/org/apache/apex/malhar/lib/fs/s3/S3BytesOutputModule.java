@@ -49,7 +49,50 @@ public class S3BytesOutputModule implements Module
     s3compaction.setConverter(new GenericFileOutputOperator.NoOpConverter());
 
     S3Reconciler s3Reconciler = dag.addOperator("S3Reconciler", new S3Reconciler());
+    s3Reconciler.setAccessKey(accessKey);
+    s3Reconciler.setSecretKey(secretKey);
+    s3Reconciler.setBucketName(bucketName);
+    s3Reconciler.setDirectoryName(directoryName);
     dag.addStream("write-to-s3", s3compaction.output, s3Reconciler.input);
   }
 
+  public String getAccessKey()
+  {
+    return accessKey;
+  }
+
+  public void setAccessKey(String accessKey)
+  {
+    this.accessKey = accessKey;
+  }
+
+  public String getSecretKey()
+  {
+    return secretKey;
+  }
+
+  public void setSecretKey(String secretKey)
+  {
+    this.secretKey = secretKey;
+  }
+
+  public String getBucketName()
+  {
+    return bucketName;
+  }
+
+  public void setBucketName(String bucketName)
+  {
+    this.bucketName = bucketName;
+  }
+
+  public String getDirectoryName()
+  {
+    return directoryName;
+  }
+
+  public void setDirectoryName(String directoryName)
+  {
+    this.directoryName = directoryName;
+  }
 }
