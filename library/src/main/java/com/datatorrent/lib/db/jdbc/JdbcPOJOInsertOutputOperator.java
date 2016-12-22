@@ -56,8 +56,9 @@ public class JdbcPOJOInsertOutputOperator extends AbstractJdbcPOJOOutputOperator
   @Override
   public void setup(OperatorContext context)
   {
+    LOG.info("JdbcPOJOInsertOutputOperator: - 1");
     super.setup(context);
-
+    LOG.info("JdbcPOJOInsertOutputOperator: - 2");
     // Populate columnNames and columnDataTypes
     try {
       columnNames = Lists.newArrayList();
@@ -85,6 +86,7 @@ public class JdbcPOJOInsertOutputOperator extends AbstractJdbcPOJOOutputOperator
         }
       }
       populateColumnDataTypes(columnNamesSet);
+      LOG.info("JdbcPOJOInsertOutputOperator: - 3");
     } catch (SQLException e) {
       throw new RuntimeException(e);
     }
@@ -93,6 +95,7 @@ public class JdbcPOJOInsertOutputOperator extends AbstractJdbcPOJOOutputOperator
   @Override
   public void activate(OperatorContext context)
   {
+    LOG.info("JdbcPOJOInsertOutputOperator -> activate - 1");
     if (getFieldInfos() == null || getFieldInfos().size() == 0) {
       Field[] fields = pojoClass.getDeclaredFields();
       // Create fieldInfos in case of direct mapping
@@ -118,7 +121,7 @@ public class JdbcPOJOInsertOutputOperator extends AbstractJdbcPOJOOutputOperator
       }
       setFieldInfos(fieldInfos);
     }
-
+    LOG.info("JdbcPOJOInsertOutputOperator -> activate - 2");
     for (FieldInfo fi : getFieldInfos()) {
       columnFieldGetters.add(new ActiveFieldInfo(fi));
     }
@@ -134,7 +137,7 @@ public class JdbcPOJOInsertOutputOperator extends AbstractJdbcPOJOOutputOperator
         values.append(",");
       }
     }
-
+    LOG.info("JdbcPOJOInsertOutputOperator -> activate - 3");
     insertStatement = "INSERT INTO "
             + getTablename()
             + " (" + columns.toString() + ")"
@@ -142,6 +145,7 @@ public class JdbcPOJOInsertOutputOperator extends AbstractJdbcPOJOOutputOperator
     LOG.debug("insert statement is {}", insertStatement);
 
     super.activate(context);
+    LOG.info("JdbcPOJOInsertOutputOperator -> activate - 4");
   }
 
   private String getMatchingField(Field[] fields, String columnName)
@@ -162,6 +166,7 @@ public class JdbcPOJOInsertOutputOperator extends AbstractJdbcPOJOOutputOperator
   protected void populateColumnDataTypes(HashSet<String> columnNamesSet) throws SQLException
   {
     ResultSet rsColumns;
+    LOG.info("populateColumnDataTypes - 1");
     DatabaseMetaData meta = store.getConnection().getMetaData();
     rsColumns = meta.getColumns(null, null, getTablename(), null);
     /**Identifiers (table names, column names etc.) may be stored internally in either uppercase or lowercase.**/
@@ -174,6 +179,7 @@ public class JdbcPOJOInsertOutputOperator extends AbstractJdbcPOJOOutputOperator
         }
       }
     }
+    LOG.info("populateColumnDataTypes - 2");
     boolean readAllColumns = columnNamesSet.size() == 0 ? true : false;
     int remainingColumns = columnNamesSet.size();
     while (rsColumns.next()) {

@@ -100,7 +100,9 @@ public abstract class AbstractJdbcTransactionableOutputOperator<T>
   public void activate(OperatorContext context)
   {
     try {
+      logger.info("AbstractJdbcTransactionableOutputOperator: activate : {}", getUpdateCommand());
       updateCommand = store.connection.prepareStatement(getUpdateCommand());
+      logger.info("End - AbstractJdbcTransactionableOutputOperator: activate : {}", getUpdateCommand());
     } catch (SQLException e) {
       throw new RuntimeException(e);
     }

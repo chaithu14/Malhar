@@ -226,6 +226,7 @@ public class JdbcTransactionalStore extends JdbcStore implements Transactionable
       lastWindowFetchCommand.setString(1, appId);
       lastWindowFetchCommand.setInt(2, operatorId);
       Long lastWindow = null;
+      LOG.info("getCommittedWindowIdHelper: {}", lastWindowFetchCommand.toString());
       ResultSet resultSet = lastWindowFetchCommand.executeQuery();
       if (resultSet.next()) {
         lastWindow = resultSet.getLong(1);
