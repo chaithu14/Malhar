@@ -38,6 +38,7 @@ public class S3BytesOutputModule implements Module
   private String bucketName;
   @NotNull
   private String directoryName;
+  private Long maxLength;
 
   public final transient ProxyInputPort<byte[]> input = new ProxyInputPort<byte[]>();
 
@@ -47,12 +48,16 @@ public class S3BytesOutputModule implements Module
     S3CompactionOperator<byte[]> s3compaction =
         dag.addOperator("S3Compaction", new S3CompactionOperator());
     s3compaction.setConverter(new GenericFileOutputOperator.NoOpConverter());
+    if (maxLength != null) {
+      s3compaction.setMaxLength(maxLength);
+    }
 
     S3Reconciler s3Reconciler = dag.addOperator("S3Reconciler", new S3Reconciler());
     s3Reconciler.setAccessKey(accessKey);
     s3Reconciler.setSecretKey(secretKey);
     s3Reconciler.setBucketName(bucketName);
     s3Reconciler.setDirectoryName(directoryName);
+    input.set(s3compaction.input);
     dag.addStream("write-to-s3", s3compaction.output, s3Reconciler.input);
   }
 
@@ -94,5 +99,15 @@ public class S3BytesOutputModule implements Module
   public void setDirectoryName(String directoryName)
   {
     this.directoryName = directoryName;
+  }
+
+  public Long getMaxLength()
+  {
+    return maxLength;
+  }
+
+  public void setMaxLength(Long maxLength)
+  {
+    this.maxLength = maxLength;
   }
 }

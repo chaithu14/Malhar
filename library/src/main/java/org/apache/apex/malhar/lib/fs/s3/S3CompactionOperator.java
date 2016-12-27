@@ -22,7 +22,6 @@ import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.apex.malhar.lib.fs.GenericFileOutputOperator;
-import org.apache.commons.io.FileUtils;
 import org.apache.hadoop.fs.Path;
 
 import com.datatorrent.api.Context;
@@ -57,7 +56,8 @@ public class S3CompactionOperator<INPUT> extends GenericFileOutputOperator<INPUT
 
     //String tmpFileName = getFileNameToTmpName().get(partFile);
     String srcPath = filePath + Path.SEPARATOR + fileName;
-    long offset = FileUtils.sizeOf(FileUtils.getFile(srcPath));
+
+    long offset = fs.getFileStatus(new Path(srcPath)).getLen();
 
     S3Reconciler.OutputMetaData metaData = new S3Reconciler.OutputMetaData(srcPath, fileName, offset);
     output.emit(metaData);
