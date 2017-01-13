@@ -97,34 +97,39 @@ public class S3Reconciler extends AbstractReconciler<S3Reconciler.OutputMetaData
     while (doneTuples.peek() != null) {
       S3Reconciler.OutputMetaData metaData = doneTuples.poll();
       logger.info("found metaData = {}", metaData);
-      committedTuples.remove(metaData);
-      try {
-        Path dest = new Path(metaData.getPath());
-        //Deleting the intermediate files and when writing to tmp files
-        // there can be vagrant tmp files which we have to clean
-        FileStatus[] statuses = fs.listStatus(dest.getParent());
-        logger.info("found statuses = {}", statuses);
+      removeProcessedTuple(metaData);
+    }
+  }
 
-        for (FileStatus status : statuses) {
-          String statusName = status.getPath().getName();
-          logger.info("statusName = {}", statusName);
-          if (statusName.endsWith(TMP_EXTENSION) && statusName.startsWith(metaData.getFileName())) {
-            //a tmp file has tmp extension always preceded by timestamp
-            String actualFileName = statusName.substring(0,
-                statusName.lastIndexOf('.', statusName.lastIndexOf('.') - 1));
-            logger.info("actualFileName = {}", actualFileName);
-            if (metaData.getFileName().equals(actualFileName)) {
-              logger.info("deleting stray file {}", statusName);
-              fs.delete(status.getPath(), true);
-            }
-          } else if (statusName.equals(metaData.getFileName())) {
-            logger.info("deleting s3-compaction file {}", statusName);
+  public void removeProcessedTuple(S3Reconciler.OutputMetaData metaData)
+  {
+    committedTuples.remove(metaData);
+    try {
+      Path dest = new Path(metaData.getPath());
+      //Deleting the intermediate files and when writing to tmp files
+      // there can be vagrant tmp files which we have to clean
+      FileStatus[] statuses = fs.listStatus(dest.getParent());
+      logger.info("found statuses = {}", statuses);
+
+      for (FileStatus status : statuses) {
+        String statusName = status.getPath().getName();
+        logger.info("statusName = {}", statusName);
+        if (statusName.endsWith(TMP_EXTENSION) && statusName.startsWith(metaData.getFileName())) {
+          //a tmp file has tmp extension always preceded by timestamp
+          String actualFileName = statusName.substring(0,
+              statusName.lastIndexOf('.', statusName.lastIndexOf('.') - 1));
+          logger.info("actualFileName = {}", actualFileName);
+          if (metaData.getFileName().equals(actualFileName)) {
+            logger.info("deleting stray file {}", statusName);
             fs.delete(status.getPath(), true);
           }
+        } else if (statusName.equals(metaData.getFileName())) {
+          logger.info("deleting s3-compaction file {}", statusName);
+          fs.delete(status.getPath(), true);
         }
-      } catch (IOException e) {
-        logger.error("Unable to Delete a file: {}", metaData.getFileName());
       }
+    } catch (IOException e) {
+      logger.error("Unable to Delete a file: {}", metaData.getFileName());
     }
   }
 
