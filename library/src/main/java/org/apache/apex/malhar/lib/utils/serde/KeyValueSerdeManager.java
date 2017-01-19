@@ -18,6 +18,9 @@
  */
 package org.apache.apex.malhar.lib.utils.serde;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.apache.apex.malhar.lib.state.managed.Bucket;
 import org.apache.apex.malhar.lib.state.managed.BucketProvider;
 
@@ -25,6 +28,7 @@ import com.datatorrent.netlet.util.Slice;
 
 public class KeyValueSerdeManager<K, V>
 {
+  private static final Logger LOG = LoggerFactory.getLogger(KeyValueSerdeManager.class);
   protected Serde<K> keySerde;
   protected Serde<V> valueSerde;
 
@@ -69,6 +73,15 @@ public class KeyValueSerdeManager<K, V>
    */
   public Slice serializeValue(V value)
   {
+    if (value == null) {
+      LOG.info("serializeValue: value is null");
+    }
+    if (valueBuffer == null) {
+      LOG.info("serializeValue: valueBuffer is null");
+    }
+    if (valueSerde == null) {
+      LOG.info("serializeValue: valueSerde is null");
+    }
     valueSerde.serialize(value, valueBuffer);
     return valueBuffer.toSlice();
   }
