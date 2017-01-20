@@ -29,6 +29,9 @@ import java.util.concurrent.TimeoutException;
 
 import javax.validation.constraints.NotNull;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.apache.apex.malhar.lib.state.BucketedState;
 import org.apache.apex.malhar.lib.state.managed.KeyBucketExtractor;
 import org.apache.apex.malhar.lib.state.managed.TimeExtractor;
@@ -56,6 +59,7 @@ import com.datatorrent.netlet.util.Slice;
 public class SpillableTimeSlicedMapImpl<K,V> implements Spillable.SpillableMap<K, V>, Spillable.SpillableComponent,
     Serializable
 {
+  private static final Logger LOG = LoggerFactory.getLogger(SpillableTimeSlicedMapImpl.class);
   private transient WindowBoundedMapCache<K, V> cache = new WindowBoundedMapCache<>();
   private transient Input tmpInput = new Input();
   private transient long timeIncrement;
@@ -311,7 +315,9 @@ public class SpillableTimeSlicedMapImpl<K,V> implements Spillable.SpillableMap<K
   @Override
   public void endWindow()
   {
+    LOG.info("Map- EndWindow - start");
     for (K key: cache.getChangedKeys()) {
+      LOG.info("Map: {} -> {} -> {}", key, keyValueSerdeManager.serializeDataKey(key, true), cache.get(key));
       store.put(getKeyBucket(key), getTimeBucket(cache.get(key)), keyValueSerdeManager.serializeDataKey(key, true),
           keyValueSerdeManager.serializeValue(cache.get(key)));
     }
@@ -320,6 +326,7 @@ public class SpillableTimeSlicedMapImpl<K,V> implements Spillable.SpillableMap<K
       store.put(getKeyBucket(key), time, keyValueSerdeManager.serializeDataKey(key, true), BufferSlice.EMPTY_SLICE);
     }
     cache.endWindow();
+    LOG.info("Map- EndWindow - end");
     keyValueSerdeManager.resetReadBuffer();
     time += timeIncrement;
   }

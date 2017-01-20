@@ -141,12 +141,28 @@ public class BucketsFileSystem implements ManagedStateComponent
    */
   protected void writeBucketData(long windowId, long bucketId, Map<Slice, Bucket.BucketedValue> data) throws IOException
   {
+    LOG.info("--------WriteBuketData: {} -> {}", windowId, bucketId);
     Table<Long, Slice, Bucket.BucketedValue> timeBucketedKeys = TreeBasedTable.create(Ordering.<Long>natural(),
         managedStateContext.getKeyComparator());
 
     for (Map.Entry<Slice, Bucket.BucketedValue> entry : data.entrySet()) {
       long timeBucketId = entry.getValue().getTimeBucket();
+      Slice key = entry.getKey();
+      Slice value = entry.getValue().getValue();
+      LOG.info("Before Sort: {} -> {} -> {}", timeBucketId, key, value);
+    }
+
+    for (Map.Entry<Slice, Bucket.BucketedValue> entry : data.entrySet()) {
+      long timeBucketId = entry.getValue().getTimeBucket();
       timeBucketedKeys.put(timeBucketId, entry.getKey(), entry.getValue());
+    }
+
+    for (long timeBucket : timeBucketedKeys.rowKeySet()) {
+      for (Map.Entry<Slice, Bucket.BucketedValue> entry : timeBucketedKeys.row(timeBucket).entrySet()) {
+        Slice key = entry.getKey();
+        Slice value = entry.getValue().getValue();
+        LOG.info("After Sort: {} -> {} -> {}", timeBucket, key, value);
+      }
     }
 
     for (long timeBucket : timeBucketedKeys.rowKeySet()) {
@@ -165,11 +181,11 @@ public class BucketsFileSystem implements ManagedStateComponent
       if (tbm.getLastTransferredWindowId() == -1) {
         //A new time bucket so we append all the key/values to the new file
         fileWriter = getWriter(bucketId, tmpFileName);
-
+        LOG.info("writeBucketData: {} -> {}", bucketId, timeBucket);
         for (Map.Entry<Slice, Bucket.BucketedValue> entry : timeBucketedKeys.row(timeBucket).entrySet()) {
           Slice key = entry.getKey();
           Slice value = entry.getValue().getValue();
-
+          LOG.info("Data: {} -> {}", key, value);
           dataSize += key.length;
           dataSize += value.length;
 
@@ -178,6 +194,7 @@ public class BucketsFileSystem implements ManagedStateComponent
             firstKey = key;
           }
         }
+        LOG.info("End of writeBucketData: {} -> {}", bucketId, timeBucket);
       } else {
         //the time bucket existed so we need to read the file and then re-write it
         TreeMap<Slice, Slice> fileData = new TreeMap<>(managedStateContext.getKeyComparator());

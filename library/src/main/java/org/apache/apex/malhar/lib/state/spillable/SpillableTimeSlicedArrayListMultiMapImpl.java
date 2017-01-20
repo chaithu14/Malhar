@@ -27,6 +27,9 @@ import java.util.concurrent.Future;
 import javax.annotation.Nullable;
 import javax.validation.constraints.NotNull;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.apache.apex.malhar.lib.state.managed.KeyBucketExtractor;
 import org.apache.apex.malhar.lib.state.managed.TimeExtractor;
 import org.apache.apex.malhar.lib.utils.serde.AffixKeyValueSerdeManager;
@@ -54,6 +57,7 @@ import com.datatorrent.netlet.util.Slice;
 public class SpillableTimeSlicedArrayListMultiMapImpl<K,V> implements Spillable.SpillableListMultimap<K, V>,
     Spillable.SpillableComponent
 {
+  private static final Logger LOG = LoggerFactory.getLogger(SpillableTimeSlicedArrayListMultiMapImpl.class);
   public static final int DEFAULT_BATCH_SIZE = 1000;
   public static final byte[] SIZE_KEY_SUFFIX = new byte[]{(byte)0, (byte)0, (byte)0};
 
@@ -373,16 +377,18 @@ public class SpillableTimeSlicedArrayListMultiMapImpl<K,V> implements Spillable.
   public void endWindow()
   {
     isInWindow = false;
+    LOG.info("MultiMap: EndWindow - start");
     for (K key: cache.getChangedKeys()) {
 
       SpillableTimeSlicedArrayListImpl<V> spillableArrayList = cache.get(key);
       spillableArrayList.endWindow();
-
+      LOG.info("MultiMap: {} -> {} -> {}", key, keyValueSerdeManager.serializeMetaKey(key, true), spillableArrayList.size());
       map.put(keyValueSerdeManager.serializeMetaKey(key, true), spillableArrayList.size());
     }
 
     Preconditions.checkState(cache.getRemovedKeys().isEmpty());
     cache.endWindow();
+    LOG.info("MultiMap: EndWindow - end");
     map.endWindow();
 
     keyValueSerdeManager.resetReadBuffer();

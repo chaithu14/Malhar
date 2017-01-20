@@ -237,6 +237,7 @@ public abstract class AbstractManagedStateImpl
 
   public void beginWindow(long windowId)
   {
+    LOG.info("Begin Window -> {}", windowId);
     if (throwable.get() != null) {
       Throwables.propagate(throwable.get());
     }
@@ -277,6 +278,7 @@ public abstract class AbstractManagedStateImpl
       //a single thread (operator thread). The get(sync/async) always checks memory first synchronously.
       //If the key is not in the memory, then the async get will uses other reader threads which will fetch it from
       //the files.
+      LOG.info("putInBucket: {} -> {} -> {} -> {} -> {} -> {} -> {} -> {}", timeBucket, bucketId, key, key.offset, key.length, value, value.offset, value.length);
       buckets[bucketIdx].put(key, timeBucket, value);
     }
   }
@@ -344,6 +346,7 @@ public abstract class AbstractManagedStateImpl
 
   public void endWindow()
   {
+    LOG.info("EndWindow");
     timeBucketAssigner.endWindow();
   }
 
@@ -351,6 +354,7 @@ public abstract class AbstractManagedStateImpl
   @Override
   public void beforeCheckpoint(long windowId)
   {
+    LOG.info("BeforeCheckpoint: {}", windowId);
     Map<Long, Map<Slice, Bucket.BucketedValue>> flashData = Maps.newHashMap();
 
     for (Bucket bucket : buckets) {

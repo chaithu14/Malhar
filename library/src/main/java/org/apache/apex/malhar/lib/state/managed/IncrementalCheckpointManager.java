@@ -113,7 +113,7 @@ public class IncrementalCheckpointManager extends FSWindowDataManager
                   latestExpiredTimeBucket.getAndSet(-1));
             } catch (IOException e) {
               throwable.set(e);
-              LOG.debug("delete files", e);
+              LOG.info("delete files", e);
               Throwables.propagate(e);
             }
           }
@@ -175,6 +175,16 @@ public class IncrementalCheckpointManager extends FSWindowDataManager
     if ((lthrowable = throwable.get()) != null) {
       LOG.error("Error while transferring");
       Throwables.propagate(lthrowable);
+    }
+    LOG.info("UnSavedData: {}", windowId);
+    for (Long bucketId: unsavedData.keySet()) {
+      LOG.info("UnSavedData BucketId: {}", bucketId);
+      Map<Slice, Bucket.BucketedValue> value = unsavedData.get(bucketId);
+      for (Map.Entry<Slice,Bucket.BucketedValue> k: value.entrySet()) {
+        Slice key = k.getKey();
+        Bucket.BucketedValue bValue = k.getValue();
+        LOG.info("Data: {} -> {} -> {} -> {} -> {} -> {} -> {}", key, key.offset, key.length, bValue.getValue(), bValue.getValue().offset, bValue.getValue().length, bValue.getTimeBucket());
+      }
     }
     savedWindows.put(windowId, unsavedData);
 
