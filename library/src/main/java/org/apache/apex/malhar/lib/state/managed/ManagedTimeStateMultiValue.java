@@ -57,6 +57,9 @@ import com.datatorrent.netlet.util.Slice;
 public class ManagedTimeStateMultiValue<K,V> implements Spillable.SpillableListMultimap<K,V>
 {
   private transient StreamCodec streamCodec = null;
+  private transient StreamCodec<K> keystreamCodec = null;
+  private transient StreamCodec<V> valuestreamCodec = null;
+  private transient StreamCodec<List<V>> liststreamCodec = null;
   private boolean isKeyContainsMultiValue = false;
   private long timeBucket;
   @NotNull
@@ -67,6 +70,9 @@ public class ManagedTimeStateMultiValue<K,V> implements Spillable.SpillableListM
   {
     if (streamCodec == null) {
       streamCodec = new KryoSerializableStreamCodec();
+      keystreamCodec = new KryoSerializableStreamCodec<>();
+      valuestreamCodec = new KryoSerializableStreamCodec<>();
+      liststreamCodec = new KryoSerializableStreamCodec<>();
     }
   }
 
@@ -88,20 +94,21 @@ public class ManagedTimeStateMultiValue<K,V> implements Spillable.SpillableListM
   {
     List<V> value = null;
     Slice valueSlice = null;
-    ManagedData managedData = cache.get(streamCodec.toByteArray(k));
+    ManagedData managedData = cache.get(keystreamCodec.toByteArray(k));
     if (managedData != null) {
       valueSlice = managedData.getValue();
     } else {
-      valueSlice = store.getSync(getBucketId(k), streamCodec.toByteArray(k));
+      valueSlice = store.getSync(getBucketId(k), keystreamCodec.toByteArray(k));
     }
     if (valueSlice == null || valueSlice.length == 0 || valueSlice.buffer == null) {
       return null;
     }
     if (isKeyContainsMultiValue) {
-      return (List<V>)streamCodec.fromByteArray(valueSlice);
+      return (List<V>)liststreamCodec.fromByteArray(valueSlice);
+      //return (List<V>)streamCodec.fromByteArray(valueSlice);
     }
     value = new ArrayList<>();
-    value.add((V)streamCodec.fromByteArray(valueSlice));
+    value.add((V)valuestreamCodec.fromByteArray(valueSlice));
     return  value;
   }
 
@@ -112,11 +119,11 @@ public class ManagedTimeStateMultiValue<K,V> implements Spillable.SpillableListM
    */
   public CompositeFuture getAsync(@Nullable K k)
   {
-    ManagedData managedData = cache.get(streamCodec.toByteArray(k));
+    ManagedData managedData = cache.get(keystreamCodec.toByteArray(k));
     if (managedData != null) {
-      return new CompositeFuture(Futures.immediateFuture(managedData.getValue()));
+      return new CompositeFuture(Futures.immediateFuture(managedData.getValue()), valuestreamCodec, liststreamCodec);
     }
-    return new CompositeFuture(store.getAsync(getBucketId(k), streamCodec.toByteArray(k)));
+    return new CompositeFuture(store.getAsync(getBucketId(k), keystreamCodec.toByteArray(k)), valuestreamCodec, liststreamCodec);
   }
 
   @Override
@@ -199,20 +206,20 @@ public class ManagedTimeStateMultiValue<K,V> implements Spillable.SpillableListM
       return false;
     }
     if (isKeyContainsMultiValue) {
-      Slice keySlice = streamCodec.toByteArray(k);
+      Slice keySlice = keystreamCodec.toByteArray(k);
       long bucketId = getBucketId(k);
       Slice valueSlice = store.getSync(bucketId, keySlice);
       List<V> listOb;
       if (valueSlice == null || valueSlice.length == 0) {
         listOb = new ArrayList<>();
       } else {
-        listOb = (List<V>)streamCodec.fromByteArray(valueSlice);
+        listOb = (List<V>)liststreamCodec.fromByteArray(valueSlice);
       }
       listOb.add(v);
-      cache.put(keySlice, new ManagedData((int)bucketId, timeBucket, streamCodec.toByteArray(listOb)));
+      cache.put(keySlice, new ManagedData((int)bucketId, timeBucket, liststreamCodec.toByteArray(listOb)));
       //return insertInStore(bucketId, timeBucket, keySlice, streamCodec.toByteArray(listOb));
     } else {
-      cache.put(streamCodec.toByteArray(k), new ManagedData((int)getBucketId(k), timeBucket, streamCodec.toByteArray(v)));
+      cache.put(streamCodec.toByteArray(k), new ManagedData((int)getBucketId(k), timeBucket, valuestreamCodec.toByteArray(v)));
     }
     return true;
     //return insertInStore(getBucketId(k), timeBucket, streamCodec.toByteArray(k),streamCodec.toByteArray(v));
@@ -232,20 +239,20 @@ public class ManagedTimeStateMultiValue<K,V> implements Spillable.SpillableListM
       return false;
     }
     if (isKeyContainsMultiValue) {
-      Slice keySlice = streamCodec.toByteArray(k);
+      Slice keySlice = keystreamCodec.toByteArray(k);
       long bucketId = getBucketId(k);
       Slice valueSlice = store.getSync(bucketId, keySlice);
       List<V> listOb;
       if (valueSlice == null || valueSlice.length == 0) {
         listOb = new ArrayList<>();
       } else {
-        listOb = (List<V>)streamCodec.fromByteArray(valueSlice);
+        listOb = (List<V>)liststreamCodec.fromByteArray(valueSlice);
       }
       listOb.add(v);
-      cache.put(keySlice, new ManagedData((int)bucketId, timeBucket, streamCodec.toByteArray(listOb)));
+      cache.put(keySlice, new ManagedData((int)bucketId, timeBucket, liststreamCodec.toByteArray(listOb)));
       //return insertInStore(bucketId, timeBucket, keySlice, streamCodec.toByteArray(listOb));
     } else {
-      cache.put(streamCodec.toByteArray(k), new ManagedData((int)getBucketId(k), timeBucket, streamCodec.toByteArray(v)));
+      cache.put(streamCodec.toByteArray(k), new ManagedData((int)getBucketId(k), timeBucket, valuestreamCodec.toByteArray(v)));
     }
     return true;
     //return insertInStore(getBucketId(k), timeBucket, streamCodec.toByteArray(k),streamCodec.toByteArray(v));
@@ -334,13 +341,17 @@ public class ManagedTimeStateMultiValue<K,V> implements Spillable.SpillableListM
     cache.clear();
   }
 
-  public class CompositeFuture implements Future<List>
+  public class CompositeFuture implements Future<List<V>>
   {
     public Future<Slice> slice;
+    private StreamCodec<V> valuestreamCodec = null;
+    private StreamCodec<List<V>> liststreamCodec = null;
 
-    public CompositeFuture(Future<Slice> slice)
+    public CompositeFuture(Future<Slice> slice, StreamCodec<V> valuestreamCodec, StreamCodec<List<V>> liststreamCodec)
     {
       this.slice = slice;
+      this.valuestreamCodec = valuestreamCodec;
+      this.liststreamCodec = liststreamCodec;
     }
 
     @Override
@@ -368,7 +379,7 @@ public class ManagedTimeStateMultiValue<K,V> implements Spillable.SpillableListM
      * @throws ExecutionException
      */
     @Override
-    public List get() throws InterruptedException, ExecutionException
+    public List<V> get() throws InterruptedException, ExecutionException
     {
       List<V> value = null;
       Slice valueSlice = slice.get();
@@ -376,16 +387,16 @@ public class ManagedTimeStateMultiValue<K,V> implements Spillable.SpillableListM
         return null;
       }
       if (isKeyContainsMultiValue) {
-        value = (List<V>)streamCodec.fromByteArray(valueSlice);
+        value = (List<V>)liststreamCodec.fromByteArray(valueSlice);
       }  else {
         value = new ArrayList<>();
-        value.add((V)streamCodec.fromByteArray(valueSlice));
+        value.add((V)valuestreamCodec.fromByteArray(valueSlice));
       }
       return value;
     }
 
     @Override
-    public List get(long l, TimeUnit timeUnit) throws InterruptedException, ExecutionException, TimeoutException
+    public List<V> get(long l, TimeUnit timeUnit) throws InterruptedException, ExecutionException, TimeoutException
     {
       throw new UnsupportedOperationException();
     }
