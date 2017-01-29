@@ -97,14 +97,16 @@ public abstract class AbstractManagedStateInnerJoinOperator<K,T> extends Abstrac
     }
     Spillable.SpillableListMultimap<K, T> valuestore = isStream1Data ? stream2Data : stream1Data;
     Future<List> future = ((ManagedTimeStateMultiValue)valuestore).getAsync(key);
-    if (future.isDone()) {
-      try {
-        joinStream(tuple,isStream1Data, future.get());
-      } catch (InterruptedException | ExecutionException e) {
-        throw new RuntimeException(e);
+    if (future != null) {
+      if (future.isDone()) {
+        try {
+          joinStream(tuple,isStream1Data, future.get());
+        } catch (InterruptedException | ExecutionException e) {
+          throw new RuntimeException(e);
+        }
+      } else {
+        waitingEvents.put(new JoinEvent<>(key,tuple,isStream1Data),future);
       }
-    } else {
-      waitingEvents.put(new JoinEvent<>(key,tuple,isStream1Data),future);
     }
   }
 
@@ -141,8 +143,6 @@ public abstract class AbstractManagedStateInnerJoinOperator<K,T> extends Abstrac
   public void setup(Context.OperatorContext context)
   {
     super.setup(context);
-    stream1Data = new ManagedTimeStateMultiValue(stream1Store, !isLeftKeyPrimary());
-    stream2Data = new ManagedTimeStateMultiValue(stream2Store, !isRightKeyPrimary());
     ((FileAccessFSImpl)stream1Store.getFileAccess()).setBasePath(context.getValue(DAG.APPLICATION_PATH) + Path.SEPARATOR + stateDir + Path.SEPARATOR + String.valueOf(context.getId()) + Path.SEPARATOR + stream1State);
     ((FileAccessFSImpl)stream2Store.getFileAccess()).setBasePath(context.getValue(DAG.APPLICATION_PATH) + Path.SEPARATOR + stateDir + Path.SEPARATOR + String.valueOf(context.getId()) + Path.SEPARATOR + stream2State);
     stream1Store.getCheckpointManager().setStatePath("managed_state_" + stream1State);
@@ -162,7 +162,8 @@ public abstract class AbstractManagedStateInnerJoinOperator<K,T> extends Abstrac
     stream1Store.setup(context);
     stream2Store.setup(context);
     assert stream1Store.getTimeBucketAssigner() == stream2Store.getTimeBucketAssigner();
-
+    stream1Data = new ManagedTimeStateMultiValue(stream1Store, !isLeftKeyPrimary());
+    stream2Data = new ManagedTimeStateMultiValue(stream2Store, !isRightKeyPrimary());
   }
 
   @Override
