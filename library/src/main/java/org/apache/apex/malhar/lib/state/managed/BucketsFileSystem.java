@@ -157,7 +157,7 @@ public class BucketsFileSystem implements ManagedStateComponent
       timeBucketedKeys.put(timeBucketId, entry.getKey(), entry.getValue());
       //LOG.info("writeBucketData: {} -> {} -> {}", windowId, ((FileAccessFSImpl)managedStateContext.getFileAccess()).getBasePath(), sliceData);
     }
-
+    String[] arr = ((FileAccessFSImpl)managedStateContext.getFileAccess()).getBasePath().split("/");
     for (long timeBucket : timeBucketedKeys.rowKeySet()) {
       BucketsFileSystem.MutableTimeBucketMeta tbm = getMutableTimeBucketMeta(bucketId, timeBucket);
       if (tbm == null) {
@@ -214,14 +214,38 @@ public class BucketsFileSystem implements ManagedStateComponent
       }
       fileWriter.close();
       rename(bucketId, tmpFileName, getFileName(timeBucket));
-      LOG.info("writeBucketData: Rename - 1 :  {} -> {} -> {} -> {} ", windowId, timeBucket, firstKey, ((FileAccessFSImpl)managedStateContext.getFileAccess()).getBasePath());
+      LOG.info("writeBucketData: Rename - 1 :  {} -> {} -> {} -> {} ", timeBucket, windowId, firstKey, ((FileAccessFSImpl)managedStateContext.getFileAccess()).getBasePath());
       tbm.updateTimeBucketMeta(windowId, dataSize, firstKey);
       updateTimeBuckets(tbm);
-      LOG.info("writeBucketData: Rename - 2:  {} -> {} -> {} -> {} -> {} ", windowId, timeBucket, timeBucketsMeta.get(bucketId, timeBucket).getFirstKey(), firstKey, ((FileAccessFSImpl)managedStateContext.getFileAccess()).getBasePath());
+      if (arr[arr.length - 1].contains("stream2Data")) {
+        printBucketMeta(bucketId);
+      }
+      //LOG.info("writeBucketData: Rename - 2:  {} -> {} -> {} -> {} -> {} ", timeBucket, windowId, timeBucketsMeta.get(bucketId, timeBucket).getFirstKey(), firstKey, ((FileAccessFSImpl)managedStateContext.getFileAccess()).getBasePath());
+      /*if (timeBucketsMeta.get(bucketId, 4053L) != null) {
+        LOG.info("writeBucketData: Rename - 2:  {} -> {} -> {} -> {} -> {} ", timeBucket, windowId, timeBucketsMeta.get(bucketId, 4053).getFirstKey(), firstKey, ((FileAccessFSImpl)managedStateContext.getFileAccess()).getBasePath());
+      }*/
     }
 
     updateBucketMetaFile(bucketId);
   }
+
+  void printBucketMeta(long bucketId) throws IOException
+  {
+    synchronized (timeBucketsMeta) {
+      Map<Long, MutableTimeBucketMeta> timeBuckets = timeBucketsMeta.row(bucketId);
+
+      Preconditions.checkNotNull(timeBuckets, "timeBuckets");
+      Map<Long, Slice> bucketMetas = new HashMap<>();
+
+      for (Map.Entry<Long, MutableTimeBucketMeta> entry : timeBuckets.entrySet()) {
+        MutableTimeBucketMeta tbm = entry.getValue();
+        bucketMetas.put(tbm.getTimeBucketId(), tbm.getFirstKey());
+      }
+      LOG.info("printBucketMeta : {} -> {} -> {}", bucketId, ((FileAccessFSImpl)managedStateContext.getFileAccess()).getBasePath(), bucketMetas.toString());
+      bucketMetas.clear();
+    }
+  }
+
 
   /**
    * Retrieves the time bucket meta of a particular time-bucket. If the time bucket doesn't exist then a new one
@@ -236,6 +260,7 @@ public class BucketsFileSystem implements ManagedStateComponent
   private MutableTimeBucketMeta getMutableTimeBucketMeta(long bucketId, long timeBucketId) throws IOException
   {
     synchronized (timeBucketsMeta) {
+      LOG.info("getMutableTimeBucketMeta: {} -> {}", bucketId, timeBucketId);
       return timeBucketMetaHelper(bucketId, timeBucketId);
     }
   }
@@ -244,8 +269,12 @@ public class BucketsFileSystem implements ManagedStateComponent
   {
     Preconditions.checkNotNull(mutableTimeBucketMeta, "mutable time bucket meta");
     synchronized (timeBucketsMeta) {
-      timeBucketsMeta.put(mutableTimeBucketMeta.getBucketId(), mutableTimeBucketMeta.getTimeBucketId(),
-          mutableTimeBucketMeta);
+      if (timeBucketsMeta.get(mutableTimeBucketMeta.getBucketId(), mutableTimeBucketMeta.getTimeBucketId()) != null) {
+        timeBucketsMeta.get(mutableTimeBucketMeta.getBucketId(), mutableTimeBucketMeta.getTimeBucketId()).setFirstKey(mutableTimeBucketMeta.getFirstKey());
+      } else {
+        timeBucketsMeta.put(mutableTimeBucketMeta.getBucketId(), mutableTimeBucketMeta.getTimeBucketId(), mutableTimeBucketMeta);
+      }
+      LOG.info("UpdateTimeBuckets: {} -> {} -> {} -> {} -> {}", mutableTimeBucketMeta.getBucketId(), mutableTimeBucketMeta.getTimeBucketId(), mutableTimeBucketMeta.getFirstKey(), timeBucketsMeta.get(mutableTimeBucketMeta.getBucketId(), mutableTimeBucketMeta.getTimeBucketId()).getFirstKey(), ((FileAccessFSImpl)managedStateContext.getFileAccess()).getBasePath());
     }
   }
 
@@ -266,6 +295,7 @@ public class BucketsFileSystem implements ManagedStateComponent
   public TimeBucketMeta getTimeBucketMeta(long bucketId, long timeBucketId) throws IOException
   {
     synchronized (timeBucketsMeta) {
+      LOG.info("getTimeBucketMeta: {} -> {}", bucketId, timeBucketId);
       MutableTimeBucketMeta tbm = timeBucketMetaHelper(bucketId, timeBucketId);
       if (tbm != null) {
         return tbm.getImmutableTimeBucketMeta();
@@ -284,17 +314,12 @@ public class BucketsFileSystem implements ManagedStateComponent
    */
   private MutableTimeBucketMeta timeBucketMetaHelper(long bucketId, long timeBucketId) throws IOException
   {
-    MutableTimeBucketMeta tbm = timeBucketsMeta.get(bucketId, timeBucketId);
-    if (tbm != null) {
-      return tbm;
-    }
-    if (exists(bucketId, META_FILE_NAME)) {
+    LOG.info("timeBucketMetaHelper: {} -> {}", bucketId, timeBucketId);
+    if (!timeBucketsMeta.containsRow(bucketId) && exists(bucketId, META_FILE_NAME)) {
       try (DataInputStream dis = getInputStream(bucketId, META_FILE_NAME)) {
         //Load meta info of all the time buckets of the bucket identified by bucketId.
         loadBucketMetaFile(bucketId, dis);
       }
-    } else {
-      return null;
     }
     return timeBucketsMeta.get(bucketId, timeBucketId);
   }
@@ -341,7 +366,7 @@ public class BucketsFileSystem implements ManagedStateComponent
    */
   private void loadBucketMetaFile(long bucketId, DataInputStream dis) throws IOException
   {
-    LOG.debug("Loading bucket meta-file {}", bucketId);
+    LOG.info("Loading bucket meta-file {}", bucketId);
     int metaDataVersion = dis.readInt();
 
     if (metaDataVersion == META_FILE_VERSION) {
@@ -436,6 +461,7 @@ public class BucketsFileSystem implements ManagedStateComponent
   void invalidateTimeBucket(long bucketId, long timeBucketId) throws IOException
   {
     synchronized (timeBucketsMeta) {
+      LOG.info("invalidateTimeBucket: {} -> {}", bucketId, timeBucketId);
       timeBucketsMeta.remove(bucketId, timeBucketId);
     }
     updateBucketMetaFile(bucketId);
@@ -494,6 +520,11 @@ public class BucketsFileSystem implements ManagedStateComponent
     public Slice getFirstKey()
     {
       return firstKey;
+    }
+
+    public void setFirstKey(Slice firstKey)
+    {
+      this.firstKey = firstKey;
     }
 
     @Override
@@ -561,18 +592,20 @@ public class BucketsFileSystem implements ManagedStateComponent
       super.lastTransferredWindowId = lastTransferredWindow;
       super.sizeInBytes = bytes;
       super.firstKey = Preconditions.checkNotNull(firstKey, "first key");
+      LOG.info("updateTimeBucketMeta: {} -> {} -> {} -> {} -> {}", super.bucketId, super.timeBucketId, lastTransferredWindow, super.firstKey, changed);
     }
 
     synchronized TimeBucketMeta getImmutableTimeBucketMeta()
     {
       if (immutableTimeBucketMeta == null || changed) {
-
+        LOG.info("getImmutableTimeBucketMeta - 1: {} -> {}", getBucketId(), getTimeBucketId());
         immutableTimeBucketMeta = new TimeBucketMeta(getBucketId(), getTimeBucketId());
         immutableTimeBucketMeta.lastTransferredWindowId = getLastTransferredWindowId();
         immutableTimeBucketMeta.sizeInBytes = getSizeInBytes();
         immutableTimeBucketMeta.firstKey = getFirstKey();
         changed = false;
       }
+      LOG.info("getImmutableTimeBucketMeta - 2: {} -> {}", getBucketId(), getTimeBucketId());
       return immutableTimeBucketMeta;
     }
 
