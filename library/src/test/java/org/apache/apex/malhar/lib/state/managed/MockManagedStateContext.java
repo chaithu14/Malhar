@@ -32,6 +32,7 @@ class MockManagedStateContext implements ManagedStateContext
   private Comparator<Slice> keyComparator = new SliceComparator();
   private BucketsFileSystem bucketsFileSystem = new BucketsFileSystem();
   private MovingBoundaryTimeBucketAssigner timeBucketAssigner = new MovingBoundaryTimeBucketAssigner();
+  private IncrementalCheckpointManager checkpointManager = new IncrementalCheckpointManager();
 
   private final Context.OperatorContext operatorContext;
 
@@ -61,6 +62,12 @@ class MockManagedStateContext implements ManagedStateContext
   public MovingBoundaryTimeBucketAssigner getTimeBucketAssigner()
   {
     return timeBucketAssigner;
+  }
+
+  @Override
+  public IncrementalCheckpointManager getCheckpointManager()
+  {
+    return checkpointManager;
   }
 
   @Override

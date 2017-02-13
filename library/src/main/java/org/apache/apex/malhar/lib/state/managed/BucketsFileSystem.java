@@ -146,6 +146,9 @@ public class BucketsFileSystem implements ManagedStateComponent
 
     for (Map.Entry<Slice, Bucket.BucketedValue> entry : data.entrySet()) {
       long timeBucketId = entry.getValue().getTimeBucket();
+      if (timeBucketId <= managedStateContext.getCheckpointManager().getLatestPurgedTimeBucket()) {
+        continue;
+      }
       timeBucketedKeys.put(timeBucketId, entry.getKey(), entry.getValue());
     }
 
@@ -273,17 +276,11 @@ public class BucketsFileSystem implements ManagedStateComponent
    */
   private MutableTimeBucketMeta timeBucketMetaHelper(long bucketId, long timeBucketId) throws IOException
   {
-    MutableTimeBucketMeta tbm = timeBucketsMeta.get(bucketId, timeBucketId);
-    if (tbm != null) {
-      return tbm;
-    }
-    if (exists(bucketId, META_FILE_NAME)) {
+    if (!timeBucketsMeta.containsRow(bucketId) && exists(bucketId, META_FILE_NAME)) {
       try (DataInputStream dis = getInputStream(bucketId, META_FILE_NAME)) {
         //Load meta info of all the time buckets of the bucket identified by bucketId.
         loadBucketMetaFile(bucketId, dis);
       }
-    } else {
-      return null;
     }
     return timeBucketsMeta.get(bucketId, timeBucketId);
   }

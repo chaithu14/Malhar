@@ -361,6 +361,10 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
      */
     private BucketedValue getValueFromTimeBucketReader(Slice key, long timeBucket)
     {
+
+      if (timeBucket <= ((MovingBoundaryTimeBucketAssigner)managedStateContext.getTimeBucketAssigner()).getLowestPurgeableTimeBucket()) {
+        return null;
+      }
       FileAccess.FileReader fileReader = readers.get(timeBucket);
       if (fileReader != null) {
         return readValue(fileReader, key, timeBucket);
@@ -468,8 +472,9 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
             reader.close();
           }
         }
+        cachedBucketMetas.clear();
       }
-
+      cachedBucketMetas = null;
       sizeInBytes.getAndAdd(-memoryFreed);
 
       //add the windowId to the queue to let operator thread release memory from keyStream and valueStream
@@ -565,8 +570,6 @@ public interface Bucket extends ManagedStateComponent, KeyValueByteStreamProvide
           break;
         }
       }
-
-      cachedBucketMetas = null;
     }
 
     @Override

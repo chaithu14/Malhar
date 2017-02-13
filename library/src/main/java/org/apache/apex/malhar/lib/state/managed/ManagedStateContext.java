@@ -38,4 +38,6 @@ public interface ManagedStateContext
   BucketsFileSystem getBucketsFileSystem();
 
   TimeBucketAssigner getTimeBucketAssigner();
+
+  IncrementalCheckpointManager getCheckpointManager();
 }

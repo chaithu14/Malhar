@@ -54,6 +54,7 @@ public class MovingBoundaryTimeBucketAssigner extends TimeBucketAssigner
   private long start;
 
   private long end;
+  private long oldend;
 
   @NotNull
   private Instant referenceInstant = new Instant();
@@ -66,7 +67,7 @@ public class MovingBoundaryTimeBucketAssigner extends TimeBucketAssigner
 
   private int numBuckets;
   private transient long fixedStart;
-  private transient boolean triggerPurge;
+  private transient boolean triggerPurge = false;
   private transient long lowestPurgeableTimeBucket = -1;
 
 
@@ -82,6 +83,7 @@ public class MovingBoundaryTimeBucketAssigner extends TimeBucketAssigner
       bucketSpanMillis = getBucketSpan().getMillis();
       numBuckets = (int)((expireBefore.getMillis() + bucketSpanMillis - 1) / bucketSpanMillis);
       end = start + (numBuckets * bucketSpanMillis);
+      oldend = end;
 
       setInitialized(true);
     }
@@ -125,9 +127,12 @@ public class MovingBoundaryTimeBucketAssigner extends TimeBucketAssigner
       long move = (diffInBuckets + 1) * bucketSpanMillis;
       start += move;
       end += move;
-      lowestPurgeableTimeBucket += diffInBuckets;
       // trigger purge when lower bound changes
-      triggerPurge = (diffInBuckets > 0);
+      if (((time - oldend) / bucketSpanMillis) > 0) {
+        triggerPurge = true;
+        oldend = end;
+        lowestPurgeableTimeBucket = ((start - fixedStart) / bucketSpanMillis) - 1;
+      }
     }
     return key;
 
@@ -178,4 +183,8 @@ public class MovingBoundaryTimeBucketAssigner extends TimeBucketAssigner
     this.expireBefore = expireBefore;
   }
 
+  public long getLowestPurgeableTimeBucket()
+  {
+    return lowestPurgeableTimeBucket;
+  }
 }
