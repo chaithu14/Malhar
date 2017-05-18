@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -273,6 +274,7 @@ public class KafkaSinglePortExactlyOnceOutputOperator<T> extends AbstractKafkaOu
       }
     }
 
+    logger.info("getPartitionsAndOffsets: {} -> {}", latest, parttionsAndOffset.toString());
     return parttionsAndOffset;
   }
 
@@ -285,23 +287,30 @@ public class KafkaSinglePortExactlyOnceOutputOperator<T> extends AbstractKafkaOu
 
     try {
       storedOffsets = (Map<Integer, Long>)this.windowDataManager.retrieve(windowId);
+      logger.info("RebuildPartialWindow - 1");
       currentOffsets = getPartitionsAndOffsets(true);
+      logger.info("RebuildPartialWindow - 2");
     } catch (IOException | ExecutionException | InterruptedException e) {
+      logger.info("RebuildPartialWindow - 3");
       throw new RuntimeException(e);
     }
 
+    logger.info("RebuildPartialWindow - 4");
     if (currentOffsets == null) {
       logger.info("No tuples found while building partial window " + windowDataManager.getLargestCompletedWindow());
       return;
     }
 
+    logger.info("RebuildPartialWindow - 5");
     if (storedOffsets == null) {
 
       logger.info("Stored offset not available, seeking to the beginning of the Kafka Partition.");
 
       try {
         storedOffsets = getPartitionsAndOffsets(false);
+        logger.info("RebuildPartialWindow - 6");
       } catch (ExecutionException | InterruptedException e) {
+        logger.info("RebuildPartialWindow - 7");
         throw new RuntimeException(e);
       }
     }
@@ -312,18 +321,23 @@ public class KafkaSinglePortExactlyOnceOutputOperator<T> extends AbstractKafkaOu
       topicPartitions.add(new TopicPartition(getTopic(), entry.getKey()));
     }
 
+    logger.info("RebuildPartialWindow - 8");
     consumer.assign(topicPartitions);
 
+    logger.info("RebuildPartialWindow - 9");
     for (Map.Entry<Integer, Long> entry : currentOffsets.entrySet()) {
       Long storedOffset = 0L;
       Integer currentPartition = entry.getKey();
       Long currentOffset = entry.getValue();
 
+      logger.info("rebuildP : {} -> {}", currentPartition, currentOffset);
       if (storedOffsets.containsKey(currentPartition)) {
         storedOffset = storedOffsets.get(currentPartition);
       }
 
+      logger.info("rebuildP - 1 : {} -> {}", currentPartition, storedOffset);
       if (storedOffset >= currentOffset) {
+        logger.info("rebuildP - 2 : {} -> {}", currentPartition, storedOffset);
         continue;
       }
 
@@ -336,11 +350,13 @@ public class KafkaSinglePortExactlyOnceOutputOperator<T> extends AbstractKafkaOu
 
       int kafkaAttempt = 0;
 
+      logger.info("Before While: {}", currentPartition);
       while (true) {
 
         ConsumerRecords<String, T> consumerRecords = consumer.poll(100);
 
         if (consumerRecords.count() == 0) {
+          logger.info("Records count = 0: {}", currentPartition);
           if (kafkaAttempt++ == KAFKA_CONNECT_ATTEMPT) {
             break;
           }
@@ -349,8 +365,13 @@ public class KafkaSinglePortExactlyOnceOutputOperator<T> extends AbstractKafkaOu
         }
 
         boolean crossedBoundary = false;
-
+        logger.info("Size of Consumers - 1: {}", consumerRecords.count());
         for (ConsumerRecord<String, T> consumerRecord : consumerRecords) {
+
+          if (consumerRecord.offset() >= currentOffset) {
+            crossedBoundary = true;
+            break;
+          }
 
           if (!doesKeyBelongsToThisInstance(operatorId, consumerRecord.key())) {
             continue;
@@ -365,17 +386,16 @@ public class KafkaSinglePortExactlyOnceOutputOperator<T> extends AbstractKafkaOu
             partialWindowTuples.put(value, 1);
           }
 
-          if (consumerRecord.offset() >= currentOffset) {
-            crossedBoundary = true;
-            break;
-          }
-        }
+          logger.info("Count of value: {} -> {}", consumerRecord.offset(), currentOffset);
 
+        }
+        logger.info("Size of Consumers - 2: {}", consumerRecords.count());
         if (crossedBoundary) {
           break;
         }
       }
     }
+    logger.info("RebuildPartialWindow - 10");
   }
 
   private KafkaConsumer KafkaConsumerInit()
@@ -395,7 +415,7 @@ public class KafkaSinglePortExactlyOnceOutputOperator<T> extends AbstractKafkaOu
       return;
     }
 
-    getProducer().send(new ProducerRecord<>(getTopic(), key, tuple), new Callback()
+    Future<RecordMetadata> metadata = getProducer().send(new ProducerRecord<>(getTopic(), key, tuple), new Callback()
     {
       public void onCompletion(RecordMetadata metadata, Exception e)
       {
@@ -405,6 +425,9 @@ public class KafkaSinglePortExactlyOnceOutputOperator<T> extends AbstractKafkaOu
         }
       }
     });
+    if (metadata.isDone()) {
+      //metadata.get().partition()
+    }
   }
 
   private static final Logger logger = LoggerFactory.getLogger(KafkaSinglePortExactlyOnceOutputOperator.class);

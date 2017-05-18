@@ -19,8 +19,6 @@
 package org.apache.apex.examples.kafka.exactlyonceoutput;
 
 import org.apache.apex.malhar.kafka.KafkaSinglePortExactlyOnceOutputOperator;
-import org.apache.apex.malhar.kafka.KafkaSinglePortInputOperator;
-import org.apache.apex.malhar.kafka.KafkaSinglePortOutputOperator;
 import org.apache.hadoop.conf.Configuration;
 
 import com.datatorrent.api.DAG;
@@ -69,14 +67,14 @@ public class Application implements StreamingApplication
   {
 
     BatchSequenceGenerator sequenceGenerator = dag.addOperator("sequenceGenerator", BatchSequenceGenerator.class);
-    PassthroughFailOperator passthroughFailOperator = dag.addOperator("passthrough", PassthroughFailOperator.class);
+    //PassthroughFailOperator passthroughFailOperator = dag.addOperator("passthrough", PassthroughFailOperator.class);
     KafkaSinglePortExactlyOnceOutputOperator<String> kafkaExactlyOnceOutputOperator =
         dag.addOperator("kafkaExactlyOnceOutputOperator", KafkaSinglePortExactlyOnceOutputOperator.class);
-    KafkaSinglePortOutputOperator kafkaOutputOperator =
-        dag.addOperator("kafkaOutputOperator", KafkaSinglePortOutputOperator.class);
+    //KafkaSinglePortOutputOperator kafkaOutputOperator =
+    //    dag.addOperator("kafkaOutputOperator", KafkaSinglePortOutputOperator.class);
 
-    dag.addStream("sequenceToPassthrough", sequenceGenerator.out, passthroughFailOperator.input);
-    dag.addStream("linesToKafka", passthroughFailOperator.output, kafkaOutputOperator.inputPort,
+    dag.addStream("sequenceToPassthrough", sequenceGenerator.out, kafkaExactlyOnceOutputOperator.inputPort);
+    /*dag.addStream("linesToKafka", passthroughFailOperator.output, kafkaOutputOperator.inputPort,
         kafkaExactlyOnceOutputOperator.inputPort);
 
     KafkaSinglePortInputOperator kafkaInputTopicExactly = dag.addOperator("kafkaTopicExactly", KafkaSinglePortInputOperator.class);
@@ -88,7 +86,7 @@ public class Application implements StreamingApplication
     ValidationToFile validationToFile = dag.addOperator("validationToFile", ValidationToFile.class);
 
     dag.addStream("messagesFromExactly", kafkaInputTopicExactly.outputPort, validationToFile.topicExactlyInput);
-    dag.addStream("messagesFromAtLeast", kafkaInputTopicAtLeast.outputPort, validationToFile.topicAtLeastInput);
+    dag.addStream("messagesFromAtLeast", kafkaInputTopicAtLeast.outputPort, validationToFile.topicAtLeastInput);*/
 
   }
 }

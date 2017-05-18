@@ -29,12 +29,12 @@
   <!-- set maxTuplesTotal for both BatchSequenceGenerator and ValidationToFile -->
   <property>
     <name>dt.operator.(sequenceGenerator)|(validationToFile).prop.maxTuplesTotal</name>
-    <value>20</value>
+    <value>25000</value>
   </property>
   <!-- max tuples per window -->
   <property>
     <name>dt.operator.sequenceGenerator.prop.maxTuples</name>
-    <value>5</value>
+    <value>50</value>
   </property>
   <property>
     <name>dt.operator.passthrough.prop.directoryPath</name>
@@ -49,7 +49,7 @@
   <!-- KafkaExactlyOnceOutputOperator -->
   <property>
     <name>dt.operator.kafkaExactlyOnceOutputOperator.prop.topic</name>
-    <value>exactly-once</value>
+    <value>test5</value>
   </property>
   <property>
     <name>dt.operator.kafkaExactlyOnceOutputOperator.prop.properties(bootstrap.servers)</name>
@@ -62,6 +62,10 @@
   <property>
     <name>dt.operator.kafkaExactlyOnceOutputOperator.prop.properties(value.deserializer)</name>
     <value>org.apache.kafka.common.serialization.StringDeserializer</value>
+  </property>
+  <property>
+    <name>dt.operator.kafkaExactlyOnceOutputOperator.attr.PARTITIONER</name>
+    <value>com.datatorrent.common.partitioner.StatelessPartitioner:2</value>
   </property>
 
   <!-- KafkaOutputOperator -->
