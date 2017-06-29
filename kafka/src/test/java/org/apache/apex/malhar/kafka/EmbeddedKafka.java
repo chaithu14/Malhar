@@ -30,6 +30,7 @@ import java.util.Properties;
 import org.I0Itec.zkclient.ZkClient;
 
 import org.apache.commons.io.FileUtils;
+import org.apache.hadoop.util.TestZKUtil;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
@@ -54,8 +55,8 @@ public class EmbeddedKafka
 
   private ZkClient zkClient;
   private ZkUtils zkUtils;
-  private String BROKERHOST = "127.0.0.1";
-  private String BROKERPORT = "9092";
+  public String BROKERHOST = "127.0.0.1";
+  public String BROKERPORT = "9092";
   private EmbeddedZookeeper zkServer;
   private KafkaServer kafkaServer;
 
@@ -80,7 +81,6 @@ public class EmbeddedKafka
     String zkConnect = BROKERHOST + ":" + zkServer.port();
     zkClient = new ZkClient(zkConnect, 30000, 30000, ZKStringSerializer$.MODULE$);
     zkUtils = ZkUtils.apply(zkClient, false);
-
     // Setup brokers
     cleanupDir();
     Properties props = new Properties();
@@ -109,6 +109,15 @@ public class EmbeddedKafka
   public void createTopic(String topic)
   {
     AdminUtils.createTopic(zkUtils, topic, 1, 1, new Properties());
+    List<KafkaServer> servers = new ArrayList<KafkaServer>();
+    servers.add(kafkaServer);
+    TestUtils.waitUntilMetadataIsPropagated(scala.collection.JavaConversions.asScalaBuffer(servers), topic, 0, 30000);
+  }
+
+  public void createTopic(String topic, boolean hasMultiPartition)
+  {
+    int noOfPartitions = hasMultiPartition ? 2 : 1;
+    AdminUtils.createTopic(zkUtils, topic, noOfPartitions, 1, new Properties());
     List<KafkaServer> servers = new ArrayList<KafkaServer>();
     servers.add(kafkaServer);
     TestUtils.waitUntilMetadataIsPropagated(scala.collection.JavaConversions.asScalaBuffer(servers), topic, 0, 30000);

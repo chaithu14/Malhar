@@ -19,6 +19,7 @@
 package org.apache.apex.malhar.kafka;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
@@ -28,6 +29,7 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -55,14 +57,19 @@ import com.datatorrent.stram.StramLocalCluster;
  * own Kafka cluster.
  */
 @RunWith(Parameterized.class)
-public class KafkaInputOperatorTest extends KafkaOperatorTestBase
+public class KafkaInputOperatorTest
 {
-
+  public static String baseDir = "target";
+  public static final String TEST_TOPIC = "testtopic";
+  public static int testCounter = 0;
+  private EmbeddedKafka[] kafka = new EmbeddedKafka[2];
   private int totalBrokers = 0;
 
   private String partition = null;
 
   private String testName = "";
+  protected boolean hasMultiPartition = false;
+  protected boolean hasMultiCluster = false;
 
   public static String APPLICATION_PATH = baseDir + File.separator + StramLocalCluster.class.getName() + File.separator;
 
@@ -103,7 +110,7 @@ public class KafkaInputOperatorTest extends KafkaOperatorTestBase
   }
 
   @Before
-  public void before()
+  public void before() throws IOException
   {
     testName = TEST_TOPIC + testCounter++;
     logger.info("before() test case: {}", testName);
@@ -111,11 +118,27 @@ public class KafkaInputOperatorTest extends KafkaOperatorTestBase
     //reset count for next new test case
     k = 0;
 
-    createTopic(0, testName);
+    /*createTopic(0, testName);
     if (hasMultiCluster) {
       createTopic(1, testName);
+    }*/
+    kafka[0] = new EmbeddedKafka();
+    kafka[0].start();
+    kafka[0].createTopic(testName, hasMultiPartition);
+    if (hasMultiCluster) {
+      kafka[1] = new EmbeddedKafka();
+      kafka[1].start();
+      kafka[1].createTopic(testName, hasMultiPartition);
     }
+  }
 
+  @After
+  public void after() throws IOException
+  {
+    kafka[0].stop();
+    if (hasMultiCluster) {
+      kafka[1].stop();
+    }
   }
 
   public KafkaInputOperatorTest(boolean hasMultiCluster, boolean hasMultiPartition, String partition)
@@ -389,11 +412,13 @@ public class KafkaInputOperatorTest extends KafkaOperatorTestBase
 
   private String getClusterConfig()
   {
-    String l = "localhost:";
-    return l + TEST_KAFKA_BROKER_PORT[0][0] +
+    String l = kafka[0].BROKERHOST + ":" + kafka[0].BROKERPORT;
+    return l  +
+      (hasMultiCluster ? "," + kafka[1].BROKERHOST + ":" + kafka[1].BROKERPORT : "");
+    /*return l + TEST_KAFKA_BROKER_PORT[0][0] +
       (hasMultiPartition ? "," + l + TEST_KAFKA_BROKER_PORT[0][1] : "") +
       (hasMultiCluster ? ";" + l + TEST_KAFKA_BROKER_PORT[1][0] : "") +
-      (hasMultiCluster && hasMultiPartition ? "," + l + TEST_KAFKA_BROKER_PORT[1][1] : "");
+      (hasMultiCluster && hasMultiPartition ? "," + l + TEST_KAFKA_BROKER_PORT[1][1] : "");*/
   }
 
 }

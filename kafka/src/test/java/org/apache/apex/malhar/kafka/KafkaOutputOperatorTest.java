@@ -50,8 +50,12 @@ import static org.apache.kafka.clients.consumer.ConsumerConfig.GROUP_ID_CONFIG;
 import static org.apache.kafka.clients.consumer.ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG;
 import static org.apache.kafka.clients.consumer.ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG;
 
-public class KafkaOutputOperatorTest extends KafkaOperatorTestBase
+public class KafkaOutputOperatorTest
 {
+  public static String baseDir = "target";
+  public static final String TEST_TOPIC = "testtopic";
+  public static int testCounter = 0;
+  private EmbeddedKafka kafka;
   String testName;
   private static List<Person> tupleCollection = new LinkedList<>();
   private final String VALUE_DESERIALIZER = "org.apache.apex.malhar.kafka.KafkaHelper";
@@ -60,19 +64,19 @@ public class KafkaOutputOperatorTest extends KafkaOperatorTestBase
   public static String APPLICATION_PATH = baseDir + File.separator + "MyKafkaApp" + File.separator;
 
   @Before
-  public void before()
+  public void before() throws IOException
   {
     FileUtils.deleteQuietly(new File(APPLICATION_PATH));
     testName = TEST_TOPIC + testCounter++;
-    createTopic(0, testName);
-    if (hasMultiCluster) {
-      createTopic(1, testName);
-    }
+    kafka = new EmbeddedKafka();
+    kafka.start();
+    kafka.createTopic(testName);
   }
 
   @After
-  public void after()
+  public void after() throws IOException
   {
+    kafka.stop();
     FileUtils.deleteQuietly(new File(APPLICATION_PATH));
   }
 
@@ -280,11 +284,9 @@ public class KafkaOutputOperatorTest extends KafkaOperatorTestBase
 
   private String getClusterConfig()
   {
-    String l = "localhost:";
-    return l + TEST_KAFKA_BROKER_PORT[0][0] +
-      (hasMultiPartition ? "," + l + TEST_KAFKA_BROKER_PORT[0][1] : "") +
-      (hasMultiCluster ? ";" + l + TEST_KAFKA_BROKER_PORT[1][0] : "") +
-      (hasMultiCluster && hasMultiPartition ? "," + l + TEST_KAFKA_BROKER_PORT[1][1] : "");
+    String l = kafka.BROKERHOST + ":" + kafka.BROKERPORT;
+
+    return l;
   }
 
   private List<Person> GenerateList()
