@@ -52,16 +52,17 @@ import kafka.utils.ZkUtils;
 
 public class EmbeddedKafka
 {
-  private static final String KAFKA_PATH = "/tmp/kafka-test";
+  private static final String[] KAFKA_PATH = new String[]{"/tmp/kafka-test1","/tmp/kafka-test2"};
 
-  private ZkClient zkClient;
-  private ZkUtils zkUtils;
+  private ZkClient[] zkClient = new ZkClient[2];
+  private ZkUtils[] zkUtils = new ZkUtils[2];
   private String BROKERHOST = "localhost";
   private ZooKeeperServer[] zkServer = new ZooKeeperServer[2];
-  private KafkaServer kafkaServer;
+  private KafkaServer[] kafkaServer = new KafkaServer[2];
   public static final int[] TEST_ZOOKEEPER_PORT;
   public static final int[] TEST_KAFKA_BROKER_PORT;
   public static String baseDir = "target";
+  private int clusterId = 0;
 
   private static final String zkBaseDir = "zookeeper-server-data";
   private static final String kafkaBaseDir = "kafka-server-data";
@@ -134,31 +135,45 @@ public class EmbeddedKafka
 
   public void start() throws IOException
   {
-    FileUtils.deleteDirectory(new File(KAFKA_PATH));
+    FileUtils.deleteDirectory(new File(KAFKA_PATH[0]));
+    FileUtils.deleteDirectory(new File(KAFKA_PATH[1]));
     // Setup Zookeeper
     //zkServer = new EmbeddedZookeeper();
     startZookeeper(0);
     startZookeeper(1);
-    String zkConnect = BROKERHOST + ":" + TEST_ZOOKEEPER_PORT[0];
-    zkClient = new ZkClient(zkConnect, 30000, 30000, ZKStringSerializer$.MODULE$);
-    zkUtils = ZkUtils.apply(zkClient, false);
-
     // Setup brokers
     cleanupDir();
+    startBroker(0);
+    startBroker(1);
+  }
+
+  public void startBroker(int clusterId)
+  {
+    String zkConnect = BROKERHOST + ":" + TEST_ZOOKEEPER_PORT[clusterId];
+    zkClient[clusterId] = new ZkClient(zkConnect, 30000, 30000, ZKStringSerializer$.MODULE$);
+    zkUtils[clusterId] = ZkUtils.apply(zkClient[clusterId], false);
+
     Properties props = new Properties();
     props.setProperty("zookeeper.connect", zkConnect);
-    props.setProperty("broker.id", "0");
-    props.setProperty("log.dirs", KAFKA_PATH);
-    props.setProperty("listeners", "PLAINTEXT://" + BROKERHOST + ":" + TEST_KAFKA_BROKER_PORT[0]);
+    props.setProperty("broker.id", "" + clusterId);
+    props.setProperty("log.dirs", KAFKA_PATH[clusterId]);
+    props.setProperty("listeners", "PLAINTEXT://" + BROKERHOST + ":" + TEST_KAFKA_BROKER_PORT[clusterId]);
     KafkaConfig config = new KafkaConfig(props);
     Time mock = new MockTime();
-    kafkaServer = TestUtils.createServer(config, mock);
+    kafkaServer[clusterId] = TestUtils.createServer(config, mock);
+
+  }
+
+  public void stopBroker(int clusterId)
+  {
+    kafkaServer[clusterId].shutdown();
+    zkClient[clusterId].close();
   }
 
   public void stop() throws IOException
   {
-    kafkaServer.shutdown();
-    zkClient.close();
+    stopBroker(0);
+    stopBroker(1);
     stopZookeeper(0);
     stopZookeeper(1);
     cleanupDir();
@@ -166,21 +181,30 @@ public class EmbeddedKafka
 
   private void cleanupDir() throws IOException
   {
-    FileUtils.deleteDirectory(new File(KAFKA_PATH));
+    FileUtils.deleteDirectory(new File(KAFKA_PATH[0]));
+    FileUtils.deleteDirectory(new File(KAFKA_PATH[1]));
   }
 
   public void createTopic(String topic)
   {
-    AdminUtils.createTopic(zkUtils, topic, 1, 1, new Properties());
+    AdminUtils.createTopic(zkUtils[clusterId], topic, 1, 1, new Properties());
     List<KafkaServer> servers = new ArrayList<KafkaServer>();
-    servers.add(kafkaServer);
+    servers.add(kafkaServer[clusterId]);
+    TestUtils.waitUntilMetadataIsPropagated(scala.collection.JavaConversions.asScalaBuffer(servers), topic, 0, 30000);
+  }
+
+  public void createTopic(String topic, int clusterId)
+  {
+    AdminUtils.createTopic(zkUtils[clusterId], topic, 1, 1, new Properties());
+    List<KafkaServer> servers = new ArrayList<KafkaServer>();
+    servers.add(kafkaServer[clusterId]);
     TestUtils.waitUntilMetadataIsPropagated(scala.collection.JavaConversions.asScalaBuffer(servers), topic, 0, 30000);
   }
 
   public void publish(String topic, List<String> messages)
   {
     Properties producerProps = new Properties();
-    producerProps.setProperty("bootstrap.servers", BROKERHOST + ":" + TEST_KAFKA_BROKER_PORT[0]);
+    producerProps.setProperty("bootstrap.servers", BROKERHOST + ":" + TEST_KAFKA_BROKER_PORT[clusterId]);
     producerProps.setProperty("key.serializer", "org.apache.kafka.common.serialization.IntegerSerializer");
     producerProps.setProperty("value.serializer", "org.apache.kafka.common.serialization.ByteArraySerializer");
 
@@ -192,7 +216,7 @@ public class EmbeddedKafka
     }
 
     List<KafkaServer> servers = new ArrayList<KafkaServer>();
-    servers.add(kafkaServer);
+    servers.add(kafkaServer[clusterId]);
     TestUtils.waitUntilMetadataIsPropagated(scala.collection.JavaConversions.asScalaBuffer(servers), topic, 0, 30000);
   }
 
