@@ -20,6 +20,7 @@ package org.apache.apex.malhar.kafka;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -28,6 +29,7 @@ import java.util.List;
 import java.util.Properties;
 
 import org.I0Itec.zkclient.ZkClient;
+import org.slf4j.LoggerFactory;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
@@ -36,6 +38,9 @@ import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.utils.SystemTime;
+import org.apache.zookeeper.server.NIOServerCnxnFactory;
+import org.apache.zookeeper.server.ServerCnxnFactory;
+import org.apache.zookeeper.server.ZooKeeperServer;
 
 import kafka.admin.AdminUtils;
 import kafka.admin.RackAwareMode;
@@ -44,7 +49,6 @@ import kafka.server.KafkaServer;
 import kafka.utils.TestUtils;
 import kafka.utils.ZKStringSerializer$;
 import kafka.utils.ZkUtils;
-import kafka.zk.EmbeddedZookeeper;
 
 public class EmbeddedKafka
 {
@@ -53,23 +57,31 @@ public class EmbeddedKafka
   private ZkClient zkClient;
   private ZkUtils zkUtils;
   private String BROKERHOST = "localhost";
-  private EmbeddedZookeeper zkServer;
+  private ZooKeeperServer[] zkServer = new ZooKeeperServer[2];
   private KafkaServer kafkaServer;
   public static final int[] TEST_ZOOKEEPER_PORT;
   public static final int[] TEST_KAFKA_BROKER_PORT;
+  public static String baseDir = "target";
+
+  private static final String zkBaseDir = "zookeeper-server-data";
+  private static final String kafkaBaseDir = "kafka-server-data";
+  private static final String[] zkdir = new String[]{"zookeeper-server-data1", "zookeeper-server-data2"};
+  private static final String[] zklogdir = new String[]{"zookeeper-log-data1", "zookeeper-log-data2"};
+  private static ServerCnxnFactory[] zkFactory = new ServerCnxnFactory[2];
+  static final org.slf4j.Logger logger = LoggerFactory.getLogger(EmbeddedKafka.class);
 
   // get available ports
   static {
-    ServerSocket[] listeners = new ServerSocket[6];
-    int[] p = new int[6];
+    ServerSocket[] listeners = new ServerSocket[4];
+    int[] p = new int[4];
 
     try {
-      for (int i = 0; i < 6; i++) {
+      for (int i = 0; i < 4; i++) {
         listeners[i] = new ServerSocket(0);
         p[i] = listeners[i].getLocalPort();
       }
 
-      for (int i = 0; i < 6; i++) {
+      for (int i = 0; i < 4; i++) {
         listeners[i].close();
       }
     } catch (IOException e) {
@@ -78,6 +90,41 @@ public class EmbeddedKafka
 
     TEST_ZOOKEEPER_PORT = new int[]{p[0], p[1]};
     TEST_KAFKA_BROKER_PORT = new int[]{p[2], p[3]};
+  }
+
+  public void startZookeeper(int clusterId)
+  {
+    try {
+      int numConnections = 100;
+      int tickTime = 2000;
+      File snapshotDir;
+      File logDir;
+      try {
+        snapshotDir = java.nio.file.Files.createTempDirectory(zkdir[clusterId]).toFile();
+        logDir = java.nio.file.Files.createTempDirectory(zklogdir[clusterId]).toFile();
+      } catch (IOException e) {
+        throw new RuntimeException("Unable to start Kafka", e);
+      }
+
+      snapshotDir.deleteOnExit();
+      logDir.deleteOnExit();
+      zkServer[clusterId] = new ZooKeeperServer(snapshotDir, logDir, tickTime);
+      zkFactory[clusterId] = new NIOServerCnxnFactory();
+      zkFactory[clusterId].configure(new InetSocketAddress(TEST_ZOOKEEPER_PORT[clusterId]), numConnections);
+
+      zkFactory[clusterId].startup(zkServer[clusterId]); // start the zookeeper server.
+      Thread.sleep(2000);
+      //kserver.startup();
+    } catch (Exception ex) {
+      logger.error(ex.getLocalizedMessage());
+    }
+  }
+
+  public void stopZookeeper(int clusterId)
+  {
+    zkServer[clusterId].shutdown();
+    zkFactory[clusterId].closeAll();
+    zkFactory[clusterId].shutdown();
   }
 
   public String getBroker()
@@ -89,8 +136,10 @@ public class EmbeddedKafka
   {
     FileUtils.deleteDirectory(new File(KAFKA_PATH));
     // Setup Zookeeper
-    zkServer = new EmbeddedZookeeper();
-    String zkConnect = BROKERHOST + ":" + zkServer.port();
+    //zkServer = new EmbeddedZookeeper();
+    startZookeeper(0);
+    startZookeeper(1);
+    String zkConnect = BROKERHOST + ":" + TEST_ZOOKEEPER_PORT[0];
     zkClient = new ZkClient(zkConnect, 30000, 30000, ZKStringSerializer$.MODULE$);
     zkUtils = ZkUtils.apply(zkClient, false);
 
@@ -110,7 +159,8 @@ public class EmbeddedKafka
   {
     kafkaServer.shutdown();
     zkClient.close();
-    zkServer.shutdown();
+    stopZookeeper(0);
+    stopZookeeper(1);
     cleanupDir();
   }
 
