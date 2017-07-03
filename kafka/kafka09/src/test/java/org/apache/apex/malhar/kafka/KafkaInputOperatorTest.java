@@ -19,6 +19,7 @@
 package org.apache.apex.malhar.kafka;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
@@ -28,8 +29,10 @@ import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestWatcher;
@@ -49,13 +52,16 @@ import com.datatorrent.api.LocalMode;
 import com.datatorrent.common.util.BaseOperator;
 import com.datatorrent.stram.StramLocalCluster;
 
+import static org.apache.apex.malhar.kafka.KafkaOperatorTestBase.TEST_TOPIC;
+import static org.apache.apex.malhar.kafka.KafkaOperatorTestBase.baseDir;
+
 /**
  * A bunch of test to verify the input operator will be automatically partitioned
  * per kafka partition This test is launching its
  * own Kafka cluster.
  */
 @RunWith(Parameterized.class)
-public class KafkaInputOperatorTest extends KafkaOperatorTestBase
+public class KafkaInputOperatorTest
 {
 
   private int totalBrokers = 0;
@@ -63,6 +69,8 @@ public class KafkaInputOperatorTest extends KafkaOperatorTestBase
   private String partition = null;
 
   private String testName = "";
+  protected boolean hasMultiPartition = false;
+  protected boolean hasMultiCluster = false;
 
   public static String APPLICATION_PATH = baseDir + File.separator + StramLocalCluster.class.getName() + File.separator;
 
@@ -84,6 +92,7 @@ public class KafkaInputOperatorTest extends KafkaOperatorTestBase
     }
   }
 
+  private static EmbeddedKafka kafkaServer = new EmbeddedKafka();
   @Rule
   public final KafkaTestInfo testInfo = new KafkaTestInfo();
 
@@ -91,10 +100,10 @@ public class KafkaInputOperatorTest extends KafkaOperatorTestBase
   public static Collection<Object[]> testScenario()
   {
     return Arrays.asList(new Object[][]{
-      {true, false, "one_to_one"},// multi cluster with single partition
+      /*{true, false, "one_to_one"},// multi cluster with single partition
       {true, false, "one_to_many"},
       {true, true, "one_to_one"},// multi cluster with multi partitions
-      {true, true, "one_to_many"},
+      {true, true, "one_to_many"},*/
       {false, true, "one_to_one"}, // single cluster with multi partitions
       {false, true, "one_to_many"},
       {false, false, "one_to_one"}, // single cluster with single partitions
@@ -102,18 +111,38 @@ public class KafkaInputOperatorTest extends KafkaOperatorTestBase
     });
   }
 
+  @BeforeClass
+  public static void beforeClass()
+  {
+    try {
+      kafkaServer.start();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @AfterClass
+  public static void afterClass()
+  {
+    try {
+      kafkaServer.stop();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   @Before
   public void before()
   {
-    testName = TEST_TOPIC + testCounter++;
+    testName = TEST_TOPIC + KafkaOperatorTestBase.testCounter++;
     logger.info("before() test case: {}", testName);
     tupleCollection.clear();
     //reset count for next new test case
     k = 0;
 
-    createTopic(0, testName);
+    kafkaServer.createTopic(testName);
     if (hasMultiCluster) {
-      createTopic(1, testName);
+      //createTopic(1, testName);
     }
 
   }
@@ -302,7 +331,7 @@ public class KafkaInputOperatorTest extends KafkaOperatorTestBase
         testName, totalBrokers, hasFailure, hasMultiCluster, hasMultiPartition, partition);
 
     // Start producer
-    KafkaTestProducer p = new KafkaTestProducer(testName, hasMultiPartition, hasMultiCluster);
+    KafkaTestProducer p = new KafkaTestProducer(testName, hasMultiPartition, hasMultiCluster, kafkaServer.getBroker());
     p.setSendCount(totalCount);
     Thread t = new Thread(p);
     t.start();
@@ -390,8 +419,8 @@ public class KafkaInputOperatorTest extends KafkaOperatorTestBase
   private String getClusterConfig()
   {
     String l = "localhost:";
-    return l + TEST_KAFKA_BROKER_PORT[0] +
-      (hasMultiCluster ? ";" + l + TEST_KAFKA_BROKER_PORT[1] : "");
+    return kafkaServer.getBroker() /*+
+      (hasMultiCluster ? ";" + l + TEST_KAFKA_BROKER_PORT[1] : "")*/;
   }
 
 }

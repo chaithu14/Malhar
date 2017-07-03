@@ -35,13 +35,13 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.utils.SystemTime;
 
 import kafka.admin.AdminUtils;
+import kafka.admin.RackAwareMode;
 import kafka.server.KafkaConfig;
 import kafka.server.KafkaServer;
-import kafka.utils.MockTime;
 import kafka.utils.TestUtils;
-import kafka.utils.Time;
 import kafka.utils.ZKStringSerializer$;
 import kafka.utils.ZkUtils;
 import kafka.zk.EmbeddedZookeeper;
@@ -102,8 +102,8 @@ public class EmbeddedKafka
     props.setProperty("log.dirs", KAFKA_PATH);
     props.setProperty("listeners", "PLAINTEXT://" + BROKERHOST + ":" + TEST_KAFKA_BROKER_PORT[0]);
     KafkaConfig config = new KafkaConfig(props);
-    Time mock = new MockTime();
-    kafkaServer = TestUtils.createServer(config, mock);
+    kafkaServer = TestUtils.createServer(config, new SystemTime());
+    //kafkaServer = TestUtils.createServer(config, mock);
   }
 
   public void stop() throws IOException
@@ -121,9 +121,10 @@ public class EmbeddedKafka
 
   public void createTopic(String topic)
   {
-    AdminUtils.createTopic(zkUtils, topic, 1, 1, new Properties());
+    AdminUtils.createTopic(zkUtils, topic, 1, 1, new Properties(), RackAwareMode.Disabled$.MODULE$);
     List<KafkaServer> servers = new ArrayList<KafkaServer>();
     servers.add(kafkaServer);
+    //TestUtils.createTopic(zkUtils, topic, 1, 1, servers, new Properties());
     TestUtils.waitUntilMetadataIsPropagated(scala.collection.JavaConversions.asScalaBuffer(servers), topic, 0, 30000);
   }
 

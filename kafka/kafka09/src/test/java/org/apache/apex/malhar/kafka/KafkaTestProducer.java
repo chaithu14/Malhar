@@ -84,6 +84,23 @@ public class KafkaTestProducer implements Runnable
     return props;
   }
 
+  private Properties createProducerConfig(int cid, String brokerId)
+  {
+    Properties props = new Properties();
+    props.setProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+    props.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+    props.setProperty(ProducerConfig.PARTITIONER_CLASS_CONFIG, KafkaTestPartitioner.class.getName());
+    String brokerList = brokerId;
+    brokerList += hasPartition ? (",localhost:" + KafkaOperatorTestBase.TEST_KAFKA_BROKER_PORT[cid]) : "";
+    props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, brokerList);
+    props.setProperty(ProducerConfig.METADATA_MAX_AGE_CONFIG, "20000");
+    props.setProperty(ProducerConfig.ACKS_CONFIG, getAckType());
+    props.setProperty(ProducerConfig.RETRIES_CONFIG, "1");
+    props.setProperty(ProducerConfig.MAX_IN_FLIGHT_REQUESTS_PER_CONNECTION, "1");
+
+    return props;
+  }
+
   public KafkaTestProducer(String topic)
   {
     this(topic, false);
@@ -97,6 +114,21 @@ public class KafkaTestProducer implements Runnable
     this.hasPartition = hasPartition;
     this.hasMultiCluster = hasMultiCluster;
     producer = new KafkaProducer<>(createProducerConfig(0));
+    if (hasMultiCluster) {
+      producer1 = new KafkaProducer<>(createProducerConfig(1));
+    } else {
+      producer1 = null;
+    }
+  }
+
+  public KafkaTestProducer(String topic, boolean hasPartition, boolean hasMultiCluster, String broker)
+  {
+    // Use random partitioner. Don't need the key type. Just set it to Integer.
+    // The message is of type String.
+    this.topic = topic;
+    this.hasPartition = hasPartition;
+    this.hasMultiCluster = hasMultiCluster;
+    producer = new KafkaProducer<>(createProducerConfig(0, broker));
     if (hasMultiCluster) {
       producer1 = new KafkaProducer<>(createProducerConfig(1));
     } else {
