@@ -130,7 +130,12 @@ public class EmbeddedKafka
 
   public String getBroker()
   {
-    return BROKERHOST + ":" + TEST_KAFKA_BROKER_PORT[0];
+    return BROKERHOST + ":" + TEST_KAFKA_BROKER_PORT[clusterId];
+  }
+
+  public String getBroker(int clusterId)
+  {
+    return BROKERHOST + ":" + TEST_KAFKA_BROKER_PORT[clusterId];
   }
 
   public void start() throws IOException

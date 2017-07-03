@@ -121,16 +121,16 @@ public class KafkaTestProducer implements Runnable
     }
   }
 
-  public KafkaTestProducer(String topic, boolean hasPartition, boolean hasMultiCluster, String broker)
+  public KafkaTestProducer(String topic, boolean hasPartition, boolean hasMultiCluster, EmbeddedKafka server)
   {
     // Use random partitioner. Don't need the key type. Just set it to Integer.
     // The message is of type String.
     this.topic = topic;
     this.hasPartition = hasPartition;
     this.hasMultiCluster = hasMultiCluster;
-    producer = new KafkaProducer<>(createProducerConfig(0, broker));
+    producer = new KafkaProducer<>(createProducerConfig(0, server.getBroker(0)));
     if (hasMultiCluster) {
-      producer1 = new KafkaProducer<>(createProducerConfig(1));
+      producer1 = new KafkaProducer<>(createProducerConfig(1, server.getBroker(1)));
     } else {
       producer1 = null;
     }

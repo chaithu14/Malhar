@@ -100,10 +100,10 @@ public class KafkaInputOperatorTest
   public static Collection<Object[]> testScenario()
   {
     return Arrays.asList(new Object[][]{
-      /*{true, false, "one_to_one"},// multi cluster with single partition
+      {true, false, "one_to_one"},// multi cluster with single partition
       {true, false, "one_to_many"},
       {true, true, "one_to_one"},// multi cluster with multi partitions
-      {true, true, "one_to_many"},*/
+      {true, true, "one_to_many"},
       {false, true, "one_to_one"}, // single cluster with multi partitions
       {false, true, "one_to_many"},
       {false, false, "one_to_one"}, // single cluster with single partitions
@@ -135,14 +135,14 @@ public class KafkaInputOperatorTest
   public void before()
   {
     testName = TEST_TOPIC + KafkaOperatorTestBase.testCounter++;
-    logger.info("before() test case: {}", testName);
+    logger.info("before() test case: {} -> {} -> {} -> {}", testName, hasMultiCluster, hasMultiPartition, partition);
     tupleCollection.clear();
     //reset count for next new test case
     k = 0;
 
     kafkaServer.createTopic(testName);
     if (hasMultiCluster) {
-      //createTopic(1, testName);
+      kafkaServer.createTopic(testName, 1);
     }
 
   }
@@ -258,6 +258,7 @@ public class KafkaInputOperatorTest
       int countDownTupleSize = countDownAll ? tupleSize : endTuples;
 
       if (latch != null) {
+        logger.info("Tuples Size: {} -> {} -> {} -> {}", latch.getCount(), countDownTupleSize, tupleSize, endTuples);
         Assert.assertTrue(
             "received END_TUPLES more than expected.", latch.getCount() >= countDownTupleSize);
         while (countDownTupleSize > 0) {
@@ -302,6 +303,7 @@ public class KafkaInputOperatorTest
   @Test
   public void testInputOperator() throws Exception
   {
+    logger.info("--- testInputOperator");
     hasFailure = false;
     testInputOperator(false, false);
   }
@@ -309,6 +311,7 @@ public class KafkaInputOperatorTest
   @Test
   public void testInputOperatorWithFailure() throws Exception
   {
+    logger.info("--- testInputOperatorWithFailure");
     hasFailure = true;
     testInputOperator(true, false);
   }
@@ -316,6 +319,7 @@ public class KafkaInputOperatorTest
   @Test
   public void testIdempotentInputOperatorWithFailure() throws Exception
   {
+    logger.info("--- testIdempotentnputOperator");
     hasFailure = true;
     testInputOperator(true, true);
   }
@@ -331,7 +335,7 @@ public class KafkaInputOperatorTest
         testName, totalBrokers, hasFailure, hasMultiCluster, hasMultiPartition, partition);
 
     // Start producer
-    KafkaTestProducer p = new KafkaTestProducer(testName, hasMultiPartition, hasMultiCluster, kafkaServer.getBroker());
+    KafkaTestProducer p = new KafkaTestProducer(testName, hasMultiPartition, hasMultiCluster, kafkaServer);
     p.setSendCount(totalCount);
     Thread t = new Thread(p);
     t.start();
@@ -418,9 +422,8 @@ public class KafkaInputOperatorTest
 
   private String getClusterConfig()
   {
-    String l = "localhost:";
-    return kafkaServer.getBroker() /*+
-      (hasMultiCluster ? ";" + l + TEST_KAFKA_BROKER_PORT[1] : "")*/;
+    return kafkaServer.getBroker() +
+      (hasMultiCluster ? ";" + kafkaServer.getBroker(1) : "");
   }
 
 }
