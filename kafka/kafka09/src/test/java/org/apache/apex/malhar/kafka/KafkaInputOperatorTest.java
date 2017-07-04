@@ -52,9 +52,6 @@ import com.datatorrent.api.LocalMode;
 import com.datatorrent.common.util.BaseOperator;
 import com.datatorrent.stram.StramLocalCluster;
 
-import static org.apache.apex.malhar.kafka.KafkaOperatorTestBase.TEST_TOPIC;
-import static org.apache.apex.malhar.kafka.KafkaOperatorTestBase.baseDir;
-
 /**
  * A bunch of test to verify the input operator will be automatically partitioned
  * per kafka partition This test is launching its
@@ -72,7 +69,7 @@ public class KafkaInputOperatorTest
   protected boolean hasMultiPartition = false;
   protected boolean hasMultiCluster = false;
 
-  public static String APPLICATION_PATH = baseDir + File.separator + StramLocalCluster.class.getName() + File.separator;
+  public static String APPLICATION_PATH = EmbeddedKafka.baseDir + File.separator + StramLocalCluster.class.getName() + File.separator;
 
   public class KafkaTestInfo extends TestWatcher
   {
@@ -134,7 +131,7 @@ public class KafkaInputOperatorTest
   @Before
   public void before()
   {
-    testName = TEST_TOPIC + KafkaOperatorTestBase.testCounter++;
+    testName = EmbeddedKafka.TEST_TOPIC + EmbeddedKafka.testCounter++;
     logger.info("before() test case: {} -> {} -> {} -> {}", testName, hasMultiCluster, hasMultiPartition, partition);
     tupleCollection.clear();
     //reset count for next new test case
@@ -227,7 +224,7 @@ public class KafkaInputOperatorTest
         hasFailure = false;
         throw new RuntimeException();
       }
-      if (tuple.startsWith(KafkaOperatorTestBase.END_TUPLE)) {
+      if (tuple.startsWith(EmbeddedKafka.END_TUPLE)) {
         endTuples++;
       }
 
@@ -258,7 +255,6 @@ public class KafkaInputOperatorTest
       int countDownTupleSize = countDownAll ? tupleSize : endTuples;
 
       if (latch != null) {
-        logger.info("Tuples Size: {} -> {} -> {} -> {}", latch.getCount(), countDownTupleSize, tupleSize, endTuples);
         Assert.assertTrue(
             "received END_TUPLES more than expected.", latch.getCount() >= countDownTupleSize);
         while (countDownTupleSize > 0) {
@@ -303,7 +299,6 @@ public class KafkaInputOperatorTest
   @Test
   public void testInputOperator() throws Exception
   {
-    logger.info("--- testInputOperator");
     hasFailure = false;
     testInputOperator(false, false);
   }
@@ -311,7 +306,6 @@ public class KafkaInputOperatorTest
   @Test
   public void testInputOperatorWithFailure() throws Exception
   {
-    logger.info("--- testInputOperatorWithFailure");
     hasFailure = true;
     testInputOperator(true, false);
   }
@@ -319,7 +313,6 @@ public class KafkaInputOperatorTest
   @Test
   public void testIdempotentInputOperatorWithFailure() throws Exception
   {
-    logger.info("--- testIdempotentnputOperator");
     hasFailure = true;
     testInputOperator(true, true);
   }

@@ -73,8 +73,8 @@ public class KafkaTestProducer implements Runnable
     props.setProperty(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
     props.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
     props.setProperty(ProducerConfig.PARTITIONER_CLASS_CONFIG, KafkaTestPartitioner.class.getName());
-    String brokerList = "localhost:" + KafkaOperatorTestBase.TEST_KAFKA_BROKER_PORT[cid];
-    brokerList += hasPartition ? (",localhost:" + KafkaOperatorTestBase.TEST_KAFKA_BROKER_PORT[cid]) : "";
+    String brokerList = "localhost:" + EmbeddedKafka.TEST_KAFKA_BROKER_PORT[cid];
+    brokerList += hasPartition ? (",localhost:" + EmbeddedKafka.TEST_KAFKA_BROKER_PORT[cid]) : "";
     props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, brokerList);
     props.setProperty(ProducerConfig.METADATA_MAX_AGE_CONFIG, "20000");
     props.setProperty(ProducerConfig.ACKS_CONFIG, getAckType());
@@ -91,7 +91,7 @@ public class KafkaTestProducer implements Runnable
     props.setProperty(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
     props.setProperty(ProducerConfig.PARTITIONER_CLASS_CONFIG, KafkaTestPartitioner.class.getName());
     String brokerList = brokerId;
-    brokerList += hasPartition ? (",localhost:" + KafkaOperatorTestBase.TEST_KAFKA_BROKER_PORT[cid]) : "";
+    brokerList += hasPartition ? (",localhost:" + EmbeddedKafka.TEST_KAFKA_BROKER_PORT[cid]) : "";
     props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, brokerList);
     props.setProperty(ProducerConfig.METADATA_MAX_AGE_CONFIG, "20000");
     props.setProperty(ProducerConfig.ACKS_CONFIG, getAckType());
@@ -159,9 +159,9 @@ public class KafkaTestProducer implements Runnable
     }
     // produce the end tuple to let the test input operator know it's done produce messages
     for (int i = 0; i < (hasPartition ? 2 : 1); ++i) {
-      sendTasks.add(producer.send(new ProducerRecord<>(topic, "" + i, KafkaOperatorTestBase.END_TUPLE)));
+      sendTasks.add(producer.send(new ProducerRecord<>(topic, "" + i, EmbeddedKafka.END_TUPLE)));
       if (hasMultiCluster) {
-        sendTasks.add(producer1.send(new ProducerRecord<>(topic, "" + i, KafkaOperatorTestBase.END_TUPLE)));
+        sendTasks.add(producer1.send(new ProducerRecord<>(topic, "" + i, EmbeddedKafka.END_TUPLE)));
       }
     }
   }

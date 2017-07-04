@@ -63,6 +63,9 @@ public class EmbeddedKafka
   public static final int[] TEST_KAFKA_BROKER_PORT;
   public static String baseDir = "target";
   private int clusterId = 0;
+  public static final String TEST_TOPIC = "testtopic";
+  public static int testCounter = 0;
+  public static final String END_TUPLE = "END_TUPLE";
 
   private static final String zkBaseDir = "zookeeper-server-data";
   private static final String kafkaBaseDir = "kafka-server-data";

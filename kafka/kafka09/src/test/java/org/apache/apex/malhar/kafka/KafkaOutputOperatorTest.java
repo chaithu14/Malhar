@@ -26,8 +26,10 @@ import java.util.List;
 import java.util.Properties;
 
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import org.apache.apex.malhar.lib.wal.FSWindowDataManager;
@@ -49,23 +51,45 @@ import static org.apache.kafka.clients.consumer.ConsumerConfig.GROUP_ID_CONFIG;
 import static org.apache.kafka.clients.consumer.ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG;
 import static org.apache.kafka.clients.consumer.ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG;
 
-public class KafkaOutputOperatorTest extends KafkaOperatorTestBase
+public class KafkaOutputOperatorTest
 {
   String testName;
   private static List<Person> tupleCollection = new LinkedList<>();
+  private static EmbeddedKafka kafkaserver = new EmbeddedKafka();
   private final String VALUE_DESERIALIZER = "org.apache.apex.malhar.kafka.KafkaHelper";
   private final String VALUE_SERIALIZER = "org.apache.apex.malhar.kafka.KafkaHelper";
+  protected boolean hasMultiCluster = false;
 
-  public static String APPLICATION_PATH = baseDir + File.separator + "MyKafkaApp" + File.separator;
+  public static String APPLICATION_PATH = EmbeddedKafka.baseDir + File.separator + "MyKafkaApp" + File.separator;
+
+  @BeforeClass
+  public static void beforeClass()
+  {
+    try {
+      kafkaserver.start();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @AfterClass
+  public static void afterClass()
+  {
+    try {
+      kafkaserver.stop();
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
 
   @Before
   public void before()
   {
     FileUtils.deleteQuietly(new File(APPLICATION_PATH));
-    testName = TEST_TOPIC + testCounter++;
-    createTopic(0, testName);
+    testName = EmbeddedKafka.TEST_TOPIC + EmbeddedKafka.testCounter++;
+    kafkaserver.createTopic(testName, 0);
     if (hasMultiCluster) {
-      createTopic(1, testName);
+      kafkaserver.createTopic(testName, 1);
     }
   }
 
@@ -279,9 +303,8 @@ public class KafkaOutputOperatorTest extends KafkaOperatorTestBase
 
   private String getClusterConfig()
   {
-    String l = "localhost:";
-    return l + TEST_KAFKA_BROKER_PORT[0] +
-      (hasMultiCluster ? ";" + l + TEST_KAFKA_BROKER_PORT[1] : "");
+    return kafkaserver.getBroker(0) +
+      (hasMultiCluster ? ";" + kafkaserver.getBroker(1) : "");
   }
 
   private List<Person> GenerateList()

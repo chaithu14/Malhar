@@ -52,9 +52,6 @@ import com.datatorrent.api.LocalMode;
 import com.datatorrent.common.util.BaseOperator;
 import com.datatorrent.stram.StramLocalCluster;
 
-import static org.apache.apex.malhar.kafka.KafkaOperatorTestBase.TEST_TOPIC;
-import static org.apache.apex.malhar.kafka.KafkaOperatorTestBase.baseDir;
-
 /**
  * A bunch of test to verify the input operator will be automatically partitioned
  * per kafka partition This test is launching its
@@ -72,7 +69,7 @@ public class KafkaInputOperatorTest
   protected boolean hasMultiPartition = false;
   protected boolean hasMultiCluster = false;
 
-  public static String APPLICATION_PATH = baseDir + File.separator + StramLocalCluster.class.getName() + File.separator;
+  public static String APPLICATION_PATH = EmbeddedKafka.baseDir + File.separator + StramLocalCluster.class.getName() + File.separator;
 
   public class KafkaTestInfo extends TestWatcher
   {
@@ -134,8 +131,8 @@ public class KafkaInputOperatorTest
   @Before
   public void before()
   {
-    testName = TEST_TOPIC + KafkaOperatorTestBase.testCounter++;
-    logger.info("before() test case: {}", testName);
+    testName = EmbeddedKafka.TEST_TOPIC + EmbeddedKafka.testCounter++;
+    logger.info("before() test case: {} -> {} -> {} -> {}", testName, hasMultiCluster, hasMultiPartition, partition);
     tupleCollection.clear();
     //reset count for next new test case
     k = 0;
@@ -227,7 +224,7 @@ public class KafkaInputOperatorTest
         hasFailure = false;
         throw new RuntimeException();
       }
-      if (tuple.startsWith(KafkaOperatorTestBase.END_TUPLE)) {
+      if (tuple.startsWith(EmbeddedKafka.END_TUPLE)) {
         endTuples++;
       }
 
