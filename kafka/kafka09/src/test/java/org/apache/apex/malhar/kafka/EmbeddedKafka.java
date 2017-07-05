@@ -59,8 +59,8 @@ public class EmbeddedKafka
   private String BROKERHOST = "localhost";
   private ZooKeeperServer[] zkServer = new ZooKeeperServer[2];
   private KafkaServer[] kafkaServer = new KafkaServer[2];
-  public static final int[] TEST_ZOOKEEPER_PORT;
-  public static final int[] TEST_KAFKA_BROKER_PORT;
+  public static int[] TEST_ZOOKEEPER_PORT;
+  public static int[] TEST_KAFKA_BROKER_PORT;
   public static String baseDir = "target";
   private int clusterId = 0;
   public static final String TEST_TOPIC = "testtopic";
@@ -75,7 +75,8 @@ public class EmbeddedKafka
   static final org.slf4j.Logger logger = LoggerFactory.getLogger(EmbeddedKafka.class);
 
   // get available ports
-  static {
+  private void getAvailablePorts()
+  {
     ServerSocket[] listeners = new ServerSocket[4];
     int[] p = new int[4];
 
@@ -143,6 +144,7 @@ public class EmbeddedKafka
 
   public void start() throws IOException
   {
+    getAvailablePorts();
     FileUtils.deleteDirectory(new File(KAFKA_PATH[0]));
     FileUtils.deleteDirectory(new File(KAFKA_PATH[1]));
     // Setup Zookeeper
