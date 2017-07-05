@@ -132,7 +132,7 @@ public class KafkaInputOperatorTest
   public void before()
   {
     testName = EmbeddedKafka.TEST_TOPIC + EmbeddedKafka.testCounter++;
-    logger.info("before() test case: {} -> {} -> {} -> {}", testName, hasMultiCluster, hasMultiPartition, partition);
+    logger.warn("before() test case: {} -> {} -> {} -> {}", testName, hasMultiCluster, hasMultiPartition, partition);
     tupleCollection.clear();
     //reset count for next new test case
     k = 0;
@@ -141,7 +141,7 @@ public class KafkaInputOperatorTest
     if (hasMultiCluster) {
       kafkaServer.createTopic(testName, 1);
     }
-
+    logger.warn("after() test case: {} -> {} -> {} -> {}", testName, hasMultiCluster, hasMultiPartition, partition);
   }
 
   public KafkaInputOperatorTest(boolean hasMultiCluster, boolean hasMultiPartition, String partition)
@@ -299,6 +299,7 @@ public class KafkaInputOperatorTest
   @Test
   public void testInputOperator() throws Exception
   {
+    logger.warn("testInputOperator - {}, {}", testName, hasMultiCluster);
     hasFailure = false;
     testInputOperator(false, false);
   }
@@ -306,6 +307,7 @@ public class KafkaInputOperatorTest
   @Test
   public void testInputOperatorWithFailure() throws Exception
   {
+    logger.warn("testInputOperatorWithFailure - {}, {}", testName, hasMultiCluster);
     hasFailure = true;
     testInputOperator(true, false);
   }
@@ -313,6 +315,7 @@ public class KafkaInputOperatorTest
   @Test
   public void testIdempotentInputOperatorWithFailure() throws Exception
   {
+    logger.warn("testIdempotentInputOperatorWithFailure - {}, {}", testName, hasMultiCluster);
     hasFailure = true;
     testInputOperator(true, true);
   }
