@@ -214,6 +214,11 @@ public abstract class AbstractKafkaInputOperatorTest
       if (isIdempotentTest) {
         String key = operatorId + "," + currentWindowId;
         List<String> msgsInWin = tupleCollectedInWindow.get(key);
+        if (msgsInWin != null && hasFailure) {
+          logger.warn("end-Window: {} -> {}", msgsInWin.size(), key);
+        } else {
+          logger.warn("end-Window: {}", key);
+        }
         if (msgsInWin != null) {
           Assert.assertEquals(
               "replay messages should be exactly same as previous window", msgsInWin, windowTupleCollector);
@@ -231,6 +236,7 @@ public abstract class AbstractKafkaInputOperatorTest
       int countDownTupleSize = countDownAll ? tupleSize : endTuples;
 
       if (latch != null) {
+        logger.warn("END-TUPLES: {} -> {} -> {} -> {}", latch.getCount(), countDownTupleSize, tupleSize, endTuples);
         Assert.assertTrue(
             "received END_TUPLES more than expected.", latch.getCount() >= countDownTupleSize);
         while (countDownTupleSize > 0) {
@@ -302,7 +308,7 @@ public abstract class AbstractKafkaInputOperatorTest
   {
     // each broker should get a END_TUPLE message
     latch = new CountDownLatch(countDownAll ? totalCount + totalBrokers : totalBrokers);
-
+    logger.warn("testInputOperator: {} -> {}",latch.getCount(), totalBrokers);
     logger.info(
         "Test Case: name: {}; totalBrokers: {}; hasFailure: {}; hasMultiCluster: {};" +
         " hasMultiPartition: {}, partition: {}",
