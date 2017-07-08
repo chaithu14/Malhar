@@ -239,6 +239,11 @@ public abstract class AbstractKafkaInputOperatorTest
         logger.warn("END-TUPLES: {} -> {} -> {} -> {}", latch.getCount(), countDownTupleSize, tupleSize, endTuples);
         Assert.assertTrue(
             "received END_TUPLES more than expected.", latch.getCount() >= countDownTupleSize);
+        if (hasFailure && latch.getCount() != countDownTupleSize) {
+          tupleCollection.clear();
+          logger.warn("END-TUPLES - Failure: {} -> {} -> {} -> {}", latch.getCount(), countDownTupleSize, tupleSize, endTuples);
+          return;
+        }
         while (countDownTupleSize > 0) {
           latch.countDown();
           --countDownTupleSize;
