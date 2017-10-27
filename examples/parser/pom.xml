@@ -101,5 +101,10 @@
       <version>${apex.core.version}</version>
       <scope>provided</scope>
     </dependency>
+    <dependency>
+      <groupId>org.rocksdb</groupId>
+      <artifactId>rocksdbjni</artifactId>
+      <version>5.8.0</version>
+    </dependency>
   </dependencies>
 </project>

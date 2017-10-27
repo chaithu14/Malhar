@@ -44,7 +44,7 @@
   </property>
   <property>
     <name>dt.application.Kafka2HDFS.operator.kafkaIn.prop.clusters</name>
-    <value>localhost:9092</value>  <!-- broker (NOT zookeeper) address -->
+    <value>localhost:9093</value>  <!-- broker (NOT zookeeper) address -->
   </property>
 
   <!-- file output operator -->

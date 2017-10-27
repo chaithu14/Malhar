@@ -57,4 +57,16 @@
 		</name>
 		<value>Error:%s</value>
 	</property>
+	<property>
+		<name>dt.operator.Input.prop.maxTuplesPerWindow</name>
+		<value>1</value>
+	</property>
+	<property>
+		<name>dt.operator.Process.prop.maxInsertions</name>
+		<value>6000</value>
+	</property>
+	<property>
+		<name>dt.operator.Process.prop.basePath</name>
+		<value>/tmp/rocksDB/</value>
+	</property>
 </configuration>
